@@ -1,6 +1,6 @@
 # 外部通知事件（notifier）
 
-流水线除了把消息发回发起的对话，还可以在关键时刻调用本机的通知模块，例如把消息转发到企业内部 IM。req-kit 只定义调用方式和事件格式，不包含任何 IM 的实现；模板见 [notifiers/im-template.mjs](../notifiers/im-template.mjs)。
+流水线除了把消息发回发起的对话，还可以在关键时刻调用本机的通知模块，例如把消息转发到企业内部 IM。req-kit 只定义调用方式和事件格式，不包含任何 IM 的实现；模板见 `notifiers/im-template.mjs`（尚未搬运，见抽取计划 M1）。
 
 ## 配置
 
