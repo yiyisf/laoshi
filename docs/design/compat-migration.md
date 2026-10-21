@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | npm 包 | `paseo-req-kit` | `laoshi`（已确认可用） | `paseo-req-kit` 2.0 成为薄分发包 |
 | 命令 | `req`、`req-kit`、`paseo-req-kit`、`start-pipeline` | `laoshi` | 旧名全部保留为别名 |
-| 入口 skill | `/req`、`/req-setup`、`/req-doctor`、`/req-retro` | `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro` | **待定**，见 §6 |
+| 入口 skill | `/req`、`/req-setup`、`/req-doctor`、`/req-retro` | `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro` | **已决定**（[ADR 0005](../adr/0005-skill-names.md)）：`paseo-req-kit` 2.0 额外安装转发到 laoshi 的 `/req*` 薄 skill |
 | 机器配置目录 | `~/.req-kit/` | `~/.laoshi/` | 旧目录作回退读取；`REQ_KIT_HOME` 仍然有效，新增 `LAOSHI_HOME` |
 | 项目配置 | `.requirement-pipeline.json`、`.requirement-pipeline/`（含 `project-notes.md`、`verify.md`） | `.laoshi.json`、`.laoshi/` | 两者都读，新项目写新名；`laoshi migrate` 提供重命名但不强制（避免逼团队仓库提交改名） |
 | 功能目录 | `docs/features/<日期>-<名称>/` | 不变 | — |
@@ -59,7 +59,7 @@ npx laoshi migrate --apply  # 确认后执行
 
 ## 6. 待定
 
-- **skill 名**：`/req` 已经形成使用习惯，改名有学习成本；但保留 `/req` 会让 laoshi 的品牌和命令不一致。选项：（a）laoshi 用 `/laoshi*`，`paseo-req-kit` 2.0 额外安装转发到 laoshi 的 `/req*` 薄 skill；（b）laoshi 直接沿用 `/req*`。倾向（a），需要团队意见。
+- ~~skill 名~~：已决定，见 [ADR 0005](../adr/0005-skill-names.md)。仍待做的是转发薄 skill 的写法：只做命令转发和一句"这个命令已改名为 /laoshi"，不复制手册内容，避免两份手册漂移。
 - laoshi 的版本从 `0.1.0` 起，达到对等时发布 `1.0.0`，`paseo-req-kit` 2.0 依赖 `laoshi@^1`。
 - 内网文档站：laoshi 的站点和现有 req-kit 站点是并存还是替换，以及同步到内网 Git Pages 的流程，需要单独设计。
 - 现有对外材料（给技术领导的汇报稿、同事使用说明）在 2.0 之前保持对 req-kit 的描述，2.0 之后统一改口径。

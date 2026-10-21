@@ -7,12 +7,12 @@ npm 包名：**`laoshi`（已确认可用）**。
 ## 实施前的准备（本文档集之后、写代码之前）
 
 - [x] 能力契约：[contracts/agent-runtime.md](../../contracts/agent-runtime.md)
-- [x] 设计：[architecture](../design/architecture.md)、[adapter-guide](../design/adapter-guide.md)、[platform-vocabulary](../design/platform-vocabulary.md)、[init-bootstrap](../design/init-bootstrap.md)、[in-chat-orchestration](../design/in-chat-orchestration.md)、[state-v2](../design/state-v2.md)、[compat-migration](../design/compat-migration.md)
-- [x] 决策：ADR 0001~0004
+- [x] 设计：[internal-platform-adapter](../design/internal-platform-adapter.md)（草案）、[architecture](../design/architecture.md)、[adapter-guide](../design/adapter-guide.md)、[platform-vocabulary](../design/platform-vocabulary.md)、[init-bootstrap](../design/init-bootstrap.md)、[in-chat-orchestration](../design/in-chat-orchestration.md)、[state-v2](../design/state-v2.md)、[compat-migration](../design/compat-migration.md)
+- [x] 决策：ADR 0001~0005
 - [ ] **团队评审设计文档**，重点是各文档末尾的"待定"项（见本文末尾汇总）
 - [ ] **一个能访问 npm 的开发环境**：`npm install`、`npm run typecheck`、`npm test` 在 req-kit 1.13 上跑通，并记录基线结果（通过数、耗时）
 - [ ] 为 req-kit 1.13 补一份 `evals` 基线（`evals/baselines/1.13.0.md`），作为"对等"的比较对象
-- [ ] 拿到**内部 agent 平台的接口说明**（命令行或 HTTP），决定第二个适配器走哪条路
+- [ ] 拿到**内部 agent 平台的 CLI 说明**：已知能启动任务、恢复暂停的 HITL 会话并传入输入、取消等待中的 HITL 请求；待确认的五个问题见 [internal-platform-adapter §6](../design/internal-platform-adapter.md)（状态与 HITL 语义最关键）
 
 ## 里程碑
 
@@ -38,7 +38,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 完成标准：不依赖 Paseo，在一台只有编码 agent 命令行的机器上跑通一个 `evals/` 用例，"夸大"为零。
 
 ### M4 内部平台适配器
-- 依据接口说明选择：声明式描述（[init-bootstrap](../design/init-bootstrap.md)）或手写适配器。
+- 平台是 CLI 形态（轮询式 `wait`、HITL 映射），映射与缺口见 [internal-platform-adapter](../design/internal-platform-adapter.md)；据此选择声明式描述（[init-bootstrap](../design/init-bootstrap.md)）或手写适配器。
+- 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案。
 - 完成标准：能力矩阵、探针测试、至少一个端到端用例通过。
 
 ### M5 初始化 skill 与自检
@@ -66,7 +67,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 ## 待定项汇总（评审时逐条定）
 
-1. **skill 名**：`/laoshi*` 加 `paseo-req-kit` 2.0 的转发薄 skill，还是沿用 `/req*`？（[compat-migration §6](../design/compat-migration.md)）
+1. ~~skill 名~~：已决定 `/laoshi*`，`paseo-req-kit` 2.0 额外装转发薄 skill（[ADR 0005](../adr/0005-skill-names.md)）。
 2. **laoshi 版本号**：`0.1.0` 起、对等时 `1.0.0`，是否接受？
 3. **模式 B 的命令集**与"谁调用 `record`"。（[in-chat-orchestration §7](../design/in-chat-orchestration.md)）
 4. **锁定文件**放机器配置目录还是项目仓库。（[init-bootstrap §6](../design/init-bootstrap.md)）
