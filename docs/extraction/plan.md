@@ -8,7 +8,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 - [x] 能力契约：[contracts/agent-runtime.md](../../contracts/agent-runtime.md)
 - [x] 设计：[internal-platform-adapter](../design/internal-platform-adapter.md)（草案）、[architecture](../design/architecture.md)、[adapter-guide](../design/adapter-guide.md)、[platform-vocabulary](../design/platform-vocabulary.md)、[init-bootstrap](../design/init-bootstrap.md)、[in-chat-orchestration](../design/in-chat-orchestration.md)、[state-v2](../design/state-v2.md)、[compat-migration](../design/compat-migration.md)
-- [x] 决策：ADR 0001~0005
+- [x] 决策：ADR 0001~0005；[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)（确定性引擎 + 平台能力层，先手写后生成，提议）
+- [x] 分工与阶段门槛：[workstreams.md](workstreams.md)（5~6 人小队）
 - [ ] **团队评审设计文档**，重点是各文档末尾的"待定"项（见本文末尾汇总）
 - [ ] **一个能访问 npm 的开发环境**：`npm install`、`npm run typecheck`、`npm test` 在 req-kit 1.13 上跑通，并记录基线结果（通过数、耗时）
 - [ ] 为 req-kit 1.13 补一份 `evals` 基线（`evals/baselines/1.13.0.md`），作为"对等"的比较对象
@@ -32,6 +33,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 平台词汇表：先收敛 `messages.ts`、`launch.ts`、`control.ts`；加 CI 检查，核心里不得出现平台名。
 - 完成标准：核心目录中搜不到平台名；M1 的回归全部通过。
 
+> **顺序说明（ADR 0006）**：摸高平台就是内部平台，M4 优先于原计划，与 M3 并行；M5 的"生成"排在两个手写适配器之后。
+
 ### M3 无头 CLI 运行时（第一个非 Paseo 适配器）
 - 每个步骤 agent 是一个编码 agent 命令行的子进程；通知写文件或走外部通知器。
 - 同时抽出 `runConformance(adapter)`，让新适配器复用编排测试的期望。
@@ -39,11 +42,13 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 ### M4 内部平台适配器
 - 平台是 CLI 形态（轮询式 `wait`、HITL 映射），映射与缺口见 [internal-platform-adapter](../design/internal-platform-adapter.md)；据此选择声明式描述（[init-bootstrap](../design/init-bootstrap.md)）或手写适配器。
-- 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案。
+- 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案，且已确认引擎进程能在哪里运行。
+- 第一版**手写**，不生成；生成实验见 M5。
 - 完成标准：能力矩阵、探针测试、至少一个端到端用例通过。
 
 ### M5 初始化 skill 与自检
 - `laoshi init`（detect → probe → generate → review → lock → verify）、锁定文件、`laoshi doctor` 的哈希校验与能力矩阵。
+- 先做探针与锁定校验，再做"LLM 起草适配器"：以 M3、M4 手写适配器为真值，要求生成版本通过同一套一致性测试，并与手写版本能力矩阵一致。
 - 完成标准：对 M3、M4 的平台各跑一次 init，生成物经审阅后锁定，`doctor` 通过。
 
 ### M6 会话内编排（模式 B，有条件）
@@ -59,6 +64,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 | 风险 | 影响 | 应对 |
 | --- | --- | --- |
 | 内部平台没有可用的接口 | M4、M5 受阻 | 无头 CLI 运行时（M3）兜底；模式 B（M6）作为第二选择 |
+| 引擎无法在平台沙箱内运行（无 Node、后台进程被回收、不能调命令行） | 引擎位置需重新设计 | 摸底实验最先验证；备选：引擎放在使用者机器或服务器，沙箱只作步骤执行环境 |
+| LLM 生成的适配器质量无先例保证 | 生成实验失败 | 先手写；一致性测试为唯一准入；失败时保留手写适配器 |
 | 声明式描述表达力不够 | M5 退化为手写适配器 | 保留"手写适配器"出口；参考适配器作模板 |
 | 模式 B 假设不成立 | M6 工作量大增 | M6 设为有条件；先验证再投入 |
 | 抽取过程中 1.x 仍在修缺陷，两边漂移 | 回归、缺陷重复 | 路径保持一致；`docs/porting-log.md` 登记；"只接收严重缺陷"的规则 |

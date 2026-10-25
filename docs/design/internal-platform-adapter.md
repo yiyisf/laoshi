@@ -5,6 +5,8 @@
 
 ## 1. 已知
 
+内部平台就是摸高项目要用的平台（2026-10-25 确认同一平台）。首选用命令行起步骤任务，主会话子 agent 不进主路径；第一版适配器手写（[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)）。
+
 内部平台提供命令行（CLI），已知具备：
 
 1. 启动 agent 任务；
