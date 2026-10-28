@@ -78,13 +78,18 @@ laoshi/
 
 **核心文件保持 req-kit 的路径和文件名**（`engine/src/pipeline.ts` 等），只把 Paseo 实现移到 `adapters/paseo/`。理由：过渡期 req-kit 1.x 的缺陷修复要移植过来，路径一致时大多数补丁可以直接应用；等 1.x 停止维护后再考虑整理目录。
 
+**安装位置**（[ADR 0007](../adr/0007-one-install-many-repos.md)）：一次安装服务多个代码库。安装单位是安装根（`LAOSHI_HOME`，本机默认 `~/.laoshi/`），laoshi 本体、skill、适配器与锁定文件、安装级配置、使用记录都在里面；在只有工作区持久的平台上（如摸高的 `/data/workspace`），安装根放在工作区内。代码库内只放专属配置（`.laoshi.json`、`.laoshi/`、平台要求的工作区配置）和需求产出（`docs/features/`），`laoshi-setup` 不向代码库复制 skill、提示词、脚本或引擎代码。
+
 ## 6. 配置
 
-沿用 req-kit 的分层（机器 → 团队 → 项目，后者覆盖前者），新增：
+两层：**安装级 → 代码库级**（后者覆盖前者），不设团队层；团队版平台下安装级配置本身就是团队共享的（[ADR 0007](../adr/0007-one-install-many-repos.md)）。在此之上新增：
 
 - `platform.adapter`：选择适配器（如 `"paseo"`）。
 - `platform.<适配器名>`：适配器私有配置。req-kit 的 `daemonUrl`、`daemonPasswordEnv` 迁移到 `platform.paseo` 下，旧字段继续读取并提示迁移。
 - `AgentProfile` 拆成通用字段（模型、模式、思考档位）和适配器私有字段（Paseo 的 `paseoProfile`、`featureValues`）。
+- 代码库级可声明 laoshi 最低版本，由 `doctor` 检查。
+- req-kit 1.x 的团队层配置继续读取，`laoshi migrate` 提示合并到安装级。
+- 凭据只来自使用者自己的环境变量，不写入安装根。
 
 ## 7. 适配器如何接入
 
