@@ -8,17 +8,17 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 - [x] 能力契约：[contracts/agent-runtime.md](../../contracts/agent-runtime.md)
 - [x] 设计：[internal-platform-adapter](../design/internal-platform-adapter.md)（草案）、[architecture](../design/architecture.md)、[adapter-guide](../design/adapter-guide.md)、[platform-vocabulary](../design/platform-vocabulary.md)、[init-bootstrap](../design/init-bootstrap.md)、[in-chat-orchestration](../design/in-chat-orchestration.md)、[state-v2](../design/state-v2.md)、[compat-migration](../design/compat-migration.md)
-- [x] 决策：ADR 0001~0005；[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)（确定性引擎 + 平台能力层，先手写后生成，提议）
+- [x] 决策：ADR 0001~0005；[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)（确定性引擎 + 平台能力层，先手写后生成，提议）；[ADR 0007](../adr/0007-one-install-many-repos.md)（一次安装、多库共用，个人版与团队版同一设计，提议）
 - [x] 分工与阶段门槛：[workstreams.md](workstreams.md)（5~6 人小队）
 - [ ] **团队评审设计文档**，重点是各文档末尾的"待定"项（见本文末尾汇总）
 - [ ] **一个能访问 npm 的开发环境**：`npm install`、`npm run typecheck`、`npm test` 在 req-kit 1.13 上跑通，并记录基线结果（通过数、耗时）
 - [ ] 为 req-kit 1.13 补一份 `evals` 基线（`evals/baselines/1.13.0.md`），作为"对等"的比较对象
-- [ ] 拿到**内部 agent 平台的 CLI 说明**：已知能启动任务、恢复暂停的 HITL 会话并传入输入、取消等待中的 HITL 请求；待确认的五个问题见 [internal-platform-adapter §6](../design/internal-platform-adapter.md)（状态与 HITL 语义最关键）；平台方暂无详细信息，改用[平台摸底清单](../design/platform-discovery.md)自行实验
+- [ ] 拿到**内部 agent 平台的 CLI 说明**：已知能启动任务、恢复暂停的 HITL 会话并传入输入、取消等待中的 HITL 请求；待确认的五个问题见 [internal-platform-adapter §6](../design/internal-platform-adapter.md)（状态与 HITL 语义最关键）；平台方暂无详细信息，改用[平台摸底清单](../design/platform-discovery.md)自行实验（含 ADR 0007 的安装与团队版实验）
 
 ## 里程碑
 
 ### M0 契约与文档（进行中）
-契约导入完成；设计与 ADR 完成。剩余：契约里的 Paseo 字样逐份中性化（文件格式契约不涉及流程语义，改动小）。
+契约导入完成；设计与 ADR 完成。剩余：契约里的 Paseo 字样逐份中性化（文件格式契约不涉及流程语义，改动小）；按 ADR 0007 在使用记录、通知事件、`laoshi api` 契约中新增 `repo`、`user` 字段，状态契约增加发起人。
 
 ### M1 搬运核心，行为不变
 - 搬：方法类 skill 与原则、步骤提示词、`engine/src` 的核心文件、`engine/test`、`evals/`。**文件路径和名字保持不变**（见 [architecture §5](../design/architecture.md)）。
@@ -28,10 +28,10 @@ npm 包名：**`laoshi`（已确认可用）**。
 ### M2 拆耦合
 - `launch.ts`、`doctor.ts`、`configure.ts`、`factory.ts`：把"连 Paseo"的部分移进适配器；体检拆成通用 + 适配器。
 - 运行时层：适配器声明能力，未声明能力统一返回 `null`，去掉调用点各自的降级写法。
-- 配置：`platform.adapter` / `platform.<id>`；`AgentProfile` 拆通用与私有；旧字段继续读取并提示。
+- 配置：`platform.adapter` / `platform.<id>`；`AgentProfile` 拆通用与私有；旧字段继续读取并提示。安装根（`LAOSHI_HOME`）与"安装级 → 代码库级"两层配置；代码库与使用者标识；`laoshi-setup` 只写代码库专属配置（[ADR 0007](../adr/0007-one-install-many-repos.md)）。
 - 状态 v2：迁移函数与测试；对外契约保持 `schema: 1`（[ADR 0004](../adr/0004-external-contracts-stay-stable.md)）。
 - 平台词汇表：先收敛 `messages.ts`、`launch.ts`、`control.ts`；加 CI 检查，核心里不得出现平台名。
-- 完成标准：核心目录中搜不到平台名；M1 的回归全部通过。
+- 完成标准：核心目录中搜不到平台名；M1 的回归全部通过；同一安装根下两个代码库的需求可同时运行，使用记录能区分代码库和使用者。
 
 > **顺序说明（ADR 0006）**：摸高平台就是内部平台，M4 优先于原计划，与 M3 并行；M5 的"生成"排在两个手写适配器之后。
 
@@ -42,9 +42,9 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 ### M4 内部平台适配器
 - 平台是 CLI 形态（轮询式 `wait`、HITL 映射），映射与缺口见 [internal-platform-adapter](../design/internal-platform-adapter.md)；据此选择声明式描述（[init-bootstrap](../design/init-bootstrap.md)）或手写适配器。
-- 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案，且已确认引擎进程能在哪里运行。
+- 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案，且已确认引擎进程能在哪里运行、安装根能否放在工作区内（ADR 0007）。
 - 第一版**手写**，不生成；生成实验见 M5。
-- 完成标准：能力矩阵、探针测试、至少一个端到端用例通过。
+- 完成标准：能力矩阵、探针测试、至少一个端到端用例通过；安装根在工作区内，跨对话无需重装。
 
 ### M5 初始化 skill 与自检
 - `laoshi init`（detect → probe → generate → review → lock → verify）、锁定文件、`laoshi doctor` 的哈希校验与能力矩阵。
@@ -65,6 +65,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 | --- | --- | --- |
 | 内部平台没有可用的接口 | M4、M5 受阻 | 无头 CLI 运行时（M3）兜底；模式 B（M6）作为第二选择 |
 | 引擎无法在平台沙箱内运行（无 Node、后台进程被回收、不能调命令行） | 引擎位置需重新设计 | 摸底实验最先验证；备选：引擎放在使用者机器或服务器，沙箱只作步骤执行环境 |
+| 工作区外的安装被清理，或平台不能从工作区加载 skill | "一次安装、多库共用"在平台上不成立 | 实验 A 先验证；安装根放工作区内（ADR 0007）；skill 不能直接加载时由适配器在会话开始时从安装根恢复 |
 | LLM 生成的适配器质量无先例保证 | 生成实验失败 | 先手写；一致性测试为唯一准入；失败时保留手写适配器 |
 | 声明式描述表达力不够 | M5 退化为手写适配器 | 保留"手写适配器"出口；参考适配器作模板 |
 | 模式 B 假设不成立 | M6 工作量大增 | M6 设为有条件；先验证再投入 |
@@ -77,6 +78,6 @@ npm 包名：**`laoshi`（已确认可用）**。
 1. ~~skill 名~~：已决定 `/laoshi*`，`paseo-req-kit` 2.0 额外装转发薄 skill（[ADR 0005](../adr/0005-skill-names.md)）。
 2. **laoshi 版本号**：`0.1.0` 起、对等时 `1.0.0`，是否接受？
 3. **模式 B 的命令集**与"谁调用 `record`"。（[in-chat-orchestration §7](../design/in-chat-orchestration.md)）
-4. **锁定文件**放机器配置目录还是项目仓库。（[init-bootstrap §6](../design/init-bootstrap.md)）
+4. ~~锁定文件~~：已决定放安装根，不进代码库（[ADR 0007](../adr/0007-one-install-many-repos.md)）。
 5. **文档站**：laoshi 站点与 req-kit 站点并存还是替换；内网 Git Pages 同步流程。
 6. 探针对内部平台的用量与副作用是否可接受。
