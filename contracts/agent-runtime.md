@@ -66,6 +66,10 @@
 - 步骤 agent 的创建要保证产物写在 `cwd` 下（ADR 0001 的问题：有的平台在传了 parent 时会改用 parent 的目录）。
 - 不要让某个可选方法抛出未捕获的异常来表示"不支持"，除非上表标了 ⚠；用 `null`。
 
+## 计划中的修订（ADR 0008，提议）
+
+[ADR 0008](../docs/adr/0008-capability-sources-and-platform-plugin.md) 定下了以下修订的方向，将与实现一起提交，本文暂不改动：能力标明来源（平台 / 插件 / 内置 / 降级）；新增"回答待处理的请求"与审批策略；`listPaseoProfiles` 改名为 `listProfiles`；`attachAgent` 改为"恢复步骤会话"；引入 agent 事件模型，由核心推导 `wait`、活动和用量；把对话相关的能力拆为"对话通道"。
+
 ## 已知需要中性化的地方（尚未处理）
 
 这些不影响 `AgentRuntime` 的形状，但换平台时会暴露：

@@ -39,6 +39,8 @@ interface PlatformAdapter {
 
 ## 2. 能力声明
 
+> [ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)（提议）对本节有两处补充：每项能力要标明来源（`platform` / `plugin` / `builtin` / `none`），运行时层按这个顺序选择；适配器可以带一个运行在平台进程内的插件，用来补上外部 API 调不到的能力。dsh 的实例见 [dsh-adapter](dsh-adapter.md)。
+
 必需能力（`verifyOrigin`、`startAgent`、`StepAgent.*`、`attachAgent`、`notifyAgent`、`interruptAgent`、`close`）必须全部实现，不需要声明。可选和按需能力用名称声明：
 
 | 名称 | 对应方法 |
