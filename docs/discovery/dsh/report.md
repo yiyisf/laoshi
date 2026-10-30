@@ -40,7 +40,7 @@
 | 用量 | 每个会话的 `tokenUsage`：未缓存输入、输出、缓存读取、缓存写入 | 探针 1 |
 | 数据外传 | `dsh-session-log-deepseek` 默认挂载：调用 DeepSeek 官方 API 时，请求里附带增量会话日志。使用其他 provider 时不涉及；laoshi 在内网通过自定义 provider 接入模型，不受影响 | 包 README |
 | 对外连接 | 用 `netlog.mjs` 记录 web host 及其子进程的所有 DNS 解析和连接：启动、跑一个回合、空闲 60 秒，以及摸底包自测全程，除本机和模型端点外**没有任何对外连接**。浏览器界面触发的功能还没有覆盖到 | 摸底包自测 P14 |
-| 运行要求 | Node ≥ 24.9；`npm install` 后 `node_modules` 约 930 MB | 安装 |
+| 运行要求 | 声明要求 Node ≥ 24.9。在 Node 22.20、22.22 上，摸底包自测的全部探针都能通过（npm 安装时只有 EBADENGINE 警告）。`npm install` 后 `node_modules` 约 930 MB | 安装；摸底包自测 |
 
 ## 探针清单
 

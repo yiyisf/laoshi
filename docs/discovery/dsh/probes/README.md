@@ -12,7 +12,7 @@
 
 | 需要 | 说明 |
 | --- | --- |
-| Node.js ≥ 24.9 | dsh 的要求。req-kit 用的 Node 22 不够 |
+| Node.js ≥ 24.9，或 22.19 以上 | dsh 声明要求 ≥ 24.9。但在自测中，Node 22.20 和 22.22 下全部探针都能通过，所以 22.19 以上也可以运行，报告的 P01 会标为 info。低于 22.19 时摸底包会停止 |
 | npm 镜像能安装 `@deepseek-ai/dsh@0.2.2-alpha.2` | 会装上约 650 个包，占用约 950 MB，全部在 `@deepseek-ai/*` 等公开包名下 |
 | git | 摸底包会建一个小样例仓库 |
 | pnpm（可选） | 有 pnpm 时用 `dsh plugin add` 安装探针插件；没有时直接复制，也能用 |
@@ -36,6 +36,8 @@
 mkdir dsh-probe && cd dsh-probe
 cp -r <laoshi>/docs/discovery/dsh/probes/* .
 npm install @deepseek-ai/dsh@0.2.2-alpha.2 --registry=<内网 npm 镜像>
+# 在 Node 22 上会出现 EBADENGINE 警告，可以忽略；如果内网 npm 配置了 engine-strict=true，
+# 安装会被拒绝，这时加上 --engine-strict=false
 
 # 2. 先自测：用模拟模型验证摸底包在内网环境里能跑，不消耗模型用量，约 3 分钟
 node run.mjs --self-test
@@ -101,3 +103,5 @@ node run.mjs
 - P13 在自测中只验证流程（模拟模型做不了任务）。
 - P12 中子 agent 在 host 重启后**能接着跑**；这一项在首轮摸底时还没有验证。
 - P14：整个过程中，除本机和模拟模型外没有任何对外连接。
+
+同一天又在 Node 22.20.0 和 22.22.0 上各跑了一次：结果与 Node 24 相同，P01～P12、P14 全部通过。

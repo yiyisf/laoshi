@@ -269,7 +269,10 @@ async function main() {
   // P01 environment and install
   facts.node = process.version;
   const [maj, min] = process.versions.node.split('.').map(Number);
-  const nodeOk = maj > 24 || (maj === 24 && min >= 9);
+  // dsh declares >= 24.9, but Node 22.19+ ran every probe in the self-test (22.20 and 22.22);
+  // below 22.19 the previous dsh floor applies and we stop.
+  const nodeDeclared = maj > 24 || (maj === 24 && min >= 9);
+  const nodeOk = nodeDeclared || (maj === 22 && min >= 19);
   try {
     facts.dsh = run(dsh, ['--version'], { env: { ...env, DSH_HOME: dirs.home } }).trim();
   } catch (e) {
@@ -286,9 +289,9 @@ async function main() {
     facts.installRoot = path.basename(d) === 'node_modules' ? d : null;
     if (facts.installRoot) facts.installSize = run('du', ['-sh', facts.installRoot]).split('\t')[0];
   } catch {}
-  record('P01', '环境与安装', nodeOk && !facts.dsh.startsWith('无法') ? 'pass' : 'fail',
-    `Node ${facts.node}（dsh 要求 ≥ 24.9）；dsh ${facts.dsh}；pnpm ${facts.pnpm ?? '未安装'}；安装占用 ${facts.installSize ?? '未知'}`);
-  if (!nodeOk) throw new Error('Node 版本低于 24.9，dsh 无法运行');
+  record('P01', '环境与安装', !nodeOk || facts.dsh.startsWith('无法') ? 'fail' : nodeDeclared ? 'pass' : 'info',
+    `Node ${facts.node}（dsh 声明要求 ≥ 24.9${nodeOk && !nodeDeclared ? '；低于声明，但 22.19 以上在自测中可以运行，继续' : ''}）；dsh ${facts.dsh}；pnpm ${facts.pnpm ?? '未安装'}；安装占用 ${facts.installSize ?? '未知'}`);
+  if (!nodeOk) throw new Error('Node 版本低于 22.19，dsh 无法运行（声明要求 ≥ 24.9）');
 
   if (selfTest) {
     mockPort = 41000 + Math.floor(Math.random() * 1000);

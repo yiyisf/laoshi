@@ -87,7 +87,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 
 ## 6. 安装与运行
 
-- **Node ≥ 24.9**（dsh 的要求），比 req-kit 现在的 Node 22 高。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
+- **Node 版本**：dsh 声明要求 ≥ 24.9。这个下限来自 dsh 的一个实验性子 agent 集成（依赖的 `@botiverse/oar` 要求 Node 24），以及 Node 24.9 才稳定提供的 `import.meta.main` 等能力。在 Node 22.20 和 22.22 上实测（模拟模型），摸底包的全部探针都能通过；dsh 在 0.2.1-rc.2 之前的版本也正式支持 Node 22.19 以上。因此内网的 Node 22.20 可以先用于摸底，但正式使用前需要定下来：升级到 Node 24，还是接受在声明范围之外运行（§8）。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
 - 插件通过 `dsh plugin --profile <名称> add <包>` 安装，并在 `$DSH_HOME/profiles/<名称>/cordis.patch.yml` 中用 `insert` 挂载。安装器负责这两步，`doctor` 负责检查。
 - skill：`~/.agents/skills` 本来就会被 dsh 读取；按 [ADR 0007](../adr/0007-one-install-many-repos.md)，也可以用 `customSkillDirs` 指向安装根。
 - **内网离线**：
@@ -114,4 +114,5 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 2. worktree 用 laoshi 内置实现，还是启用 dsh 的实验包。
 3. builder 和 reviewer 用不同 harness 时，挂载哪些子 agent 提供方。
 4. 需求总览是否做成 dsh 的界面插件，还是先用本机网页。
-5. 内网真实模型下的结果：用[内网摸底包](../discovery/dsh/probes/README.md)确认模型网关的兼容设置、步骤任务能否按结果文件约定完成、有没有对外连接。模型本身已经在 Paseo 上验证过，这里要验证的是"同一个模型 + dsh 的提示词和工具"能否配合好。
+5. 内网 dsh 用哪个 Node：升级到 Node 24（可以只给 dsh 单独装一个，例如 npm 包 `node-linux-x64@24`，不影响系统的 Node 22），还是继续用 Node 22.20、接受在 dsh 声明的范围之外运行。
+6. 内网真实模型下的结果：用[内网摸底包](../discovery/dsh/probes/README.md)确认模型网关的兼容设置、步骤任务能否按结果文件约定完成、有没有对外连接。模型本身已经在 Paseo 上验证过，这里要验证的是"同一个模型 + dsh 的提示词和工具"能否配合好。
