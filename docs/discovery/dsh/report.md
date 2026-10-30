@@ -25,7 +25,7 @@
 | 中途插话 | 是。`mode: "steer"` 在当前步骤结束后插入 | 探针 7、8 |
 | 打断（`interruptAgent`） | 是。`session/cancel` 立即生效 | 探针 6 |
 | 认证 | host 启动时打印带 `?token=` 的地址，用它换取 cookie。cookie 由持久保存的密钥签名，**host 重启后仍然有效**。对所有请求都校验 Host 头（只接受 loopback、绑定地址或 `trustedHosts`），并拒绝跨站请求 | 重启测试；`client/connection/src/api-request-trust.ts`、`browser-auth.ts` |
-| 续跑（`attachAgent`） | 是。会话持久保存在 `$DSH_HOME/sessions`，host 重启后列表仍在，再下发任务时会冷恢复 | 重启测试 |
+| 续跑（`attachAgent`） | 是。会话持久保存在 `$DSH_HOME/sessions`，host 重启后列表仍在，再下发任务时会冷恢复。**子 agent 也能在重启后通过 `subagents/prompt` 接着跑**（摸底包自测 P12） | 重启测试；摸底包自测 |
 | 沙箱 | 生效（Linux 上用 Landlock，没有 bwrap）。`workspace-write` 模式下写 `/root` 被拒绝，`/tmp` 可以写。工具结果会提示模型可以带 `sandbox_permissions` 和 `justification` 申请升级 | 探针 9、10 |
 | 权限请求怎么呈现 | 升级申请走 `approval/request` 事件。默认只有浏览器能回答（通过 WebSocket 转发）。**没有浏览器连接时请求一直挂起**，`session/list` 只显示 `running: true`。host 内部的 `pendingInput` 能区分出"在等审批"，但列表接口不返回它 | 探针 11 |
 | 插件能否代为审批 | 是。插件用 `{ prepend: true }` 注册 `approval/request` 监听，可以返回 `allowed-once`，或调用 `next()` 交给下一个应答者（例如浏览器）。不加 prepend 时，转发给浏览器的应答者先接住，插件拿不到请求 | 探针 12、13 |
@@ -38,7 +38,8 @@
 | 后台任务 / 服务 | 已挂载 `ctx.jobs`：任务属于启动它的会话，完成时以会话内通知送达。没有 `paseo.json` 那样的"服务定义 + 端口 + 健康检查" | plugin.log.sample；`jobs` README |
 | skill 目录 | 按优先级依次为 `<项目>/.dsh/skills`、`<项目>/.agents/skills`、`customSkillDirs`、`$DSH_HOME/skills`、`<agentsHome>/skills`。req-kit 现在安装到的 `~/.agents/skills` 能直接被读到；`customSkillDirs` 可以指向安装根（ADR 0007） | `docs/subsystems/skills.zh.md` |
 | 用量 | 每个会话的 `tokenUsage`：未缓存输入、输出、缓存读取、缓存写入 | 探针 1 |
-| 数据外传 | `dsh-session-log-deepseek` 默认挂载：调用 DeepSeek 官方 API 时，请求里附带增量会话日志。使用其他 provider 时不涉及。只能通过禁用这个插件关闭 | 包 README |
+| 数据外传 | `dsh-session-log-deepseek` 默认挂载：调用 DeepSeek 官方 API 时，请求里附带增量会话日志。使用其他 provider 时不涉及；laoshi 在内网通过自定义 provider 接入模型，不受影响 | 包 README |
+| 对外连接 | 用 `netlog.mjs` 记录 web host 及其子进程的所有 DNS 解析和连接：启动、跑一个回合、空闲 60 秒，以及摸底包自测全程，除本机和模型端点外**没有任何对外连接**。浏览器界面触发的功能还没有覆盖到 | 摸底包自测 P14 |
 | 运行要求 | Node ≥ 24.9；`npm install` 后 `node_modules` 约 930 MB | 安装 |
 
 ## 探针清单
@@ -63,6 +64,8 @@
 | 重启 | 停止并重新启动 host | 会话还在；旧 cookie 仍然有效；新 token 会重新打印 |
 
 ## 复现
+
+最简单的方式是用[内网摸底包](probes/README.md)：`node run.mjs --self-test` 用模拟模型跑完全部探针。下面是首轮摸底时的手工步骤。
 
 ```sh
 # Node ≥ 24.9；DSH_HOME 指向一个临时目录，不污染本机配置
@@ -101,9 +104,13 @@ node probes/dsh-api.mjs web.log session/create '{"request":{"cwd":"/path/to/empt
         allowFile: /path/to/ALLOW
 ```
 
+## 内网摸底包
+
+laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些结论还需要在内网用真实模型复核一遍，为此把本次的探针整理成了一条命令就能运行的[内网摸底包](probes/README.md)：P01～P14，生成 `report.md`。摸底包已在云端用模拟模型自测通过。
+
 ## 尚未验证
 
-1. 真实模型（DeepSeek V4 等）下的步骤产出质量，以及 `evals/` 端到端用例。
+1. 内网真实模型（与 req-kit 相同）配合 dsh 的效果：模型网关的兼容设置，以及步骤任务能否按结果文件约定完成（内网摸底包 P02、P13）；之后再跑 `evals/` 端到端用例。
 2. 挂载 ACP、Claude Code、Codex 子 agent 提供方以后，builder 和 reviewer 能否使用不同的模型或 harness。
 3. 同一个 host 上同时跑多条流水线时，子 agent 的并发与委派深度上限（`subagents` 的 `maxDepth` 默认为 1）的实际影响。
 4. 启用 `dsh-experimental-worktree` 以后，worktree 能否满足 `--worktree` 和联合需求。

@@ -4,6 +4,8 @@
 - 依据：[dsh 摸底报告](../discovery/dsh/report.md)（`@deepseek-ai/dsh@0.2.2-alpha.2`，没有使用真实模型）
 - 决策：[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)
 - 前置阅读：[agent-runtime.md](../../contracts/agent-runtime.md)、[adapter-guide.md](adapter-guide.md)
+- 使用前提：laoshi 在内网使用。在 dsh 中使用的模型与 Paseo 上 req-kit 用的相同，经内网模型网关接入（dsh 中配置为自定义 provider），不连接 DeepSeek 官方 API。
+- 与摸高的关系：dsh 与摸高是两件独立的事，摸高的底层不是 dsh。摸高的适配见 [internal-platform-adapter](internal-platform-adapter.md)（计划 M4），dsh 的适配是计划 M4b。
 
 ## 1. 结论
 
@@ -46,7 +48,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 | `StepAgent.wait` | 轮询 `session/list` 中子会话的 `running`；"在等审批"由插件报告（见 §5）。之后可以换成订阅事件流 | platform + plugin | 是（轮询） |
 | `StepAgent.followUp` | `subagents/prompt`，`mode: "continuable"`，`delivery: "queue"` | platform | 是 |
 | `StepAgent.archive` | `workspaces` 的 `archiveSession` | platform | 否 |
-| `attachAgent` | 按会话 ID 继续；host 会冷恢复已持久化的会话 | platform | 顶层会话已验证；子会话的冷恢复未验证 |
+| `attachAgent` | 按会话 ID 继续；host 会冷恢复已持久化的会话 | platform | 是（顶层会话和子会话都已验证，见摸底包自测 P12） |
 | `notifyAgent` | `session/prompt`，`mode: "queue"` | platform | 是 |
 | `interruptAgent` | 子会话用 `subagents/interruptByParent` 或 `session/cancel`，再用 queue 模式发送新指令 | platform | `session/cancel` 已验证 |
 | `listPaseoProfiles`（将改名，见 ADR 0008） | `agentPresets` 的列表，以及模型目录 | platform | 否 |
@@ -88,7 +90,10 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 - **Node ≥ 24.9**（dsh 的要求），比 req-kit 现在的 Node 22 高。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
 - 插件通过 `dsh plugin --profile <名称> add <包>` 安装，并在 `$DSH_HOME/profiles/<名称>/cordis.patch.yml` 中用 `insert` 挂载。安装器负责这两步，`doctor` 负责检查。
 - skill：`~/.agents/skills` 本来就会被 dsh 读取；按 [ADR 0007](../adr/0007-one-install-many-repos.md)，也可以用 `customSkillDirs` 指向安装根。
-- **数据外传**：`dsh-session-log-deepseek` 默认挂载，调用 DeepSeek 官方 API 时会在请求里附带会话日志。安装器应当说明这一点，并提供关闭的选项；是否默认关闭，由团队决定（§8）。
+- **内网离线**：
+  - 安装要求内网 npm 镜像能装上 `@deepseek-ai/dsh` 及其依赖（约 650 个包，约 950 MB）。插件安装用 pnpm；没有 pnpm 时可以直接复制到 profile 的 `node_modules`，摸底包两种方式都支持。
+  - 对外连接：云端自测中，dsh web host 除本机和模型端点外没有任何对外连接。浏览器界面触发的功能（插件市场、设置页的模型目录等）还没有覆盖到。内网摸底包（P14）会全程记录；如果发现外部地址，再在 profile 中禁用对应插件，并把配置写进安装器。
+  - `dsh-session-log-deepseek` 只在调用 DeepSeek 官方 API 时附带会话日志。内网通过自定义 provider 接入模型，不涉及这个问题。
 - 子 agent 提供方：默认只有 `spawn` 和 `fork`。builder 和 reviewer 想用不同的 harness（例如 reviewer 用 Claude Code）时，需要在 profile 中挂载对应的提供方，这一点还没有验证。
 
 ## 7. 与 Paseo 体验的差异
@@ -106,8 +111,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 ## 8. 待定
 
 1. 引擎和插件之间选哪种认证方式（§4 的第 1 种还是第 2 种）。
-2. 是否默认关闭 `dsh-session-log-deepseek`。
-3. worktree 用 laoshi 内置实现，还是启用 dsh 的实验包。
-4. builder 和 reviewer 用不同 harness 时，挂载哪些子 agent 提供方。
-5. 需求总览是否做成 dsh 的界面插件，还是先用本机网页。
-6. 摸底报告"尚未验证"中列出的各项，尤其是真实模型下的端到端评估。
+2. worktree 用 laoshi 内置实现，还是启用 dsh 的实验包。
+3. builder 和 reviewer 用不同 harness 时，挂载哪些子 agent 提供方。
+4. 需求总览是否做成 dsh 的界面插件，还是先用本机网页。
+5. 内网真实模型下的结果：用[内网摸底包](../discovery/dsh/probes/README.md)确认模型网关的兼容设置、步骤任务能否按结果文件约定完成、有没有对外连接。模型本身已经在 Paseo 上验证过，这里要验证的是"同一个模型 + dsh 的提示词和工具"能否配合好。

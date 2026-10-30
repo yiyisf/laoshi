@@ -51,7 +51,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 ### M4b DeepSeek Harness（dsh）适配器
 - 形态为"外部引擎 + laoshi dsh 插件"（[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)、[dsh-adapter](../design/dsh-adapter.md)）。摸底已完成，见 [dsh 摸底报告](../discovery/dsh/report.md)。
 - 运行时通过 web host 的 `/api` 管理会话；插件负责在对话下创建子 agent、定时任务、审批和引擎认证；服务与 worktree 使用 M2 的内置实现。
-- 前置：M2 的运行时层能按来源选择能力；[dsh-adapter §8](../design/dsh-adapter.md) 的第 1、2 项有结论。
+- 与 M4 相互独立：dsh 和摸高是两件事，摸高的底层不是 dsh。
+- 前置：M2 的运行时层能按来源选择能力；[dsh-adapter §8](../design/dsh-adapter.md) 的第 1 项有结论；[内网摸底包](../discovery/dsh/probes/README.md)在内网用真实模型跑过，P02（模型接入）和 P13（步骤任务）通过。
 - 完成标准：能力矩阵中除契约允许缺失的项外没有 `none`；探针测试转为自动化；用真实模型跑通至少一个 `evals/` 用例，"夸大"为零。
 
 ### M5 初始化 skill 与自检
@@ -80,6 +81,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 | 抽取过程中 1.x 仍在修缺陷，两边漂移 | 回归、缺陷重复 | 路径保持一致；`docs/porting-log.md` 登记；"只接收严重缺陷"的规则 |
 | 对外契约被改名破坏插件/IM/汇总 | 现网使用受影响 | [ADR 0004](../adr/0004-external-contracts-stay-stable.md) |
 | 内网模型较弱，生成阶段质量差 | 适配器生成失败 | 描述 schema 校验 + 探针；失败时明确提示手写 |
+| dsh 在内网装不上或要连外网（Node ≥ 24.9、约 950 MB 的 `@deepseek-ai/*` 依赖、浏览器界面触发的外部请求） | M4b 无法在内网使用 | 先跑内网摸底包（P01 安装、P14 对外连接）；发现外部连接时在 profile 中禁用对应插件，并写进安装器 |
 | dsh 处于开发者预览，接口和插件 API 会有不兼容变更 | M4b 返工 | 插件和运行时声明支持的 dsh 版本范围，由 `doctor` 检查；引擎尽量只和插件通信，少依赖 `/api` 的内部格式（[dsh-adapter §4](../design/dsh-adapter.md)） |
 
 ## 待定项汇总（评审时逐条定）
