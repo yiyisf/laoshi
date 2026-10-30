@@ -115,4 +115,4 @@ laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些
 3. 同一个 host 上同时跑多条流水线时，子 agent 的并发与委派深度上限（`subagents` 的 `maxDepth` 默认为 1）的实际影响。
 4. 启用 `dsh-experimental-worktree` 以后，worktree 能否满足 `--worktree` 和联合需求。
 5. 插件和引擎之间的正式通道（探针用的是文件收件箱，正式实现建议用 unix socket），以及插件如何把一个限定权限的凭据交给引擎。
-6. macOS、Windows 和桌面版（`apps/desktop`）。
+6. Windows（内网是 Windows）：摸底包已支持（`run.cmd`，探针命令用 PowerShell 写法），但还没有在 Windows 上实际跑过；PowerShell 命令只对照 dsh 源码人工核对过。此外 macOS 和桌面版（`apps/desktop`）也还没有验证。

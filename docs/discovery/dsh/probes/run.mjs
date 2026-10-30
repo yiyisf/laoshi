@@ -2,7 +2,7 @@
 // dsh 内网摸底包：一条命令跑完 dsh 摸底的全部探针，生成 report.md。
 // 说明见同目录 README.md。
 //
-//   node run.mjs                 用 LAOSHI_PROBE_MODEL_* 指定的模型网关
+//   node run.mjs                 用 LAOSHI_PROBE_MODEL_* 指定的模型网关（Windows 上用 run.cmd 启动）
 //   node run.mjs --self-test     用同目录的 mock-llm.mjs 代替模型（只验证摸底包本身）
 //   node run.mjs --out <目录>    输出目录，默认 ./dsh-probe-<时间>
 //   node run.mjs --task-timeout <分钟>   模型任务（P13）每项的超时，默认 15
@@ -64,19 +64,68 @@ const redactUrl = (u) => {
 };
 const gatewayHost = model.baseURL ? new URL(model.baseURL).hostname : '127.0.0.1';
 
+const isWin = process.platform === 'win32';
+
+// dsh is started as `node <its bin script>`: on Windows node_modules/.bin/dsh is a .cmd
+// shim, which Node refuses to spawn without a shell.
 function findDsh() {
-  const candidates = [env.LAOSHI_PROBE_DSH, path.join(process.cwd(), 'node_modules/.bin/dsh'), path.join(here, 'node_modules/.bin/dsh')].filter(Boolean);
-  for (const c of candidates) if (fs.existsSync(c)) return path.resolve(c);
+  const roots = [env.LAOSHI_PROBE_DSH, process.cwd(), here].filter(Boolean);
   try {
-    return execFileSync(process.platform === 'win32' ? 'where' : 'which', ['dsh'], { encoding: 'utf8' }).split('\n')[0].trim() || null;
-  } catch {
-    return null;
+    roots.push(path.dirname(execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: isWin, stdio: ['ignore', 'pipe', 'ignore'] }).trim()));
+  } catch {}
+  for (const root of roots) {
+    const dir = path.join(path.resolve(root), 'node_modules', '@deepseek-ai', 'dsh');
+    if (!fs.existsSync(path.join(dir, 'package.json'))) continue;
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.dsh;
+    if (bin) return { dir, bin: path.join(dir, bin) };
   }
+  return null;
 }
 const dsh = findDsh();
 if (!dsh) {
-  console.error('找不到 dsh。请先在当前目录 npm install @deepseek-ai/dsh，或用 LAOSHI_PROBE_DSH 指定 dsh 命令的路径。');
+  console.error('找不到 dsh。请先在当前目录 npm install @deepseek-ai/dsh，或用 LAOSHI_PROBE_DSH 指定安装了 dsh 的目录（其下有 node_modules/@deepseek-ai/dsh）。');
   process.exit(2);
+}
+const dshArgs = (...a) => [dsh.bin, ...a];
+
+// Probe commands in the shell dsh gives the model: bash, or PowerShell (pwsh) on Windows.
+const shellName = isWin ? 'PowerShell（pwsh）' : 'bash';
+const cmd = isWin
+  ? {
+      hello: "Set-Content -Path hello.txt -Value ok; (Get-ChildItem Env: | Where-Object Name -like 'DSH_*' | Sort-Object Name).Name | Set-Content -Path dsh-env.txt; $PSVersionTable.PSVersion.ToString() | Set-Content -Path shell-version.txt",
+      sleep: (sec) => `Start-Sleep -Seconds ${sec}`,
+      write: (file, text) => `Set-Content -Path '${file}' -Value ${text}`,
+    }
+  : {
+      hello: "echo ok > hello.txt && env | grep '^DSH_' | sed 's/=.*//' | sort > dsh-env.txt && echo \"bash $BASH_VERSION\" > shell-version.txt",
+      sleep: (sec) => `sleep ${sec}`,
+      write: (file, text) => `echo ${text} > '${file}'`,
+    };
+const readLines = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : []);
+
+function dirSize(root) {
+  let total = 0;
+  const stack = [root];
+  while (stack.length) {
+    const d = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) stack.push(p);
+      else if (e.isFile()) {
+        try {
+          total += fs.statSync(p).size;
+        } catch {}
+      }
+    }
+  }
+  return total;
 }
 
 // ---------------------------------------------------------------- layout
@@ -103,7 +152,7 @@ function writeSampleRepo() {
   fs.mkdirSync(path.join(r, 'src'), { recursive: true });
   fs.mkdirSync(path.join(r, 'test'), { recursive: true });
   fs.mkdirSync(path.join(r, 'step'), { recursive: true });
-  fs.writeFileSync(path.join(r, 'package.json'), JSON.stringify({ name: 'probe-sample', private: true, type: 'module', scripts: { test: 'node --test test/' } }, null, 2) + '\n');
+  fs.writeFileSync(path.join(r, 'package.json'), JSON.stringify({ name: 'probe-sample', private: true, type: 'module', scripts: { test: 'node --test test/sum.test.js' } }, null, 2) + '\n');
   fs.writeFileSync(path.join(r, 'src/sum.js'), 'export function sum(a, b) {\n  return a - b;\n}\n');
   fs.writeFileSync(path.join(r, 'test/sum.test.js'), "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { sum } from '../src/sum.js';\n\ntest('sum adds two numbers', () => {\n  assert.equal(sum(2, 3), 5);\n});\n");
   fs.writeFileSync(path.join(r, 'README.md'), '# probe-sample\n\n`sum(a, b)` 应当返回两数之和。\n');
@@ -164,7 +213,7 @@ async function startHost(label, port = 0) {
   const logFile = path.join(dirs.logs, `host-${label}.log`);
   const fd = fs.openSync(logFile, 'w');
   // cwd = repo: the sandbox's workspace root is the host's cwd.
-  const child = spawn(dsh, ['--profile', 'web', '--no-open', '--port', String(port)], { cwd: dirs.repo, env: hostEnv(), stdio: ['ignore', fd, fd], detached: true });
+  const child = spawn(process.execPath, dshArgs('--profile', 'web', '--no-open', '--port', String(port)), { cwd: dirs.repo, env: hostEnv(), stdio: ['ignore', fd, fd], detached: !isWin, windowsHide: true });
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     const text = fs.readFileSync(logFile, 'utf8');
@@ -183,13 +232,16 @@ async function startHost(label, port = 0) {
 async function stopHost() {
   if (!host) return;
   const { child } = host;
-  try {
-    process.kill(-child.pid, 'SIGTERM');
-  } catch {}
+  // The host and its workers: the process group on Linux/macOS, the process tree on Windows.
+  const killTree = (force) => {
+    try {
+      if (isWin) execFileSync('taskkill', ['/pid', String(child.pid), '/T', ...(force ? ['/F'] : [])], { stdio: 'ignore' });
+      else process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM');
+    } catch {}
+  };
+  killTree(false);
   for (let i = 0; i < 30 && child.exitCode === null && child.signalCode === null; i++) await sleep(500);
-  try {
-    process.kill(-child.pid, 'SIGKILL');
-  } catch {}
+  killTree(true);
   host = null;
   await sleep(1000);
 }
@@ -255,7 +307,7 @@ async function pluginOp(op, timeoutMs) {
   return waitFor(() => (fs.existsSync(reply) ? JSON.parse(fs.readFileSync(reply, 'utf8')) : null), timeoutMs, 500);
 }
 
-const run_ = (text) => `请用 bash 工具执行下面这条命令（不要改写），执行完简短回复"完成"。\nBASH: ${text}`;
+const run_ = (text) => `请用 ${shellName} 工具执行下面这条命令（不要改写），执行完简短回复"完成"。\nCMD: ${text}`;
 
 // ---------------------------------------------------------------- probes
 
@@ -274,21 +326,18 @@ async function main() {
   const nodeDeclared = maj > 24 || (maj === 24 && min >= 9);
   const nodeOk = nodeDeclared || (maj === 22 && min >= 19);
   try {
-    facts.dsh = run(dsh, ['--version'], { env: { ...env, DSH_HOME: dirs.home } }).trim();
+    facts.dsh = run(process.execPath, dshArgs('--version'), { env: { ...env, DSH_HOME: dirs.home } }).trim();
   } catch (e) {
     facts.dsh = `无法运行：${e.message.split('\n')[0]}`;
   }
   try {
-    facts.pnpm = run('pnpm', ['--version']).trim();
+    facts.pnpm = run('pnpm', ['--version'], { shell: isWin }).trim();
   } catch {
     facts.pnpm = null;
   }
-  try {
-    let d = fs.realpathSync(dsh);
-    while (path.basename(d) !== 'node_modules' && d !== path.dirname(d)) d = path.dirname(d);
-    facts.installRoot = path.basename(d) === 'node_modules' ? d : null;
-    if (facts.installRoot) facts.installSize = run('du', ['-sh', facts.installRoot]).split('\t')[0];
-  } catch {}
+  facts.platform = `${process.platform} ${os.release()}`;
+  facts.installRoot = path.resolve(dsh.dir, '..', '..'); // the node_modules holding @deepseek-ai/dsh
+  facts.installSize = `${Math.round(dirSize(facts.installRoot) / 1024 / 1024)} MB`;
   record('P01', '环境与安装', !nodeOk || facts.dsh.startsWith('无法') ? 'fail' : nodeDeclared ? 'pass' : 'info',
     `Node ${facts.node}（dsh 声明要求 ≥ 24.9${nodeOk && !nodeDeclared ? '；低于声明，但 22.19 以上在自测中可以运行，继续' : ''}）；dsh ${facts.dsh}；pnpm ${facts.pnpm ?? '未安装'}；安装占用 ${facts.installSize ?? '未知'}`);
   if (!nodeOk) throw new Error('Node 版本低于 22.19，dsh 无法运行（声明要求 ≥ 24.9）');
@@ -304,7 +353,7 @@ async function main() {
   fs.cpSync(path.join(here, 'laoshi-probe-plugin'), dirs.plugin, { recursive: true });
   let pluginInstall;
   try {
-    run(dsh, ['plugin', '--profile', 'web', 'add', `file:${dirs.plugin}`], { env: { ...env, DSH_HOME: dirs.home } });
+    run(process.execPath, dshArgs('plugin', '--profile', 'web', 'add', `file:${dirs.plugin.replace(/\\/g, '/')}`), { env: { ...env, DSH_HOME: dirs.home } });
     pluginInstall = 'dsh plugin add';
   } catch (e) {
     const target = path.join(dirs.home, 'profiles/web/node_modules/laoshi-probe');
@@ -352,13 +401,14 @@ async function main() {
   facts.pluginPending = /laoshi-probe.*pending/.test(hostLog) ? hostLog.split('\n').filter((l) => l.includes('laoshi-probe')).join(' ') : null;
 
   // P03 tool call, files in cwd, DSH_* variables
-  await prompt(main, run_(`echo ok > hello.txt && env | grep '^DSH_' | sed 's/=.*//' | sort > dsh-env.txt`));
+  await prompt(main, run_(cmd.hello));
   await waitIdle(main, 300_000);
   const hello = fs.existsSync(path.join(dirs.repo, 'hello.txt'));
-  const dshVars = fs.existsSync(path.join(dirs.repo, 'dsh-env.txt')) ? fs.readFileSync(path.join(dirs.repo, 'dsh-env.txt'), 'utf8').trim().split('\n') : [];
+  const dshVars = readLines(path.join(dirs.repo, 'dsh-env.txt'));
+  facts.shell = readLines(path.join(dirs.repo, 'shell-version.txt'))[0] ?? null;
   facts.dshVars = dshVars;
   record('P03', '工具调用与会话识别', hello && dshVars.includes('DSH_SESSION_ID') ? 'pass' : 'fail',
-    `hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}`);
+    `shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}`);
 
   // P04 status and usage
   const s4 = await summary(main);
@@ -366,7 +416,7 @@ async function main() {
   record('P04', '状态与用量', s4 && s4.running === false && usage ? 'pass' : 'fail', `running=${s4?.running}；tokenUsage=${JSON.stringify(usage ?? null)}`);
 
   // P05 cancel a running turn
-  await prompt(main, run_('sleep 60'));
+  await prompt(main, run_(cmd.sleep(60)));
   const running5 = await waitFor(async () => (await summary(main))?.running, 60_000);
   await sleep(5000);
   const t5 = Date.now();
@@ -376,14 +426,14 @@ async function main() {
   record('P05', '打断（session/cancel）', running5 && idle5 && Date.now() - t5 < 20_000 ? 'pass' : 'fail', `取消后 ${cancelSec} 秒回到空闲`);
 
   // P06 queue while running: handled after the running turn, not interrupting it
-  await prompt(main, run_('sleep 15'));
+  await prompt(main, run_(cmd.sleep(15)));
   await waitFor(async () => (await summary(main))?.running, 60_000);
   await sleep(2000);
   await prompt(main, '这是排队测试。请只回复 QUEUED-OK', 'queue');
   await waitIdle(main, 300_000);
   {
     const evs = await events(main);
-    const sleepMsg = evs.findLast((e) => e.type === 'user/message' && userText(e).includes('sleep 15'));
+    const sleepMsg = evs.findLast((e) => e.type === 'user/message' && userText(e).includes(cmd.sleep(15)));
     const queued = evs.findLast((e) => e.type === 'user/message' && userText(e).includes('QUEUED-OK'));
     const endAfterSleep = evs.find((e) => e.type === 'turn/end' && sleepMsg && e.seq > sleepMsg.seq);
     const ok = sleepMsg && queued && endAfterSleep && queued.seq > endAfterSleep.seq;
@@ -392,7 +442,7 @@ async function main() {
   }
 
   // P07 steer while running: enters the running turn
-  await prompt(main, run_('sleep 15'));
+  await prompt(main, run_(cmd.sleep(15)));
   await waitFor(async () => (await summary(main))?.running, 60_000);
   await sleep(2000);
   await prompt(main, '这是插话测试。命令结束后请只回复 STEER-OK', 'steer');
@@ -400,7 +450,7 @@ async function main() {
   {
     const evs = await events(main);
     const steer = evs.findLast((e) => e.type === 'user/message' && userText(e).includes('STEER-OK'));
-    const sleepMsg = evs.findLast((e) => e.type === 'user/message' && userText(e).includes('sleep 15'));
+    const sleepMsg = evs.findLast((e) => e.type === 'user/message' && userText(e).includes(cmd.sleep(15)));
     const endAfterSleep = evs.find((e) => e.type === 'turn/end' && sleepMsg && e.seq > sleepMsg.seq);
     const inTurn = steer && endAfterSleep && steer.seq < endAfterSleep.seq;
     record('P07', '运行中插话（steer）', inTurn ? 'pass' : 'info', inTurn ? '插入到正在运行的回合中' : '没有插入当前回合（可能命令已先结束）');
@@ -411,7 +461,7 @@ async function main() {
   if (!facts.pluginLoaded) {
     record('P08', '插件在会话下创建子 agent', 'fail', `插件没有加载（安装方式：${pluginInstall}${facts.pluginPending ? `；${facts.pluginPending}` : ''}）`);
   } else {
-    const r8 = await pluginOp({ op: 'spawn', parent: main, label: 'laoshi 探针：子步骤', prompt: run_('echo child-ok > child.txt'), cwd: path.join(dirs.repo, 'step') }, 600_000);
+    const r8 = await pluginOp({ op: 'spawn', parent: main, label: 'laoshi 探针：子步骤', prompt: run_(cmd.write('child.txt', 'child-ok')), cwd: path.join(dirs.repo, 'step') }, 600_000);
     childId = r8?.childId ?? null;
     const parent = await summary(main);
     const child = childId ? await summary(childId) : null;
@@ -425,7 +475,7 @@ async function main() {
 
   // P09 follow up the child from outside
   if (childId) {
-    await rpc('subagents/prompt', { request: { requestId: `probe-child-${Date.now()}`, parentSessionId: main, childSessionId: childId, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: run_('echo child-2 > child2.txt') }] } });
+    await rpc('subagents/prompt', { request: { requestId: `probe-child-${Date.now()}`, parentSessionId: main, childSessionId: childId, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: run_(cmd.write('child2.txt', 'child-2')) }] } });
     await waitIdle(childId, 300_000);
     const ok = fs.existsSync(path.join(dirs.repo, 'step/child2.txt'));
     record('P09', '外部追问子 agent（subagents/prompt）', ok ? 'pass' : 'fail', ok ? '子 agent 执行了追问' : '没有执行');
@@ -452,7 +502,7 @@ async function main() {
   fs.mkdirSync(outside, { recursive: true });
   const outsideFile = path.join(outside, 'approval.txt');
   const escalation = (file) =>
-    `请用 bash 工具执行下面这条命令（不要改写）。它要写工作区之外的文件，如果被沙箱拒绝，请按工具结果的提示带上 sandbox_permissions 和 justification 重试一次。\nBASH: echo x > ${file}`;
+    `请用 ${shellName} 工具执行下面这条命令（不要改写）。它要写工作区之外的文件，如果被沙箱拒绝，请按工具结果的提示带上 sandbox_permissions 和 justification 重试一次。\nCMD: ${cmd.write(file, 'x')}`;
   if (facts.pluginLoaded) {
     fs.writeFileSync(files.allow, '');
     await prompt(main, escalation(outsideFile));
@@ -498,7 +548,7 @@ async function main() {
   let childBack = null;
   if (childId) {
     try {
-      await rpc('subagents/prompt', { request: { requestId: `probe-child-r-${Date.now()}`, parentSessionId: main, childSessionId: childId, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: run_('echo after-restart > child3.txt') }] } });
+      await rpc('subagents/prompt', { request: { requestId: `probe-child-r-${Date.now()}`, parentSessionId: main, childSessionId: childId, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: run_(cmd.write('child3.txt', 'after-restart')) }] } });
       await waitIdle(childId, 300_000);
       childBack = fs.existsSync(path.join(dirs.repo, 'step/child3.txt')) ? '续上了' : '没有执行';
     } catch (e) {
@@ -553,7 +603,7 @@ async function modelTasks(parent) {
       check: (j) => ['done', 'partial'].includes(j.status),
       extra: () => {
         try {
-          execFileSync(process.execPath, ['--test', 'test/'], { cwd: dirs.repo, stdio: 'ignore' });
+          execFileSync(process.execPath, ['--test', 'test/sum.test.js'], { cwd: dirs.repo, stdio: 'ignore' });
           return '测试通过';
         } catch {
           return '测试没有通过';
@@ -599,6 +649,7 @@ function writeReport(error) {
     '',
     `- 时间：${new Date().toISOString()}`,
     `- 模式：${selfTest ? '自测（模拟模型，只验证摸底包本身）' : '真实模型'}`,
+    `- 平台：${facts.platform ?? process.platform}；shell：${facts.shell ?? '未知'}`,
     `- dsh：${facts.dsh ?? '未知'}；Node：${facts.node ?? process.version}；pnpm：${facts.pnpm ?? '未安装'}；安装占用：${facts.installSize ?? '未知'}`,
     `- 模型：协议 ${model.api}，地址 ${selfTest ? '本机模拟' : redactUrl(model.baseURL)}，模型 ID ${selfTest ? 'mock-1' : '（已省略）'}；凭据来自环境变量 ${model.keyVar}，没有写入任何文件`,
     `- 采用的兼容设置：${facts.compat ? JSON.stringify(facts.compat) : '无（没有成功的组合）'}`,

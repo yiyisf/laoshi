@@ -90,6 +90,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 - **Node 版本**：dsh 声明要求 ≥ 24.9。这个下限来自 dsh 的一个实验性子 agent 集成（依赖的 `@botiverse/oar` 要求 Node 24），以及脚本入口用到的 `import.meta.main`（dsh 的说明指出 Node 24.0 还没有这个功能，所以下限没有定在 24.0）。在 Node 22.20 和 22.22 上实测（模拟模型），摸底包的全部探针都能通过；dsh 在 0.2.1-rc.2 之前的版本也正式支持 Node 22.19 以上。因此内网的 Node 22.20 可以先用于摸底，但正式使用前需要定下来：升级到 Node 24，还是接受在声明范围之外运行（§8）。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
 - 插件通过 `dsh plugin --profile <名称> add <包>` 安装，并在 `$DSH_HOME/profiles/<名称>/cordis.patch.yml` 中用 `insert` 挂载。安装器负责这两步，`doctor` 负责检查。
 - skill：`~/.agents/skills` 本来就会被 dsh 读取；按 [ADR 0007](../adr/0007-one-install-many-repos.md)，也可以用 `customSkillDirs` 指向安装根。
+- **Windows**：内网机器是 Windows。dsh 在 Windows 上给模型用的是 PowerShell 工具（`pwsh`，没有 PowerShell 7 时回退到 Windows PowerShell 5.1），沙箱换成系统的 ACL 受限令牌，不需要额外配置。已核对：req-kit 的步骤提示词里没有写死 bash 的命令，引擎本来就支持 Windows，所以不需要为 dsh 修改提示词。laoshi 的插件、服务管理和停止进程等内置能力必须按 Windows 实现（例如用 `taskkill /T` 停止进程树）。摸底包已支持 Windows，但还没有在 Windows 上实际跑过。
 - **内网离线**：
   - 安装要求内网 npm 镜像能装上 `@deepseek-ai/dsh` 及其依赖（约 650 个包，约 950 MB）。插件安装用 pnpm；没有 pnpm 时可以直接复制到 profile 的 `node_modules`，摸底包两种方式都支持。
   - 对外连接：云端自测中，dsh web host 除本机和模型端点外没有任何对外连接。浏览器界面触发的功能（插件市场、设置页的模型目录等）还没有覆盖到。内网摸底包（P14）会全程记录；如果发现外部地址，再在 profile 中禁用对应插件，并把配置写进安装器。

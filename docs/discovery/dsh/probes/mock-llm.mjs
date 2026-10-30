@@ -1,7 +1,8 @@
 // Scripted OpenAI-compatible chat endpoint, for probing dsh without a real model
 // (used by `run.mjs --self-test`). Rules, on the user messages since the last
 // assistant or tool message:
-//   a line "BASH: <cmd>"          -> one bash tool call running <cmd>
+//   a line "CMD: <cmd>"           -> one shell tool call running <cmd>; the tool is the
+//                                    one dsh offers: bash, or pwsh on Windows ("BASH:" also works)
 //   a line "ESCALATE: <cmd>"      -> the same, asking for danger-full-access up front
 //   "请只回复 <WORD>"              -> final text <WORD>
 //   "SLOW"                        -> waits 20s before answering
@@ -22,10 +23,12 @@ function textOf(content) {
   return '';
 }
 
-function lastBashCall(msgs) {
+const SHELLS = ['bash', 'pwsh'];
+
+function lastShellCall(msgs) {
   for (let i = msgs.length - 1; i >= 0; i--) {
     for (const call of msgs[i].tool_calls ?? []) {
-      if (call.function?.name === 'bash') return JSON.parse(call.function.arguments);
+      if (SHELLS.includes(call.function?.name)) return JSON.parse(call.function.arguments);
     }
   }
   return null;
@@ -49,7 +52,9 @@ http.createServer(async (req, res) => {
   log({ at: new Date().toISOString(), roles: msgs.map((m) => m.role).join(','), last: text.slice(-300) });
 
   let reply;
-  const bash = last.role === 'user' && /^BASH: (.+)$/m.exec(text);
+  const offered = (json.tools ?? []).map((t) => t.function?.name);
+  const shell = SHELLS.find((name) => offered.includes(name)) ?? 'bash';
+  const bash = last.role === 'user' && /^(?:CMD|BASH): (.+)$/m.exec(text);
   const escalate = last.role === 'user' && /^ESCALATE: (.+)$/m.exec(text);
   const only = last.role === 'user' && /请只回复\s*([A-Z0-9-]+)/.exec(text);
   if (escalate) {
@@ -57,7 +62,7 @@ http.createServer(async (req, res) => {
   } else if (bash) {
     reply = { tool: { description: 'Run probe command', command: bash[1].trim() } };
   } else if (last.role === 'tool') {
-    const prev = lastBashCall(msgs);
+    const prev = lastShellCall(msgs);
     if (/escalation available/.test(text) && prev && !prev.sandbox_permissions) {
       reply = { tool: { ...prev, sandbox_permissions: 'danger-full-access', justification: 'probe: needs to write outside the workspace' } };
     } else {
@@ -74,7 +79,7 @@ http.createServer(async (req, res) => {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
   const send = (o) => res.write(`data: ${JSON.stringify({ ...base, ...o })}\n\n`);
   if (reply.tool) {
-    send({ choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, id: 'call_' + Date.now(), type: 'function', function: { name: 'bash', arguments: JSON.stringify(reply.tool) } }] }, finish_reason: null }] });
+    send({ choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, id: 'call_' + Date.now(), type: 'function', function: { name: shell, arguments: JSON.stringify(reply.tool) } }] }, finish_reason: null }] });
     send({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
   } else {
     send({ choices: [{ index: 0, delta: { role: 'assistant', content: reply.text }, finish_reason: null }] });
