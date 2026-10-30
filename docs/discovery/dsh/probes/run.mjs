@@ -89,9 +89,42 @@ if (!dsh) {
 }
 const dshArgs = (...a) => [dsh.bin, ...a];
 
-// Probe commands in the shell dsh gives the model: bash, or PowerShell (pwsh) on Windows.
-const shellName = isWin ? 'PowerShell（pwsh）' : 'bash';
-const cmd = isWin
+// Which shell dsh gives the model. dsh's Windows default is PowerShell; where PowerShell is
+// restricted, LAOSHI_PROBE_WIN_SHELL=bash (the default here) switches dsh to Git Bash.
+const winShell = isWin ? (env.LAOSHI_PROBE_WIN_SHELL ?? 'bash') : null;
+if (isWin && !['bash', 'pwsh'].includes(winShell)) {
+  console.error('LAOSHI_PROBE_WIN_SHELL 只能是 bash 或 pwsh');
+  process.exit(2);
+}
+const usePwsh = winShell === 'pwsh';
+
+// Git Bash directories, found from git.exe (<Git>\cmd\git.exe -> <Git>\bin, <Git>\usr\bin).
+function gitBashDirs() {
+  const roots = new Set([path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Git')]);
+  try {
+    for (const line of execFileSync('where', ['git'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split(/\r?\n/)) {
+      const exe = line.trim();
+      if (exe) roots.add(path.resolve(path.dirname(exe), '..'));
+    }
+  } catch {}
+  const dirs = [];
+  for (const root of roots) {
+    for (const d of [path.join(root, 'usr', 'bin'), path.join(root, 'bin')]) {
+      if (fs.existsSync(path.join(d, 'bash.exe')) && !dirs.includes(d)) dirs.push(d);
+    }
+  }
+  return dirs;
+}
+const bashDirs = isWin && !usePwsh ? gitBashDirs() : [];
+if (isWin && !usePwsh && bashDirs.length === 0) {
+  console.error('找不到 Git Bash（<Git>\\bin\\bash.exe）。请安装 Git for Windows，或设置 LAOSHI_PROBE_WIN_SHELL=pwsh 改用 PowerShell。');
+  process.exit(2);
+}
+
+const shellName = usePwsh ? 'PowerShell（pwsh）' : 'bash';
+// Git Bash takes C:/... paths; backslashes would be escapes.
+const shellPath = (file) => (isWin ? file.replace(/\\/g, '/') : file);
+const cmd = usePwsh
   ? {
       hello: "Set-Content -Path hello.txt -Value ok; (Get-ChildItem Env: | Where-Object Name -like 'DSH_*' | Sort-Object Name).Name | Set-Content -Path dsh-env.txt; $PSVersionTable.PSVersion.ToString() | Set-Content -Path shell-version.txt",
       sleep: (sec) => `Start-Sleep -Seconds ${sec}`,
@@ -100,7 +133,7 @@ const cmd = isWin
   : {
       hello: "echo ok > hello.txt && env | grep '^DSH_' | sed 's/=.*//' | sort > dsh-env.txt && echo \"bash $BASH_VERSION\" > shell-version.txt",
       sleep: (sec) => `sleep ${sec}`,
-      write: (file, text) => `echo ${text} > '${file}'`,
+      write: (file, text) => `echo ${text} > '${shellPath(file)}'`,
     };
 const readLines = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : []);
 
@@ -165,12 +198,20 @@ function writeSampleRepo() {
 
 // ---------------------------------------------------------------- dsh host
 
-const hostEnv = () => ({
-  ...env,
-  DSH_HOME: dirs.home,
-  LAOSHI_PROBE_NETLOG: files.netlog,
-  NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import ${pathToFileURL(path.join(here, 'netlog.mjs')).href}`.trim(),
-});
+function hostEnv() {
+  const e = {
+    ...env,
+    DSH_HOME: dirs.home,
+    LAOSHI_PROBE_NETLOG: files.netlog,
+    NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import ${pathToFileURL(path.join(here, 'netlog.mjs')).href}`.trim(),
+  };
+  if (bashDirs.length) {
+    // dsh starts `bash -c` through the Windows sandbox, which searches PATH like CreateProcess.
+    const key = Object.keys(e).find((k) => k.toUpperCase() === 'PATH') ?? 'Path';
+    e[key] = [...bashDirs, e[key] ?? ''].join(path.delimiter);
+  }
+  return e;
+}
 
 function run(cmd, cmdArgs, opts = {}) {
   return execFileSync(cmd, cmdArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
@@ -195,7 +236,15 @@ ${providerCompat}        models:
   config:
     provider: laoshi-probe
     model: ${JSON.stringify(model.id)}
-- insert:
+${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行器，打开 bash 执行器和顶层 bash 工具
+# （预设里的 pwsh 工具关不掉，但它背后也换成了 bash 执行器）
+- id: pwsh-sandbox
+  disabled: true
+- id: bash-sandbox
+  disabled: false
+- id: tool-bash
+  disabled: false
+` : ''}- insert:
     - id: laoshi-probe
       name: 'laoshi-probe'
       config:
@@ -336,6 +385,25 @@ async function main() {
     facts.pnpm = null;
   }
   facts.platform = `${process.platform} ${os.release()}`;
+  if (isWin) {
+    // What the machine allows: dsh's default shell on Windows is PowerShell.
+    const tryRun = (exe, a) => {
+      try {
+        execFileSync(exe, a, { stdio: 'ignore', timeout: 30_000, windowsHide: true });
+        return '可以运行';
+      } catch (e) {
+        return e.code === 'ENOENT' ? '没有安装' : `不能运行（${String(e.message).split('\n')[0].slice(0, 80)}）`;
+      }
+    };
+    facts.windowsPowerShell = tryRun('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
+    facts.pwsh7 = tryRun('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
+    facts.wslBash = fs.existsSync(path.join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'bash.exe'));
+    facts.winShell = winShell;
+    facts.gitBash = bashDirs.join('；') || null;
+    record('P01w', 'Windows shell', usePwsh || !facts.wslBash ? 'info' : 'fail',
+      `探针使用：${usePwsh ? 'PowerShell' : `Git Bash（${facts.gitBash}）`}；Windows PowerShell 5.1：${facts.windowsPowerShell}；PowerShell 7：${facts.pwsh7}` +
+      (facts.wslBash && !usePwsh ? '；检测到 C:\\Windows\\System32\\bash.exe（WSL）：Windows 先查 System32 再查 PATH，dsh 可能启动 WSL 而不是 Git Bash' : ''));
+  }
   facts.installRoot = path.resolve(dsh.dir, '..', '..'); // the node_modules holding @deepseek-ai/dsh
   facts.installSize = `${Math.round(dirSize(facts.installRoot) / 1024 / 1024)} MB`;
   record('P01', '环境与安装', !nodeOk || facts.dsh.startsWith('无法') ? 'fail' : nodeDeclared ? 'pass' : 'info',
@@ -404,11 +472,12 @@ async function main() {
   await prompt(main, run_(cmd.hello));
   await waitIdle(main, 300_000);
   const hello = fs.existsSync(path.join(dirs.repo, 'hello.txt'));
+  facts.toolsUsed = [...new Set((await events(main)).filter((e) => e.type === 'tool/call').map((e) => e.data?.name))];
   const dshVars = readLines(path.join(dirs.repo, 'dsh-env.txt'));
   facts.shell = readLines(path.join(dirs.repo, 'shell-version.txt'))[0] ?? null;
   facts.dshVars = dshVars;
   record('P03', '工具调用与会话识别', hello && dshVars.includes('DSH_SESSION_ID') ? 'pass' : 'fail',
-    `shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}`);
+    `模型调用的工具：${facts.toolsUsed.join('、') || '无'}；shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}`);
 
   // P04 status and usage
   const s4 = await summary(main);
@@ -649,7 +718,7 @@ function writeReport(error) {
     '',
     `- 时间：${new Date().toISOString()}`,
     `- 模式：${selfTest ? '自测（模拟模型，只验证摸底包本身）' : '真实模型'}`,
-    `- 平台：${facts.platform ?? process.platform}；shell：${facts.shell ?? '未知'}`,
+    `- 平台：${facts.platform ?? process.platform}；shell：${facts.shell ?? '未知'}${isWin ? `（LAOSHI_PROBE_WIN_SHELL=${winShell}）` : ''}`,
     `- dsh：${facts.dsh ?? '未知'}；Node：${facts.node ?? process.version}；pnpm：${facts.pnpm ?? '未安装'}；安装占用：${facts.installSize ?? '未知'}`,
     `- 模型：协议 ${model.api}，地址 ${selfTest ? '本机模拟' : redactUrl(model.baseURL)}，模型 ID ${selfTest ? 'mock-1' : '（已省略）'}；凭据来自环境变量 ${model.keyVar}，没有写入任何文件`,
     `- 采用的兼容设置：${facts.compat ? JSON.stringify(facts.compat) : '无（没有成功的组合）'}`,

@@ -49,11 +49,11 @@ http.createServer(async (req, res) => {
   let from = msgs.length;
   while (from > 0 && msgs[from - 1].role === 'user') from--;
   const text = last.role === 'tool' ? textOf(last.content) : msgs.slice(from).map((m) => textOf(m.content)).join('\n');
-  log({ at: new Date().toISOString(), roles: msgs.map((m) => m.role).join(','), last: text.slice(-300) });
 
   let reply;
   const offered = (json.tools ?? []).map((t) => t.function?.name);
   const shell = SHELLS.find((name) => offered.includes(name)) ?? 'bash';
+  log({ at: new Date().toISOString(), roles: msgs.map((m) => m.role).join(','), shellTools: offered.filter((n) => SHELLS.includes(n)), last: text.slice(-300) });
   const bash = last.role === 'user' && /^(?:CMD|BASH): (.+)$/m.exec(text);
   const escalate = last.role === 'user' && /^ESCALATE: (.+)$/m.exec(text);
   const only = last.role === 'user' && /请只回复\s*([A-Z0-9-]+)/.exec(text);
