@@ -87,7 +87,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 
 ## 6. 安装与运行
 
-- **Node 版本**：dsh 声明要求 ≥ 24.9。这个下限来自 dsh 的一个实验性子 agent 集成（依赖的 `@botiverse/oar` 要求 Node 24），以及 Node 24.9 才稳定提供的 `import.meta.main` 等能力。在 Node 22.20 和 22.22 上实测（模拟模型），摸底包的全部探针都能通过；dsh 在 0.2.1-rc.2 之前的版本也正式支持 Node 22.19 以上。因此内网的 Node 22.20 可以先用于摸底，但正式使用前需要定下来：升级到 Node 24，还是接受在声明范围之外运行（§8）。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
+- **Node 版本**：dsh 声明要求 ≥ 24.9。这个下限来自 dsh 的一个实验性子 agent 集成（依赖的 `@botiverse/oar` 要求 Node 24），以及脚本入口用到的 `import.meta.main`（dsh 的说明指出 Node 24.0 还没有这个功能，所以下限没有定在 24.0）。在 Node 22.20 和 22.22 上实测（模拟模型），摸底包的全部探针都能通过；dsh 在 0.2.1-rc.2 之前的版本也正式支持 Node 22.19 以上。因此内网的 Node 22.20 可以先用于摸底，但正式使用前需要定下来：升级到 Node 24，还是接受在声明范围之外运行（§8）。`laoshi doctor` 需要分别检查 laoshi 的 Node 版本和 dsh 的 Node 版本。
 - 插件通过 `dsh plugin --profile <名称> add <包>` 安装，并在 `$DSH_HOME/profiles/<名称>/cordis.patch.yml` 中用 `insert` 挂载。安装器负责这两步，`doctor` 负责检查。
 - skill：`~/.agents/skills` 本来就会被 dsh 读取；按 [ADR 0007](../adr/0007-one-install-many-repos.md)，也可以用 `customSkillDirs` 指向安装根。
 - **内网离线**：
