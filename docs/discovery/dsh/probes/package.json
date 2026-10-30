@@ -1,0 +1,5 @@
+{
+  "name": "laoshi-dsh-probe",
+  "private": true,
+  "description": "dsh 内网摸底包；dsh 安装在本目录的 node_modules 中"
+}

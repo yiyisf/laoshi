@@ -1,0 +1,7 @@
+{"at":"2026-10-29T02:52:26.909Z","loaded":true,"services":{"agents":true,"subagents":true,"schedule":true,"approval":true,"sessions":true,"jobs":true,"worktrees":false},"subagentProviders":["spawn","fork"]}
+{"at":"2026-10-29T02:53:48.790Z","loaded":true,"services":{"agents":true,"subagents":true,"schedule":true,"approval":true,"sessions":true,"jobs":true,"worktrees":false},"subagentProviders":["spawn","fork"]}
+{"at":"2026-10-29T02:53:52.287Z","approval":{"tool":"bash","reason":"escalate sandbox to danger-full-access: probe: needs to write outside the workspace","agent":"session-09ec30d7-4a61-4f59-b6a4-c7e625552066"},"decision":"allowed-once"}
+{"at":"2026-10-29T02:54:02.329Z","spawn":"parent-lookup","live":true}
+{"at":"2026-10-29T02:54:02.353Z","spawn":"started","provider":"spawn","childId":"5c2318a9-b2eb-4dde-a3e0-8c8efb8e1e57"}
+{"at":"2026-10-29T02:54:02.358Z","schedule":"created","record":"{\"id\":\"schedule-f09647e4-ffd4-4ea6-b64f-4011289fac43\",\"kind\":\"after\",\"title\":\"laoshi: 自动继续\",\"prompt\":\"Probe schedule fired: 预约的自动继续\",\"afterSeconds\":45,\"scheduledAt\":\"2026-10-29T02:54:47.328Z\"}"}
+{"at":"2026-10-29T02:54:02.465Z","spawn":"result","childId":"5c2318a9-b2eb-4dde-a3e0-8c8efb8e1e57","result":"{\"output\":[{\"type\":\"text\",\"text\":\"DONE\"}],\"stopReason\":\"completed\"}"}

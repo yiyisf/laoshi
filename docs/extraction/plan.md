@@ -7,6 +7,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 ## 实施前的准备（本文档集之后、写代码之前）
 
 - [x] 能力契约：[contracts/agent-runtime.md](../../contracts/agent-runtime.md)
+- [x] dsh 摸底与适配设计：[摸底报告](../discovery/dsh/report.md)、[dsh-adapter](../design/dsh-adapter.md)、[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)（提议）
 - [x] 设计：[internal-platform-adapter](../design/internal-platform-adapter.md)（草案）、[architecture](../design/architecture.md)、[adapter-guide](../design/adapter-guide.md)、[platform-vocabulary](../design/platform-vocabulary.md)、[init-bootstrap](../design/init-bootstrap.md)、[in-chat-orchestration](../design/in-chat-orchestration.md)、[state-v2](../design/state-v2.md)、[compat-migration](../design/compat-migration.md)
 - [x] 决策：ADR 0001~0005；[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)（确定性引擎 + 平台能力层，先手写后生成，提议）；[ADR 0007](../adr/0007-one-install-many-repos.md)（一次安装、多库共用，个人版与团队版同一设计，提议）
 - [x] 分工与阶段门槛：[workstreams.md](workstreams.md)（5~6 人小队）
@@ -31,6 +32,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 配置：`platform.adapter` / `platform.<id>`；`AgentProfile` 拆通用与私有；旧字段继续读取并提示。安装根（`LAOSHI_HOME`）与"安装级 → 代码库级"两层配置；代码库与使用者标识；`laoshi-setup` 只写代码库专属配置（[ADR 0007](../adr/0007-one-install-many-repos.md)）。
 - 状态 v2：迁移函数与测试；对外契约保持 `schema: 1`（[ADR 0004](../adr/0004-external-contracts-stay-stable.md)）。
 - 平台词汇表：先收敛 `messages.ts`、`launch.ts`、`control.ts`；加 CI 检查，核心里不得出现平台名。
+- 能力来源与内置能力（[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)）：运行时层按 platform → plugin → builtin → none 的顺序选择；把 worktree、服务管理、本机调度做成内置实现，Paseo 适配器继续使用 Paseo 自己的能力。
 - 完成标准：核心目录中搜不到平台名；M1 的回归全部通过；同一安装根下两个代码库的需求可同时运行，使用记录能区分代码库和使用者。
 
 > **顺序说明（ADR 0006）**：摸高平台就是内部平台，M4 优先于原计划，与 M3 并行；M5 的"生成"排在两个手写适配器之后。
@@ -45,6 +47,13 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 前置：该文档 §6 前两个问题（状态来源、HITL 语义）有答案，且已确认引擎进程能在哪里运行、安装根能否放在工作区内（ADR 0007）。
 - 第一版**手写**，不生成；生成实验见 M5。
 - 完成标准：能力矩阵、探针测试、至少一个端到端用例通过；安装根在工作区内，跨对话无需重装。
+
+### M4b DeepSeek Harness（dsh）适配器
+- 形态为"外部引擎 + laoshi dsh 插件"（[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)、[dsh-adapter](../design/dsh-adapter.md)）。摸底已完成，见 [dsh 摸底报告](../discovery/dsh/report.md)。
+- 运行时通过 web host 的 `/api` 管理会话；插件负责在对话下创建子 agent、定时任务、审批和引擎认证；服务与 worktree 使用 M2 的内置实现。
+- 与 M4 相互独立：dsh 和摸高是两件事，摸高的底层不是 dsh。
+- 前置：M2 的运行时层能按来源选择能力；[dsh-adapter §8](../design/dsh-adapter.md) 的第 1 项有结论；[内网摸底包](../discovery/dsh/probes/README.md)在内网用真实模型跑过，P02（模型接入）和 P13（步骤任务）通过。
+- 完成标准：能力矩阵中除契约允许缺失的项外没有 `none`；探针测试转为自动化；用真实模型跑通至少一个 `evals/` 用例，"夸大"为零。
 
 ### M5 初始化 skill 与自检
 - `laoshi init`（detect → probe → generate → review → lock → verify）、锁定文件、`laoshi doctor` 的哈希校验与能力矩阵。
@@ -72,6 +81,9 @@ npm 包名：**`laoshi`（已确认可用）**。
 | 抽取过程中 1.x 仍在修缺陷，两边漂移 | 回归、缺陷重复 | 路径保持一致；`docs/porting-log.md` 登记；"只接收严重缺陷"的规则 |
 | 对外契约被改名破坏插件/IM/汇总 | 现网使用受影响 | [ADR 0004](../adr/0004-external-contracts-stay-stable.md) |
 | 内网模型较弱，生成阶段质量差 | 适配器生成失败 | 描述 schema 校验 + 探针；失败时明确提示手写 |
+| dsh 在内网装不上或要连外网（声明要求 Node ≥ 24.9，内网现为 22.20，但 22.20 实测可以运行；约 950 MB 的 `@deepseek-ai/*` 依赖、浏览器界面触发的外部请求） | M4b 无法在内网使用 | 先跑内网摸底包（P01 安装、P14 对外连接）；发现外部连接时在 profile 中禁用对应插件，并写进安装器 |
+| 内网 Windows 禁止运行 PowerShell；dsh 在 Windows 上默认用 PowerShell 执行命令，而改用 Git Bash 时它在 dsh 的沙箱里起不来（已实测） | M4b 在内网依赖团队的 shell 插件 | 使用内网已有的 shell 插件；确认它的沙箱和审批行为（[dsh-adapter §6](../design/dsh-adapter.md)），不足的部分由 laoshi 的审批策略和危险命令拦截补上；dsh 其余调用 PowerShell 的地方，能配置的写进安装器 |
+| dsh 处于开发者预览，接口和插件 API 会有不兼容变更 | M4b 返工 | 插件和运行时声明支持的 dsh 版本范围，由 `doctor` 检查；引擎尽量只和插件通信，少依赖 `/api` 的内部格式（[dsh-adapter §4](../design/dsh-adapter.md)） |
 
 ## 待定项汇总（评审时逐条定）
 
