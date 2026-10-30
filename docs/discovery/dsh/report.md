@@ -130,6 +130,17 @@ laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些
 - **dsh 本身在内网 Windows（Node 22.20）上可以运行**：host、`/api`、插件（子 agent、定时消息）、重启后续跑、无外连，都和 Linux 一致。
 - **唯一的问题是 shell**：dsh 通过 bash 执行器加 Windows 沙箱启动 Git Bash，命令没有生效。可能是 Git Bash（MSYS 运行时）在沙箱的受限令牌下起不来，也可能是沙箱没有找到 `bash`。这次的报告还没有记下工具返回的错误原文，因此之后的摸底包版本做了两处改进：失败时把工具返回写进报告；并自动加测 P03b，用"不加沙箱"（`DSH_PERMISSION_MODE=danger-full-access`）再执行一次，以区分是 shell 本身不行，还是在沙箱里启动不行。
 
+### 第二次（2026-10-30，摸底包 `ad854ae`，增加了诊断）
+
+| 探针 | 结果 | 说明 |
+| --- | --- | --- |
+| P03 工具调用 | fail | 工具返回：`C:\Program Files\Git\usr\bin\bash.exe: *** fatal error - couldn't create signal pipe, Win32 error 5`，退出码 3221225794 |
+| P03b 不加沙箱再执行一次 | info | 能执行：问题出在沙箱内启动 shell |
+| P04～P06 | pass | 同第一次 |
+| P08 | 中途停止 | 摸底包的缺陷：读取子 agent 的事件时用了普通会话的地址，dsh 要求子会话用"父会话 + 子会话"的地址读取（`session/agent-busy`）。已在后续版本修复，诊断读取失败也不再中止整次运行 |
+
+结论：**Git Bash（MSYS 运行时）在 dsh 的 Windows ACL 沙箱里起不来**。沙箱用受限令牌启动进程，MSYS 启动时创建信号管道被拒绝（Win32 error 5）。这不是配置问题，dsh 现有的沙箱和 Git Bash 不兼容。内网团队已有专门的 dsh 插件解决 Windows 上的 bash 问题；摸底包随后增加了 `LAOSHI_PROBE_WIN_SHELL=custom` 和团队插件参数，用来带上这个插件再测一次。
+
 ## 尚未验证
 
 1. 内网真实模型（与 req-kit 相同）配合 dsh 的效果：模型网关的兼容设置，以及步骤任务能否按结果文件约定完成（内网摸底包 P02、P13）；之后再跑 `evals/` 端到端用例。

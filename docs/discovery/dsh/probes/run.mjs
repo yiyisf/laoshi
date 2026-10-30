@@ -89,11 +89,24 @@ if (!dsh) {
 }
 const dshArgs = (...a) => [dsh.bin, ...a];
 
+// LAOSHI_PROBE_EXTRA_PATCH: a YAML patch appended to the probe's dsh profile (e.g. mounting a team plugin).
+let extraPatch = null;
+if (env.LAOSHI_PROBE_EXTRA_PATCH) {
+  try {
+    extraPatch = fs.readFileSync(env.LAOSHI_PROBE_EXTRA_PATCH, 'utf8').replace(/^\uFEFF/, '');
+  } catch (e) {
+    console.error(`读不到 LAOSHI_PROBE_EXTRA_PATCH 指定的文件：${e.message}`);
+    process.exit(2);
+  }
+}
+
 // Which shell dsh gives the model. dsh's Windows default is PowerShell; where PowerShell is
 // restricted, LAOSHI_PROBE_WIN_SHELL=bash (the default here) switches dsh to Git Bash.
+// custom: leave dsh's shell setup alone; a team plugin supplies it (LAOSHI_PROBE_EXTRA_PLUGINS
+// and LAOSHI_PROBE_EXTRA_PATCH). Probe commands are then written for bash.
 const winShell = isWin ? (env.LAOSHI_PROBE_WIN_SHELL ?? 'bash') : null;
-if (isWin && !['bash', 'pwsh'].includes(winShell)) {
-  console.error('LAOSHI_PROBE_WIN_SHELL 只能是 bash 或 pwsh');
+if (isWin && !['bash', 'pwsh', 'custom'].includes(winShell)) {
+  console.error('LAOSHI_PROBE_WIN_SHELL 只能是 bash、pwsh 或 custom');
   process.exit(2);
 }
 const usePwsh = winShell === 'pwsh';
@@ -115,8 +128,9 @@ function gitBashDirs() {
   }
   return dirs;
 }
-const bashDirs = isWin && !usePwsh ? gitBashDirs() : [];
-if (isWin && !usePwsh && bashDirs.length === 0) {
+const gitBashMode = isWin && winShell === 'bash';
+const bashDirs = gitBashMode ? gitBashDirs() : [];
+if (gitBashMode && bashDirs.length === 0) {
   console.error('找不到 Git Bash（<Git>\\bin\\bash.exe）。请安装 Git for Windows，或设置 LAOSHI_PROBE_WIN_SHELL=pwsh 改用 PowerShell。');
   process.exit(2);
 }
@@ -237,7 +251,7 @@ ${providerCompat}        models:
   config:
     provider: laoshi-probe
     model: ${JSON.stringify(model.id)}
-${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行器，打开 bash 执行器和顶层 bash 工具
+${gitBashMode ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行器，打开 bash 执行器和顶层 bash 工具
 # （预设里的 pwsh 工具关不掉，但它背后也换成了 bash 执行器）
 - id: pwsh-sandbox
   disabled: true
@@ -261,7 +275,7 @@ ${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行�
         inbox: ${JSON.stringify(dirs.inbox)}
         outbox: ${JSON.stringify(dirs.outbox)}
         allowFile: ${JSON.stringify(files.allow)}
-`;
+${extraPatch ? `# ---- 以下来自 LAOSHI_PROBE_EXTRA_PATCH（${path.basename(env.LAOSHI_PROBE_EXTRA_PATCH)}）\n${extraPatch.trimEnd()}\n` : ''}`;
   fs.mkdirSync(path.join(dirs.home, 'profiles/web'), { recursive: true });
   fs.mkdirSync(path.join(out, 'documents'), { recursive: true });
   fs.writeFileSync(path.join(dirs.home, 'profiles/web/cordis.patch.yml'), patch);
@@ -328,8 +342,12 @@ const createSession = async () => (await rpc('session/create', { request: { cwd:
 const prompt = (sessionId, text, mode = 'queue') =>
   rpc('session/prompt', { request: { requestId: `probe-${Date.now()}-${rpcCount}`, sessionId, mode, content: [{ type: 'text', text }] } });
 
-async function events(sessionId) {
-  const page = await rpc('session/page', { request: { address: { kind: 'session', sessionId }, maxMessages: 1000 } });
+// A child session is read through its parent's address (dsh: "subagent Sessions require their durable parent address").
+async function events(sessionId, parentSessionId = null) {
+  const address = parentSessionId
+    ? { kind: 'subagent', parentSessionId, childSessionId: sessionId, mode: 'continuable' }
+    : { kind: 'session', sessionId };
+  const page = await rpc('session/page', { request: { address, maxMessages: 1000 } });
   return page.records.filter((r) => r.type === 'event').map((r) => r.event);
 }
 const userText = (e) => (e.data?.content ?? []).map((p) => p.text ?? '').join('');
@@ -340,6 +358,14 @@ const lastToolResult = (evs) => {
   const t = toolResults(evs).at(-1);
   return t ? (t.length > 400 ? `${t.slice(0, 400)}…` : t) : '（没有工具结果）';
 };
+// Diagnostics never stop the run.
+async function toolTail(sessionId, parentSessionId = null) {
+  try {
+    return lastToolResult(await events(sessionId, parentSessionId));
+  } catch (e) {
+    return `（读取失败：${e.message.slice(0, 160)}）`;
+  }
+}
 const assistantTexts = (evs) => evs.filter((e) => e.type === 'assistant/message').map((e) => (e.data.message?.content ?? []).filter((p) => p.type === 'text').map((p) => p.text).join(''));
 
 async function waitIdle(sessionId, timeoutMs) {
@@ -407,9 +433,9 @@ async function main() {
     facts.wslBash = fs.existsSync(path.join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'bash.exe'));
     facts.winShell = winShell;
     facts.gitBash = bashDirs.join('；') || null;
-    record('P01w', 'Windows shell', usePwsh || !facts.wslBash ? 'info' : 'fail',
-      `探针使用：${usePwsh ? 'PowerShell' : `Git Bash（${facts.gitBash}）`}；摸底包不会启动 PowerShell` +
-      (facts.wslBash && !usePwsh ? '；检测到 C:\\Windows\\System32\\bash.exe（WSL）：Windows 先查 System32 再查 PATH，dsh 可能启动 WSL 而不是 Git Bash' : ''));
+    record('P01w', 'Windows shell', !gitBashMode || !facts.wslBash ? 'info' : 'fail',
+      `探针使用：${usePwsh ? 'PowerShell' : gitBashMode ? `Git Bash（${facts.gitBash}）` : '团队插件提供的 shell（custom，不改 dsh 的 shell 配置）'}；摸底包不会启动 PowerShell` +
+      (facts.wslBash && gitBashMode ? '；检测到 C:\\Windows\\System32\\bash.exe（WSL）：Windows 先查 System32 再查 PATH，dsh 可能启动 WSL 而不是 Git Bash' : ''));
   }
   facts.installRoot = path.resolve(dsh.dir, '..', '..'); // the node_modules holding @deepseek-ai/dsh
   facts.installSize = `${Math.round(dirSize(facts.installRoot) / 1024 / 1024)} MB`;
@@ -437,6 +463,22 @@ async function main() {
     pluginInstall = `dsh plugin add 失败（${e.message.split('\n')[0].slice(0, 120)}），改为直接复制`;
   }
   facts.pluginInstall = pluginInstall;
+
+  // Team plugins (e.g. an intranet shell plugin), installed into the probe's own profile.
+  facts.extraPlugins = [];
+  for (const spec of (env.LAOSHI_PROBE_EXTRA_PLUGINS ?? '').split(';').map((x) => x.trim()).filter(Boolean)) {
+    const target = fs.existsSync(spec) ? `file:${path.resolve(spec).replace(/\\/g, '/')}` : spec;
+    try {
+      run(process.execPath, dshArgs('plugin', '--profile', 'web', 'add', target), { env: { ...env, DSH_HOME: dirs.home } });
+      facts.extraPlugins.push(`${path.basename(spec)}：已安装`);
+    } catch (e) {
+      facts.extraPlugins.push(`${path.basename(spec)}：安装失败（${e.message.split('\n')[0].slice(0, 120)}）`);
+    }
+  }
+  if (facts.extraPlugins.length || extraPatch) {
+    record('P01x', '团队插件', facts.extraPlugins.some((x) => x.includes('失败')) ? 'fail' : 'info',
+      `${facts.extraPlugins.join('；') || '没有额外插件'}；附加补丁：${extraPatch ? path.basename(env.LAOSHI_PROBE_EXTRA_PATCH) : '无'}`);
+  }
 
   // P02 model access: try compat variants until one answers.
   const variants = model.api === 'openai-completions'
@@ -486,7 +528,7 @@ async function main() {
   const p03ok = hello && dshVars.includes('DSH_SESSION_ID');
   record('P03', '工具调用与会话识别', p03ok ? 'pass' : 'fail',
     `模型调用的工具：${facts.toolsUsed.join('、') || '无'}；shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}` +
-      (p03ok ? '' : `；工具返回：${lastToolResult(await events(main))}`));
+      (p03ok ? '' : `；工具返回：${await toolTail(main)}`));
   // LAOSHI_PROBE_FORCE_DIAG=1 runs P03b even when P03 passes (to test the probe kit itself).
   if (!p03ok || env.LAOSHI_PROBE_FORCE_DIAG) await diagnoseShell();
 
@@ -551,7 +593,7 @@ async function main() {
     const ok = r8?.ok && listed && child?.origin === 'subagent' && child?.parentSessionId === main && file;
     record('P08', '插件在会话下创建子 agent', ok ? 'pass' : 'fail',
       `结果：${r8 ? (r8.ok ? r8.result?.stopReason ?? 'ok' : r8.error) : '超时'}；出现在父会话子 agent 列表：${listed}；origin=${child?.origin}；文件写在指定目录：${file}` +
-        (file || !childId ? '' : `；子 agent 的工具返回：${lastToolResult(await events(childId))}`));
+        ((file && !env.LAOSHI_PROBE_FORCE_DIAG) || !childId ? '' : `；子 agent 的工具返回：${await toolTail(childId, main)}`));
   }
 
   // P09 follow up the child from outside
@@ -673,7 +715,7 @@ async function diagnoseShell() {
     await waitIdle(sid, 300_000);
     const ok = fs.existsSync(path.join(dirs.repo, 'diag.txt'));
     record('P03b', '诊断：不加沙箱时 shell 能否执行', ok ? 'info' : 'fail',
-      ok ? '不加沙箱时命令能执行：问题出在沙箱内启动 shell' : `不加沙箱时也不能执行：问题出在 shell 本身；工具返回：${lastToolResult(await events(sid))}`);
+      ok ? '不加沙箱时命令能执行：问题出在沙箱内启动 shell' : `不加沙箱时也不能执行：问题出在 shell 本身；工具返回：${await toolTail(sid)}`);
   } catch (e) {
     record('P03b', '诊断：不加沙箱时 shell 能否执行', 'fail', `诊断没有完成：${e.message}`);
   }
@@ -768,6 +810,7 @@ function writeReport(error) {
     `- 模型：协议 ${model.api}，地址 ${selfTest ? '本机模拟' : redactUrl(model.baseURL)}，模型 ID ${selfTest ? 'mock-1' : '（已省略）'}；凭据来自环境变量 ${model.keyVar}，没有写入任何文件`,
     `- 采用的兼容设置：${facts.compat ? JSON.stringify(facts.compat) : '无（没有成功的组合）'}`,
     `- 探针插件安装方式：${facts.pluginInstall ?? '未安装'}`,
+    `- 团队插件：${facts.extraPlugins?.length ? facts.extraPlugins.join('；') : '无'}；附加补丁：${extraPatch ? path.basename(env.LAOSHI_PROBE_EXTRA_PATCH) : '无'}`,
     '',
     '| 编号 | 探针 | 结果 | 说明 |',
     '| --- | --- | --- | --- |',

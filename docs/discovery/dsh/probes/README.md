@@ -28,7 +28,9 @@
 | `LAOSHI_PROBE_MODEL_ID` | 是 | 模型 ID，和 req-kit 当前使用的相同 |
 | `LAOSHI_PROBE_MODEL_API_KEY` | 是 | 访问网关的凭据 |
 | `LAOSHI_PROBE_MODEL_API` | 否 | 网关协议：`openai-completions`（默认）、`openai-responses`、`anthropic-messages` |
-| `LAOSHI_PROBE_WIN_SHELL` | 否 | 仅 Windows：dsh 给模型用的 shell。默认 `bash`（Git Bash）。`pwsh` 是 dsh 的原生默认（PowerShell），内网禁止 PowerShell，**不要设置** |
+| `LAOSHI_PROBE_WIN_SHELL` | 否 | 仅 Windows：dsh 给模型用的 shell。`bash`（默认）：由摸底包把 dsh 改成 Git Bash，但内网实测在沙箱里起不来，见下文；`custom`：摸底包不改 dsh 的 shell 配置，由团队插件提供（**内网用这个**）；`pwsh`：dsh 原生的 PowerShell，内网禁止，不要用 |
+| `LAOSHI_PROBE_EXTRA_PLUGINS` | 否 | 要一起装进摸底用 dsh profile 的团队插件，多个用 `;` 分隔。每项可以是插件目录、`.tgz` 文件路径，或内网 npm 上的包名（如 `@team/dsh-shell@1.2.0`）。摸底包用的是独立的 `DSH_HOME`，本机 dsh 里已装的插件不会自动带进来 |
+| `LAOSHI_PROBE_EXTRA_PATCH` | 否 | 一个 YAML 补丁文件，内容原样追加到摸底包生成的 `cordis.patch.yml` 末尾。用来挂载团队插件、调整它的配置，写法和你们本机 `$DSH_HOME\profiles\web\cordis.patch.yml` 里挂载这个插件的那几行相同 |
 | `LAOSHI_PROBE_NPM_REGISTRY` | 否 | 内网 npm 镜像地址。只有 `run.cmd` 自动安装 dsh 时会用到 |
 | `LAOSHI_PROBE_DSH` | 否 | 已经装好 dsh 的目录（其下有 `node_modules\@deepseek-ai\dsh`）。不设时依次查找：当前目录、本目录、npm 全局目录 |
 
@@ -69,6 +71,18 @@ node run.mjs --self-test
 node run.mjs
 ```
 
+### 用团队的 shell 插件（内网推荐）
+
+内网已经有专门解决 Windows 上 bash 问题的插件。运行时让摸底包把它带上：
+
+```bat
+setx LAOSHI_PROBE_WIN_SHELL custom
+setx LAOSHI_PROBE_EXTRA_PLUGINS "C:\path\to\your-shell-plugin"
+setx LAOSHI_PROBE_EXTRA_PATCH "C:\path\to\shell-plugin.patch.yml"
+```
+
+`shell-plugin.patch.yml` 照抄你们本机 dsh profile 里挂载这个插件（以及关掉默认 shell 执行器）的那几段即可。报告的 P01x 会显示插件是否装上，P03 显示模型调用的工具和执行结果。
+
 ### Windows 上的 shell
 
 dsh 在 Windows 上默认让模型通过 PowerShell 执行命令。内网禁止运行 PowerShell，所以摸底包默认（`LAOSHI_PROBE_WIN_SHELL=bash`）在 dsh 的配置里做三处改动：
@@ -81,7 +95,7 @@ dsh 在 Windows 上默认让模型通过 PowerShell 执行命令。内网禁止�
 
 需要注意：
 
-- **这不是 dsh 官方覆盖的组合。** dsh 在 Windows 上默认不开 bash，这次摸底就是要确认它能不能用。
+- **这不是 dsh 官方覆盖的组合，内网实测不能用。** 在 dsh 的 Windows 沙箱（受限令牌）里启动 Git Bash 会报 `couldn't create signal pipe, Win32 error 5`（拒绝访问）；不加沙箱时可以执行（P03b）。所以内网请用团队插件（`LAOSHI_PROBE_WIN_SHELL=custom`）。
 - Windows 查找 `bash` 时，会先查 `C:\Windows\System32` 再查 PATH。如果机器装了 WSL，`System32` 下会有一个 `bash.exe`，dsh 可能会启动 WSL 而不是 Git Bash。摸底包检测到这种情况时，P01w 会标为 fail。
 - 内网禁止运行 PowerShell，所以**摸底包从不启动 PowerShell**，也不会去测试它能不能运行，以免触发安全告警。
 
@@ -125,6 +139,7 @@ node run.mjs
 | P01w | 仅 Windows：探针用的 shell（Git Bash 的位置），以及有没有 WSL 的 `bash.exe`。不启动 PowerShell |
 | P02 | 模型接入：依次尝试几组兼容设置（`supportsDeveloperRole`、`maxTokensField`），记下第一组能用的 |
 | P03 | 工具调用（模型实际调用的工具名，以及 shell 版本）、产物落在会话目录、`DSH_*` 环境变量（用于识别发起的对话）。失败时，报告里附上工具返回的原文 |
+| P01x | 设置了 `LAOSHI_PROBE_EXTRA_PLUGINS` 或 `LAOSHI_PROBE_EXTRA_PATCH` 时：团队插件是否装上 |
 | P03b | 只在 P03 失败时运行：临时以"不加沙箱"模式（`DSH_PERMISSION_MODE=danger-full-access`）重启 dsh，在样例仓库里写一个文件，用来区分"shell 本身起不来"还是"在沙箱里起不来"，然后恢复正常模式继续 |
 | P04 | 会话状态与 token 用量 |
 | P05 | 用 `session/cancel` 打断一个正在运行的回合 |
