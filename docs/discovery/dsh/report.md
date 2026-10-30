@@ -141,6 +141,27 @@ laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些
 
 结论：**Git Bash（MSYS 运行时）在 dsh 的 Windows ACL 沙箱里起不来**。沙箱用受限令牌启动进程，MSYS 启动时创建信号管道被拒绝（Win32 error 5）。这不是配置问题，dsh 现有的沙箱和 Git Bash 不兼容。内网团队已有专门的 dsh 插件解决 Windows 上的 bash 问题；摸底包随后增加了 `LAOSHI_PROBE_WIN_SHELL=custom` 和团队插件参数，用来带上这个插件再测一次。
 
+### 第三次（2026-10-30，**真实模型**，摸底包 `0b51f89`，`LAOSHI_PROBE_WIN_SHELL=bash`，没有带团队插件）
+
+| 探针 | 结果 | 说明 |
+| --- | --- | --- |
+| P02 模型接入 | pass | 不需要任何兼容设置 |
+| P03 工具调用 | fail | 工具返回：`bash.exe: *** fatal error - NtCreateDirectoryObject(\BaseNamedObjects\msys-2.0S5-…): 0xC0000022`（拒绝访问） |
+| P03b 不加沙箱 | info | 能执行 |
+| P04～P07 | pass | |
+| P08 子 agent、P09 追问子 agent | pass | **在沙箱里的 Git Bash 执行成功** |
+| P10 定时消息 | pass | 延迟 0.1 秒 |
+| P11a 插件代为审批 | pass | 真实模型被沙箱拒绝后带 `sandbox_permissions` 申请升权，插件批准，写入成功 |
+| P11b 无人作答 | info | 一直挂起，用 cancel 结束 |
+| P12 重启后续跑 | pass | 主会话和子 agent 都续上了 |
+| P13 方案设计、代码实现、代码评审 | pass | 内网模型按结果文件约定写出合格的 JSON（`design` 的 `files` 指向 `src/sum.js`；`implement` 后测试通过，模型自报 `partial`；`code_review` 为 `pass`），各用时约 1 分钟 |
+| P14 对外连接 | pass | 73 次解析和连接，全部是本机或模型网关 |
+
+结论：
+
+- **内网真实模型 + dsh + laoshi 插件的整条链路可以跑通**：子 agent、定时消息、插件审批、重启续跑、按结果文件约定完成步骤任务、无外连。
+- **Git Bash 在沙箱里"第一次启动"失败，之后可以正常执行。** P03 失败时，报错从 `CreateDirectoryObject` 改为 `NtCreateDirectoryObject`，但都是创建 MSYS 的命名对象目录 `\BaseNamedObjects\msys-2.0S5-<hash>` 时被拒绝。P03b 用不加沙箱的 bash 执行过一次以后，之后所有沙箱里的 bash 命令（P08～P13）都能执行。推测：受限令牌不能**创建**这个目录，但能**打开**已经存在的目录；而这个目录只要还有进程持有它就会一直存在。这个推测尚未验证。之后的摸底包加了 P03c（P03b 之后在沙箱里重试 P03）和 MSYS 进程快照（`tasklist`），用来确认。
+
 ## 尚未验证
 
 1. 内网真实模型（与 req-kit 相同）配合 dsh 的效果：模型网关的兼容设置，以及步骤任务能否按结果文件约定完成（内网摸底包 P02、P13）；之后再跑 `evals/` 端到端用例。

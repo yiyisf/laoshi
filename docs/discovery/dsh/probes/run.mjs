@@ -433,6 +433,7 @@ async function main() {
     facts.wslBash = fs.existsSync(path.join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'bash.exe'));
     facts.winShell = winShell;
     facts.gitBash = bashDirs.join('；') || null;
+    facts.msysAtStart = msysProcesses();
     record('P01w', 'Windows shell', !gitBashMode || !facts.wslBash ? 'info' : 'fail',
       `探针使用：${usePwsh ? 'PowerShell' : gitBashMode ? `Git Bash（${facts.gitBash}）` : '团队插件提供的 shell（custom，不改 dsh 的 shell 配置）'}；摸底包不会启动 PowerShell` +
       (facts.wslBash && gitBashMode ? '；检测到 C:\\Windows\\System32\\bash.exe（WSL）：Windows 先查 System32 再查 PATH，dsh 可能启动 WSL 而不是 Git Bash' : ''));
@@ -530,7 +531,7 @@ async function main() {
     `模型调用的工具：${facts.toolsUsed.join('、') || '无'}；shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}` +
       (p03ok ? '' : `；工具返回：${await toolTail(main)}`));
   // LAOSHI_PROBE_FORCE_DIAG=1 runs P03b even when P03 passes (to test the probe kit itself).
-  if (!p03ok || env.LAOSHI_PROBE_FORCE_DIAG) await diagnoseShell();
+  if (!p03ok || env.LAOSHI_PROBE_FORCE_DIAG) await diagnoseShell(main);
 
   // P04 status and usage
   const s4 = await summary(main);
@@ -705,7 +706,7 @@ async function main() {
 // P03b: when the shell tool did nothing, run the same kind of command once with the sandbox
 // off (DSH_PERMISSION_MODE=danger-full-access), to tell "the shell cannot start" from "the
 // sandbox stops it". Only a file write in the sample repository runs in this mode.
-async function diagnoseShell() {
+async function diagnoseShell(main_) {
   const port = new URL(host.base).port;
   await stopHost();
   try {
@@ -719,8 +720,35 @@ async function diagnoseShell() {
   } catch (e) {
     record('P03b', '诊断：不加沙箱时 shell 能否执行', 'fail', `诊断没有完成：${e.message}`);
   }
+  facts.msysAfterDiag = msysProcesses();
   await stopHost();
   await startHost('main', port);
+
+  // P03c: the same P03 command in the sandbox again, now that an unsandboxed MSYS process has run.
+  // In the intranet run every later sandboxed command worked after P03b: the guess is that MSYS can
+  // open, but not create, its \\BaseNamedObjects\\msys-* directory under the restricted token.
+  for (const f of ['hello.txt', 'dsh-env.txt', 'shell-version.txt']) fs.rmSync(path.join(dirs.repo, f), { force: true });
+  await prompt(main_, run_(cmd.hello));
+  await waitIdle(main_, 300_000);
+  const ok = fs.existsSync(path.join(dirs.repo, 'hello.txt'));
+  facts.msysAtRetry = msysProcesses();
+  record('P03c', '诊断：P03b 之后在沙箱里重试 P03', ok ? 'info' : 'fail',
+    `${ok ? '这次能执行' : `仍然不能执行；工具返回：${await toolTail(main_)}`}` +
+      (isWin ? `；Git Bash 相关进程：开始时 ${facts.msysAtStart ?? '未记录'}，P03b 后 ${facts.msysAfterDiag}，重试时 ${facts.msysAtRetry}` : ''));
+}
+
+// Running MSYS processes (bash, sh, mintty, ssh-agent, gpg-agent...) by image name, via tasklist.
+function msysProcesses() {
+  if (!isWin) return null;
+  try {
+    const names = execFileSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true })
+      .split(/\r?\n/).map((l) => l.split('","')[0]?.replace(/^"/, '').toLowerCase()).filter(Boolean);
+    const counts = {};
+    for (const n of names) if (/^(bash|sh|mintty|ssh-agent|gpg-agent|dirmngr|git-bash|cat|sleep)\.exe$/.test(n)) counts[n] = (counts[n] ?? 0) + 1;
+    return Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(' ') || '无';
+  } catch (e) {
+    return `tasklist 失败（${String(e.message).slice(0, 60)}）`;
+  }
 }
 
 function hostWarnings() {
