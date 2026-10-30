@@ -108,6 +108,28 @@ node probes/dsh-api.mjs web.log session/create '{"request":{"cwd":"/path/to/empt
 
 laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些结论还需要在内网用真实模型复核一遍，为此把本次的探针整理成了一条命令就能运行的[内网摸底包](probes/README.md)：P01～P14，生成 `report.md`。摸底包已在云端用模拟模型自测通过。
 
+## 内网 Windows 自测结果（2026-10-30）
+
+内网 Windows 机器，Node 22.20.0，dsh 0.2.2-alpha.2，pnpm 10.33.0，摸底包 `f6ad195`，`run.cmd --self-test`（模拟模型）。内网禁止运行 PowerShell，摸底包按 Git Bash 配置 dsh。
+
+| 探针 | 结果 | 说明 |
+| --- | --- | --- |
+| P01w Windows shell | info | 找到 Git Bash（`C:\Program Files\Git\usr\bin`、`C:\Program Files\Git\bin`），没有 WSL 的 `bash.exe` |
+| P01 环境与安装 | info | Node 22.20.0 低于 dsh 声明的 24.9，但可以运行；安装占用 736 MB |
+| P02 模型接入、P04 状态与用量、P05 打断、P06 排队、P07 插话 | pass | 与 Linux 相同 |
+| P03 工具调用 | **fail** | 模型调用了 `bash` 工具，但命令没有生效：没有产生文件，读不到 `DSH_*` 变量 |
+| P08 插件创建子 agent | **fail** | 子 agent 创建成功、带标签挂在会话下（`origin=subagent`），但它执行的命令同样没有生效 |
+| P09 追问子 agent | **fail** | 同上，命令没有生效 |
+| P10 插件创建定时消息 | pass | 到点送达，延迟 0.1 秒 |
+| P11a、P11b 审批 | info、skip | 没有出现审批请求：命令没有执行到沙箱拒绝那一步 |
+| P12 重启后续跑 | pass | 会话保留、旧 cookie 有效、主会话续跑正常；子 agent 的命令仍然没有生效 |
+| P14 对外连接 | pass | 除本机和模型端点外没有对外连接 |
+
+结论：
+
+- **dsh 本身在内网 Windows（Node 22.20）上可以运行**：host、`/api`、插件（子 agent、定时消息）、重启后续跑、无外连，都和 Linux 一致。
+- **唯一的问题是 shell**：dsh 通过 bash 执行器加 Windows 沙箱启动 Git Bash，命令没有生效。可能是 Git Bash（MSYS 运行时）在沙箱的受限令牌下起不来，也可能是沙箱没有找到 `bash`。这次的报告还没有记下工具返回的错误原文，因此之后的摸底包版本做了两处改进：失败时把工具返回写进报告；并自动加测 P03b，用"不加沙箱"（`DSH_PERMISSION_MODE=danger-full-access`）再执行一次，以区分是 shell 本身不行，还是在沙箱里启动不行。
+
 ## 尚未验证
 
 1. 内网真实模型（与 req-kit 相同）配合 dsh 的效果：模型网关的兼容设置，以及步骤任务能否按结果文件约定完成（内网摸底包 P02、P13）；之后再跑 `evals/` 端到端用例。

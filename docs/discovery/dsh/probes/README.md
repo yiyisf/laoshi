@@ -124,7 +124,8 @@ node run.mjs
 | P01 | 平台，Node、dsh、pnpm 的版本，安装占用的空间 |
 | P01w | 仅 Windows：探针用的 shell（Git Bash 的位置），以及有没有 WSL 的 `bash.exe`。不启动 PowerShell |
 | P02 | 模型接入：依次尝试几组兼容设置（`supportsDeveloperRole`、`maxTokensField`），记下第一组能用的 |
-| P03 | 工具调用（模型实际调用的工具名，以及 shell 版本）、产物落在会话目录、`DSH_*` 环境变量（用于识别发起的对话） |
+| P03 | 工具调用（模型实际调用的工具名，以及 shell 版本）、产物落在会话目录、`DSH_*` 环境变量（用于识别发起的对话）。失败时，报告里附上工具返回的原文 |
+| P03b | 只在 P03 失败时运行：临时以"不加沙箱"模式（`DSH_PERMISSION_MODE=danger-full-access`）重启 dsh，在样例仓库里写一个文件，用来区分"shell 本身起不来"还是"在沙箱里起不来"，然后恢复正常模式继续 |
 | P04 | 会话状态与 token 用量 |
 | P05 | 用 `session/cancel` 打断一个正在运行的回合 |
 | P06 | 回合运行中投递消息（queue），确认不打断当前回合 |
@@ -136,6 +137,8 @@ node run.mjs
 | P12 | host 重启后：会话是否还在、旧 cookie 是否有效、主会话和子 agent 能否接着跑 |
 | P13 | 模型按 req-kit 结果文件约定完成三个步骤：方案设计、代码实现、代码评审 |
 | P14 | 对外连接：除本机和模型网关外，dsh 有没有尝试连接其他地址 |
+
+报告末尾的"dsh 启动日志中的警告"一节，会列出 dsh 启动日志里包含 warn、error、did not activate 等字样的行（不含 token）。
 
 ## 回传
 

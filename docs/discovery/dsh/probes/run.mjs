@@ -198,9 +198,10 @@ function writeSampleRepo() {
 
 // ---------------------------------------------------------------- dsh host
 
-function hostEnv() {
+function hostEnv(extra = {}) {
   const e = {
     ...env,
+    ...extra,
     DSH_HOME: dirs.home,
     LAOSHI_PROBE_NETLOG: files.netlog,
     NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import ${pathToFileURL(path.join(here, 'netlog.mjs')).href}`.trim(),
@@ -267,11 +268,11 @@ ${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行�
 }
 
 let host = null;
-async function startHost(label, port = 0) {
+async function startHost(label, port = 0, extraEnv = {}) {
   const logFile = path.join(dirs.logs, `host-${label}.log`);
   const fd = fs.openSync(logFile, 'w');
   // cwd = repo: the sandbox's workspace root is the host's cwd.
-  const child = spawn(process.execPath, dshArgs('--profile', 'web', '--no-open', '--port', String(port)), { cwd: dirs.repo, env: hostEnv(), stdio: ['ignore', fd, fd], detached: !isWin, windowsHide: true });
+  const child = spawn(process.execPath, dshArgs('--profile', 'web', '--no-open', '--port', String(port)), { cwd: dirs.repo, env: hostEnv(extraEnv), stdio: ['ignore', fd, fd], detached: !isWin, windowsHide: true });
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     const text = fs.readFileSync(logFile, 'utf8');
@@ -332,6 +333,13 @@ async function events(sessionId) {
   return page.records.filter((r) => r.type === 'event').map((r) => r.event);
 }
 const userText = (e) => (e.data?.content ?? []).map((p) => p.text ?? '').join('');
+// What the shell tool returned, for the report when a command did not take effect.
+const toolResults = (evs) =>
+  evs.filter((e) => e.type === 'tool/result').map((e) => (e.data.message?.content ?? []).map((p) => p.text ?? '').join('').replace(/\s+/g, ' ').trim());
+const lastToolResult = (evs) => {
+  const t = toolResults(evs).at(-1);
+  return t ? (t.length > 400 ? `${t.slice(0, 400)}…` : t) : '（没有工具结果）';
+};
 const assistantTexts = (evs) => evs.filter((e) => e.type === 'assistant/message').map((e) => (e.data.message?.content ?? []).filter((p) => p.type === 'text').map((p) => p.text).join(''));
 
 async function waitIdle(sessionId, timeoutMs) {
@@ -475,8 +483,12 @@ async function main() {
   const dshVars = readLines(path.join(dirs.repo, 'dsh-env.txt'));
   facts.shell = readLines(path.join(dirs.repo, 'shell-version.txt'))[0] ?? null;
   facts.dshVars = dshVars;
-  record('P03', '工具调用与会话识别', hello && dshVars.includes('DSH_SESSION_ID') ? 'pass' : 'fail',
-    `模型调用的工具：${facts.toolsUsed.join('、') || '无'}；shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}`);
+  const p03ok = hello && dshVars.includes('DSH_SESSION_ID');
+  record('P03', '工具调用与会话识别', p03ok ? 'pass' : 'fail',
+    `模型调用的工具：${facts.toolsUsed.join('、') || '无'}；shell：${facts.shell ?? '未知'}；hello.txt ${hello ? '在会话目录' : '没有出现'}；环境变量：${dshVars.join('、') || '无'}` +
+      (p03ok ? '' : `；工具返回：${lastToolResult(await events(main))}`));
+  // LAOSHI_PROBE_FORCE_DIAG=1 runs P03b even when P03 passes (to test the probe kit itself).
+  if (!p03ok || env.LAOSHI_PROBE_FORCE_DIAG) await diagnoseShell();
 
   // P04 status and usage
   const s4 = await summary(main);
@@ -538,7 +550,8 @@ async function main() {
     const file = fs.existsSync(path.join(dirs.repo, 'step/child.txt'));
     const ok = r8?.ok && listed && child?.origin === 'subagent' && child?.parentSessionId === main && file;
     record('P08', '插件在会话下创建子 agent', ok ? 'pass' : 'fail',
-      `结果：${r8 ? (r8.ok ? r8.result?.stopReason ?? 'ok' : r8.error) : '超时'}；出现在父会话子 agent 列表：${listed}；origin=${child?.origin}；文件写在指定目录：${file}`);
+      `结果：${r8 ? (r8.ok ? r8.result?.stopReason ?? 'ok' : r8.error) : '超时'}；出现在父会话子 agent 列表：${listed}；origin=${child?.origin}；文件写在指定目录：${file}` +
+        (file || !childId ? '' : `；子 agent 的工具返回：${lastToolResult(await events(childId))}`));
   }
 
   // P09 follow up the child from outside
@@ -647,6 +660,39 @@ async function main() {
     external.size === 0 ? `共记录 ${lines.length} 次解析/连接，全部是本机或模型网关` : `除本机和模型网关外，还尝试连接：${[...external].map(([k, v]) => `${k}（${v} 次）`).join('、')}`);
 }
 
+// P03b: when the shell tool did nothing, run the same kind of command once with the sandbox
+// off (DSH_PERMISSION_MODE=danger-full-access), to tell "the shell cannot start" from "the
+// sandbox stops it". Only a file write in the sample repository runs in this mode.
+async function diagnoseShell() {
+  const port = new URL(host.base).port;
+  await stopHost();
+  try {
+    await startHost('diag-full-access', 0, { DSH_PERMISSION_MODE: 'danger-full-access' });
+    const sid = await createSession();
+    await prompt(sid, run_(cmd.write('diag.txt', 'diag-ok')));
+    await waitIdle(sid, 300_000);
+    const ok = fs.existsSync(path.join(dirs.repo, 'diag.txt'));
+    record('P03b', '诊断：不加沙箱时 shell 能否执行', ok ? 'info' : 'fail',
+      ok ? '不加沙箱时命令能执行：问题出在沙箱内启动 shell' : `不加沙箱时也不能执行：问题出在 shell 本身；工具返回：${lastToolResult(await events(sid))}`);
+  } catch (e) {
+    record('P03b', '诊断：不加沙箱时 shell 能否执行', 'fail', `诊断没有完成：${e.message}`);
+  }
+  await stopHost();
+  await startHost('main', port);
+}
+
+function hostWarnings() {
+  const out_ = [];
+  for (const f of fs.existsSync(dirs.logs) ? fs.readdirSync(dirs.logs).filter((n) => n.startsWith('host-')) : []) {
+    for (const line of fs.readFileSync(path.join(dirs.logs, f), 'utf8').split(/\r?\n/)) {
+      if (/token=/.test(line) || !/warn|error|fail|did not activate|pending|unavailable/i.test(line)) continue;
+      const l = `${f}: ${line.trim().slice(0, 240)}`;
+      if (!out_.includes(l)) out_.push(l);
+    }
+  }
+  return out_.slice(0, 20);
+}
+
 async function modelTasks(parent) {
   const resultsDir = path.join(dirs.repo, '.pipeline/results');
   fs.mkdirSync(resultsDir, { recursive: true });
@@ -729,6 +775,8 @@ function writeReport(error) {
     '',
   ];
   if (error) lines.push(`**中途停止：** ${error}`, '');
+  const warnings = hostWarnings();
+  if (warnings.length) lines.push('## dsh 启动日志中的警告', '', ...warnings.map((w) => `- \`${w.replace(/`/g, "'")}\``), '');
   lines.push(
     '## 回传说明',
     '',
