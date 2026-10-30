@@ -15,7 +15,7 @@
 | Node.js 24（推荐），或 22.19 以上 | dsh 声明要求 ≥ 24.9。但自测时 Node 22.20 和 22.22 下全部探针都能通过，所以 22.19 以上也可以运行，报告的 P01 会标为 info。低于 22.19 时摸底包会停止 |
 | Git（Windows 上为 Git for Windows） | 摸底包会建一个小样例仓库；`git` 需要在 PATH 中 |
 | 内网 npm 镜像能安装 `@deepseek-ai/dsh@0.2.2-alpha.2` | 会装上约 650 个包，占用约 750～950 MB |
-| Git Bash（仅 Windows） | dsh 在 Windows 上默认通过 PowerShell 执行模型的命令。内网限制使用 PowerShell，所以摸底包默认把 dsh 改成用 Git Bash（Git for Windows 自带，见下文"Windows 上的 shell"）。摸底包会根据 `git.exe` 的位置自动找到 `bash.exe`，不需要把它加进 PATH |
+| Git Bash（仅 Windows） | dsh 在 Windows 上默认通过 PowerShell 执行模型的命令。内网禁止运行 PowerShell，所以摸底包默认把 dsh 改成用 Git Bash（Git for Windows 自带，见下文"Windows 上的 shell"）。摸底包会根据 `git.exe` 的位置自动找到 `bash.exe`，不需要把它加进 PATH |
 | pnpm（可选） | 有 pnpm 时用 `dsh plugin add` 安装探针插件；没有时直接复制，也能用 |
 
 ### 2. 环境变量
@@ -28,7 +28,7 @@
 | `LAOSHI_PROBE_MODEL_ID` | 是 | 模型 ID，和 req-kit 当前使用的相同 |
 | `LAOSHI_PROBE_MODEL_API_KEY` | 是 | 访问网关的凭据 |
 | `LAOSHI_PROBE_MODEL_API` | 否 | 网关协议：`openai-completions`（默认）、`openai-responses`、`anthropic-messages` |
-| `LAOSHI_PROBE_WIN_SHELL` | 否 | 仅 Windows：dsh 给模型用的 shell，`bash`（默认，Git Bash）或 `pwsh`（PowerShell，dsh 的原生默认） |
+| `LAOSHI_PROBE_WIN_SHELL` | 否 | 仅 Windows：dsh 给模型用的 shell。默认 `bash`（Git Bash）。`pwsh` 是 dsh 的原生默认（PowerShell），内网禁止 PowerShell，**不要设置** |
 | `LAOSHI_PROBE_NPM_REGISTRY` | 否 | 内网 npm 镜像地址。只有 `run.cmd` 自动安装 dsh 时会用到 |
 | `LAOSHI_PROBE_DSH` | 否 | 已经装好 dsh 的目录（其下有 `node_modules\@deepseek-ai\dsh`）。不设时依次查找：当前目录、本目录、npm 全局目录 |
 
@@ -71,7 +71,7 @@ node run.mjs
 
 ### Windows 上的 shell
 
-dsh 在 Windows 上默认让模型通过 PowerShell 执行命令。内网限制使用 PowerShell，所以摸底包默认（`LAOSHI_PROBE_WIN_SHELL=bash`）在 dsh 的配置里做三处改动：
+dsh 在 Windows 上默认让模型通过 PowerShell 执行命令。内网禁止运行 PowerShell，所以摸底包默认（`LAOSHI_PROBE_WIN_SHELL=bash`）在 dsh 的配置里做三处改动：
 
 - 关掉 PowerShell 执行器；
 - 打开 bash 执行器：命令以 `bash -c` 的形式在 Windows 沙箱里运行；
@@ -83,7 +83,18 @@ dsh 在 Windows 上默认让模型通过 PowerShell 执行命令。内网限制�
 
 - **这不是 dsh 官方覆盖的组合。** dsh 在 Windows 上默认不开 bash，这次摸底就是要确认它能不能用。
 - Windows 查找 `bash` 时，会先查 `C:\Windows\System32` 再查 PATH。如果机器装了 WSL，`System32` 下会有一个 `bash.exe`，dsh 可能会启动 WSL 而不是 Git Bash。摸底包检测到这种情况时，P01w 会标为 fail。
-- P01w 还会记录 `powershell.exe` 和 `pwsh.exe` 能否运行。如果"限制"只是禁止运行脚本文件，`powershell -Command` 仍然能用，dsh 的原生做法就可以直接用；这时可以设 `LAOSHI_PROBE_WIN_SHELL=pwsh` 再跑一次做对比。
+- 内网禁止运行 PowerShell，所以**摸底包从不启动 PowerShell**，也不会去测试它能不能运行，以免触发安全告警。
+
+dsh 除了 shell 工具外，还有几处会调用 `powershell.exe`：
+
+| 位置 | 什么时候触发 | 摸底包的处理 |
+| --- | --- | --- |
+| 默认工作区：查询"文档"目录 | 网页界面初始化默认工作区时 | 在配置里直接指定目录（`workspace-controller.documentsDirectory`），不再调用 PowerShell |
+| 网页终端：可选的 shell | 在网页界面里新开终端时 | 在配置里把可选的 shell 限定为 `bash` 和 `cmd` |
+| "在其他应用中打开"：读取应用图标 | 在网页界面里打开这个菜单时 | 没法通过配置关掉；摸底不需要打开网页界面，用不到 |
+| "用其他应用打开"文件：查询文件关联 | 在网页界面里使用这个功能时 | 同上 |
+
+摸底全程只通过接口操作 dsh，不需要打开网页界面。如果中途在浏览器里打开了 dsh 的网页界面，后两项可能会尝试启动 PowerShell 并失败，不影响摸底结果。
 
 ### Linux、macOS
 
@@ -111,7 +122,7 @@ node run.mjs
 | 编号 | 内容 |
 | --- | --- |
 | P01 | 平台，Node、dsh、pnpm 的版本，安装占用的空间 |
-| P01w | 仅 Windows：探针用的 shell（Git Bash 的位置），`powershell.exe`、`pwsh.exe` 能否运行，有没有 WSL 的 `bash.exe` |
+| P01w | 仅 Windows：探针用的 shell（Git Bash 的位置），以及有没有 WSL 的 `bash.exe`。不启动 PowerShell |
 | P02 | 模型接入：依次尝试几组兼容设置（`supportsDeveloperRole`、`maxTokensField`），记下第一组能用的 |
 | P03 | 工具调用（模型实际调用的工具名，以及 shell 版本）、产物落在会话目录、`DSH_*` 环境变量（用于识别发起的对话） |
 | P04 | 会话状态与 token 用量 |

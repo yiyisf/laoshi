@@ -82,7 +82,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 | 对外契约被改名破坏插件/IM/汇总 | 现网使用受影响 | [ADR 0004](../adr/0004-external-contracts-stay-stable.md) |
 | 内网模型较弱，生成阶段质量差 | 适配器生成失败 | 描述 schema 校验 + 探针；失败时明确提示手写 |
 | dsh 在内网装不上或要连外网（声明要求 Node ≥ 24.9，内网现为 22.20，但 22.20 实测可以运行；约 950 MB 的 `@deepseek-ai/*` 依赖、浏览器界面触发的外部请求） | M4b 无法在内网使用 | 先跑内网摸底包（P01 安装、P14 对外连接）；发现外部连接时在 profile 中禁用对应插件，并写进安装器 |
-| 内网 Windows 限制使用 PowerShell，而 dsh 在 Windows 上默认用 PowerShell 执行命令 | M4b 在内网不可用，或只能依赖 dsh 官方没有覆盖的 Git Bash 组合 | 内网摸底包默认按 Git Bash 配置并验证（P01w、P03～P12）；失败时再确认 PowerShell 限制的具体范围（是否只禁止脚本文件），或向 dsh 反馈 Windows 上的 bash 支持 |
+| 内网 Windows 禁止运行 PowerShell，而 dsh 在 Windows 上默认用 PowerShell 执行命令，另有几处界面功能也会调用 PowerShell | M4b 在内网不可用，或只能依赖 dsh 官方没有覆盖的 Git Bash 组合 | 内网摸底包默认按 Git Bash 配置并验证（P01w、P03～P12）；其余调用 PowerShell 的地方能配置的写进安装器配置；Git Bash 组合不可用时，向 dsh 反馈 Windows 上的 bash 支持，或评估在 WSL 外的其他 shell 方案 |
 | dsh 处于开发者预览，接口和插件 API 会有不兼容变更 | M4b 返工 | 插件和运行时声明支持的 dsh 版本范围，由 `doctor` 检查；引擎尽量只和插件通信，少依赖 `/api` 的内部格式（[dsh-adapter §4](../design/dsh-adapter.md)） |
 
 ## 待定项汇总（评审时逐条定）

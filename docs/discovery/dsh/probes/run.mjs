@@ -244,7 +244,15 @@ ${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行�
   disabled: false
 - id: tool-bash
   disabled: false
-` : ''}- insert:
+` : ''}# 避免 dsh 自己调用 PowerShell（在 Windows 上它用 PowerShell 查询"文档"目录）：直接给出默认工作区的父目录
+- id: workspace-controller
+  config:
+    documentsDirectory: ${JSON.stringify(path.join(out, 'documents'))}
+# 网页终端可选的 shell 不包括 PowerShell
+- id: terminal-controller
+  config:
+    shellCandidates: [bash, cmd]
+- insert:
     - id: laoshi-probe
       name: 'laoshi-probe'
       config:
@@ -254,6 +262,7 @@ ${isWin && !usePwsh ? `# Windows 上改用 Git Bash：关掉 PowerShell 执行�
         allowFile: ${JSON.stringify(files.allow)}
 `;
   fs.mkdirSync(path.join(dirs.home, 'profiles/web'), { recursive: true });
+  fs.mkdirSync(path.join(out, 'documents'), { recursive: true });
   fs.writeFileSync(path.join(dirs.home, 'profiles/web/cordis.patch.yml'), patch);
 }
 
@@ -386,22 +395,12 @@ async function main() {
   }
   facts.platform = `${process.platform} ${os.release()}`;
   if (isWin) {
-    // What the machine allows: dsh's default shell on Windows is PowerShell.
-    const tryRun = (exe, a) => {
-      try {
-        execFileSync(exe, a, { stdio: 'ignore', timeout: 30_000, windowsHide: true });
-        return '可以运行';
-      } catch (e) {
-        return e.code === 'ENOENT' ? '没有安装' : `不能运行（${String(e.message).split('\n')[0].slice(0, 80)}）`;
-      }
-    };
-    facts.windowsPowerShell = tryRun('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
-    facts.pwsh7 = tryRun('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
+    // PowerShell is never started here: where it is blocked, a launch attempt may raise a security alert.
     facts.wslBash = fs.existsSync(path.join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'bash.exe'));
     facts.winShell = winShell;
     facts.gitBash = bashDirs.join('；') || null;
     record('P01w', 'Windows shell', usePwsh || !facts.wslBash ? 'info' : 'fail',
-      `探针使用：${usePwsh ? 'PowerShell' : `Git Bash（${facts.gitBash}）`}；Windows PowerShell 5.1：${facts.windowsPowerShell}；PowerShell 7：${facts.pwsh7}` +
+      `探针使用：${usePwsh ? 'PowerShell' : `Git Bash（${facts.gitBash}）`}；摸底包不会启动 PowerShell` +
       (facts.wslBash && !usePwsh ? '；检测到 C:\\Windows\\System32\\bash.exe（WSL）：Windows 先查 System32 再查 PATH，dsh 可能启动 WSL 而不是 Git Bash' : ''));
   }
   facts.installRoot = path.resolve(dsh.dir, '..', '..'); // the node_modules holding @deepseek-ai/dsh
