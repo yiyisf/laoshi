@@ -160,7 +160,7 @@ laoshi 在内网使用，模型和 Paseo 上 req-kit 用的相同。上面这些
 结论：
 
 - **内网真实模型 + dsh + laoshi 插件的整条链路可以跑通**：子 agent、定时消息、插件审批、重启续跑、按结果文件约定完成步骤任务、无外连。
-- **Git Bash 在沙箱里"第一次启动"失败，之后可以正常执行。** P03 失败时，报错从 `CreateDirectoryObject` 改为 `NtCreateDirectoryObject`，但都是创建 MSYS 的命名对象目录 `\BaseNamedObjects\msys-2.0S5-<hash>` 时被拒绝。P03b 用不加沙箱的 bash 执行过一次以后，之后所有沙箱里的 bash 命令（P08～P13）都能执行。推测：受限令牌不能**创建**这个目录，但能**打开**已经存在的目录；而这个目录只要还有进程持有它就会一直存在。这个推测尚未验证。之后的摸底包加了 P03c（P03b 之后在沙箱里重试 P03）和 MSYS 进程快照（`tasklist`），用来确认。
+- **Git Bash 在沙箱里"第一次启动"失败，之后可以正常执行。** 两次 P03 的报错不同：第二次是 `couldn't create signal pipe, Win32 error 5`，这次是创建 MSYS 的命名对象目录 `\BaseNamedObjects\msys-2.0S5-<hash>` 时被拒绝（`NtCreateDirectoryObject`，0xC0000022）。两者都是 MSYS 启动时创建内核对象被拒绝。P03b 用不加沙箱的 bash 执行过一次以后，之后所有沙箱里的 bash 命令（P08～P13）都能执行。推测：受限令牌不能**创建**这个目录，但能**打开**已经存在的目录；而这个目录只要还有进程持有它就会一直存在。这个推测尚未验证。之后的摸底包加了 P03c（P03b 之后在沙箱里重试 P03）和 MSYS 进程快照（`tasklist`），用来确认。
 
 ## 尚未验证
 
