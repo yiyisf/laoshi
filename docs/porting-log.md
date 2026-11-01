@@ -20,6 +20,10 @@ laoshi 的核心来自 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)�
 | `engine/src/daemon-version.ts` | `adapters/paseo/daemon-version.ts` |
 | `engine/test/paseo-json.test.ts` | `adapters/paseo/test/paseo-json.test.ts` |
 | `engine/test/paseo-runtime.test.ts` | `adapters/paseo/test/paseo-runtime.test.ts` |
+| `engine/src/smoke-test.ts` | `adapters/paseo/smoke-test.ts`（M2a） |
+| `engine/src/doctor.ts` 中的 `daemon()`、`paseoJson()`、SDK 版本检查 | `adapters/paseo/doctor.ts`（M2a） |
+| `engine/src/configure.ts` 中的 `daemonCatalog` 与连接 daemon | `adapters/paseo/adapter.ts` 的 `agentCatalog`（M2a） |
+| `adapters/paseo/daemon-check.ts` 中的 `satisfies` | `engine/src/semver.ts`（M2a；原处保留转出） |
 
 移植涉及这几个文件的补丁时：改文件路径；补丁里的 `./config.js` 等核心模块，在适配器里写作 `../../engine/src/config.js`；核心里引用这几个文件写作 `../../adapters/paseo/<文件>.js`。
 
@@ -77,9 +81,12 @@ Node 22.22，Linux。
 
 | 文件 | 改动 | 来由 |
 | --- | --- | --- |
-| `engine/src/cli-args.ts` | 没有 `PASEO_AGENT_ID` 时，从 `DSH_SESSION_ID` 识别发起的对话 | M4b dsh 原型 |
-| `engine/src/review.ts`、`api.ts`、`code-review.ts`、`eval.ts` | 为子进程清理 Paseo 变量时，同时清理 `DSH_SESSION_ID` | M4b dsh 原型 |
-| `engine/src/runtime-loader.ts` | 适配器表增加 `dsh` | M4b dsh 原型 |
+| `engine/src/cli-args.ts`、`preflight.ts`、`digest.ts`、`doctor.ts` | 发起的对话和默认仓库用 `originFromEnv` 识别（M4b 起支持 `DSH_SESSION_ID`） | M4b、M2a |
+| `engine/src/review.ts`、`api.ts`、`code-review.ts`、`eval.ts` | 子进程的环境用 `scrubOriginEnv()` 去掉所有平台的对话变量 | M4b、M2a |
+| `engine/src/runtime-loader.ts` | 适配器表（`PlatformAdapter`）、`adapterFor`、按能力声明包装运行时、会话识别、profile 解析 | M4b、M2a |
+| `engine/src/runtime.ts` 等 | `listPaseoProfiles` 更名为 `listProfiles`，类型 `PlatformProfile` | M2a |
+| `engine/src/main.ts`、`digest.ts`、`spec-review.ts`、`card-cmd.ts`、`config-view.ts` | profile 解析与描述改用 `resolveProfiles`、`describeProfile` | M2a |
+| `engine/src/doctor.ts`、`configure.ts` | 平台相关部分改为调用适配器；体检增加"平台能力"一节 | M2a |
 
 ## 移植登记
 

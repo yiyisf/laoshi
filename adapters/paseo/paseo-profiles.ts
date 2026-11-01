@@ -9,18 +9,10 @@
 // profile in Paseo changes the next run without touching req-kit's config.
 
 import type { AgentProfile, PipelineConfig } from "../../engine/src/config.js";
+import type { PlatformProfile } from "../../engine/src/runtime.js";
 
-/** The fields of Paseo's AgentProfile that req-kit uses (protocol/src/agent-profile.ts). */
-export interface PaseoProfile {
-  id: string;
-  name: string;
-  provider: string;
-  model?: string;
-  modeId?: string;
-  thinkingOptionId?: string;
-  featureValues?: Record<string, unknown>;
-  notes?: string;
-}
+/** The fields of Paseo's AgentProfile that req-kit uses (protocol/src/agent-profile.ts): the core's PlatformProfile. */
+export type PaseoProfile = PlatformProfile;
 
 export class ProfileResolutionError extends Error {
   constructor(message: string) {

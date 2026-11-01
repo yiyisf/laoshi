@@ -205,7 +205,7 @@ export function createRuntimeWithClient(
     async interruptAgent(agentId, text) {
       await client.agents.ref(agentId).send(text, { activeTurnBehavior: "interrupt" });
     },
-    async listPaseoProfiles() {
+    async listProfiles() {
       if (!client.config) return null;
       try {
         return profilesFromDaemonConfig((await client.config.get()).config);

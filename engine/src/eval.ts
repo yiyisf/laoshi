@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { findDependency, KIT_ROOT, kitVersion } from "./locations.js";
+import { scrubOriginEnv } from "./runtime-loader.js";
 
 export const EVALS_DIR = path.join(KIT_ROOT, "evals");
 
@@ -101,10 +102,7 @@ function runPipeline(repo: string, featureDir: string, c: EvalCase, configPath: 
   const args = [tsx, path.join(KIT_ROOT, "engine", "src", "main.ts"), "--repo", repo, "--feature", featureDir, "--profile", c.profile, ...extra];
   if (configPath) args.push("--config", configPath);
   // Not launched from a chat: no origin, notifications go to the log only.
-  const env = { ...process.env };
-  delete env.PASEO_AGENT_ID;
-  delete env.PASEO_AGENT_CWD;
-  delete env.DSH_SESSION_ID;
+  const env = scrubOriginEnv();
   // Evaluation runs are not real requirements: keep them out of the machine's index and usage records.
   env.REQ_KIT_NO_RECORD = "1";
   const run = spawnSync(process.execPath, args, { cwd: repo, env, encoding: "utf8", timeout: timeoutMs, windowsHide: true });

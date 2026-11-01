@@ -1,4 +1,5 @@
-// Checks the parts of the pipeline that depend on your real Paseo setup.
+// Checks the parts of the pipeline that depend on your real Paseo setup (the Paseo adapter's
+// smoke test; moved from engine/src in laoshi M2a).
 //
 //   npm run smoke -- check                        daemon, providers, models, modes; one tiny agent per role
 //   npm run smoke -- notify --origin-agent <id>   message + subagent into an existing chat
@@ -12,9 +13,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { type AgentProfile, loadConfig, type PipelineConfig } from "./config.js";
-import { checkProfile as checkProfileWith, type Client, connect, type Report, resolveWithDaemon } from "../../adapters/paseo/daemon-check.js";
-import { defaultConfigPath } from "./locations.js";
+import { type AgentProfile, loadConfig, type PipelineConfig } from "../../engine/src/config.js";
+import { checkProfile as checkProfileWith, type Client, connect, type Report, resolveWithDaemon } from "./daemon-check.js";
+import { defaultConfigPath } from "../../engine/src/locations.js";
 
 const HEARTBEAT = path.join(os.tmpdir(), "requirement-pipeline-heartbeat.json");
 

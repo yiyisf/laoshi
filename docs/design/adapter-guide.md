@@ -5,37 +5,29 @@
 
 为一个新的 agent 平台写适配器，需要交付五样东西：**运行时、能力声明、会话识别、体检、词汇表**。
 
-## 1. 适配器的形状（草案）
+## 1. 适配器的形状
+
+M2a 起已实现，类型在 [`engine/src/platform.ts`](../../engine/src/platform.ts)，以代码为准：
 
 ```ts
 interface PlatformAdapter {
-  id: string;                       // 例如 "paseo"
-  displayName: string;              // 面向使用者，例如 "Paseo"
-  /** 平台版本范围，体检时检查，不强制 */
-  compatibleWith?: string;
-
-  createRuntime(input: RuntimeFactoryInput): Promise<AgentRuntime>;
-
-  /** 声明实现了哪些可选/按需能力（名称见下表），未声明的视为不支持 */
-  capabilities: CapabilityName[];
-
-  /** 从环境识别"发起会话"；识别不了返回 null（此时只写日志，不发通知） */
-  identifyOrigin(env: NodeJS.ProcessEnv, cwd: string): { sessionId: string; cwd: string } | null;
-
-  /** 适配器自己的体检项，由通用体检调用 */
-  doctor(ctx: DoctorContext): Promise<DoctorItem[]>;
-
-  vocabulary: PlatformVocabulary;   // 见 platform-vocabulary.md
-
-  /** 入口 skill 要安装到哪些目录 */
-  skillTargets(): SkillTarget[];
-
-  /** 适配器私有配置（platform.<id>）的 JSON Schema，用于校验与 `laoshi configure` */
-  configSchema?: object;
+  id: string;                        // 配置中 platform.adapter 的值，例如 "paseo"
+  displayName: string;               // 面向使用者，例如 "Paseo"
+  createRuntime: RuntimeFactory;
+  /** 可选能力的来源；未声明的是 "none"，由核心统一降级 */
+  capabilities: Partial<Record<CapabilityName, "platform" | "plugin" | "builtin">>;
+  /** 平台对话的环境变量：id 标识对话（发起者），cwd 是对话的工作目录（平台提供时） */
+  originEnv: { id: string; cwd?: string };
+  resolveProfiles?(config, runtime): Promise<PipelineConfig>;   // 平台的 agent profile
+  describeProfile?(profile): string;                            // 体检、日志里的一行描述
+  doctorTitle: string;                                          // 体检中平台一节的标题
+  doctorPlatform?({ config, configPath, tools }): Promise<void>; // 连接、版本、profile……
+  doctorProject?({ repo, isRepo, tools }): void;               // 项目里平台自己的文件
+  agentCatalog?(settings, progress): Promise<{ catalog; close() }>; // 配置向导可选的 agent
 }
 ```
 
-这是设计草案，字段以实现时 `src/runtime/adapter.ts` 的类型为准。
+适配器放在 `adapters/<id>/`，由 [`runtime-loader.ts`](../../engine/src/runtime-loader.ts) 登记，这是核心中唯一引用适配器的文件（`engine/test/platform.test.ts` 检查）。草案中的 `vocabulary`、`skillTargets`、`configSchema`、`compatibleWith` 在 M2c/M2e 补上。
 
 ## 2. 能力声明
 
@@ -45,30 +37,32 @@ interface PlatformAdapter {
 
 | 名称 | 对应方法 |
 | --- | --- |
-| `profiles` | `listPaseoProfiles`（将更名为中性名） |
+| `profiles` | `listProfiles` |
 | `services` | `listServices`、`startServices`、`stopServices` |
-| `worktree` | `createWorktree`、`waitForWorkspaceSetup` |
+| `worktree` | `createWorktree`、`openWorkspace`、`waitForWorkspaceSetup` |
 | `scheduling` | `scheduleMessage`、`cancelSchedule` |
 | `scheduleAgent` | `scheduleNewAgent` |
 | `sessionAgent` | `startSessionAgent` |
 | `quota` | `providerQuota` |
 | `activity` | `recentActivity` |
 | `runningTool` | `runningTool` |
+| `toolCalls` | `toolCalls` |
 | `toolInfo` | `capabilities` |
 | `providerStatus` | `providerStatus` |
 
-运行时层按声明包装适配器：**未声明的能力，对应方法统一返回 `null`**（或按契约文档中标 ⚠ 的方式处理），调用点不再各写各的 `.catch(() => null)`。这是把 req-kit 里分散的降级收拢到一处。
+运行时层按声明包装适配器（`withCapabilities`，M2a 已实现）：**未声明的能力，可选读取统一返回 `null`，定时返回"没有安排"，按需操作报"<平台> 不支持……"**。调用点里已有的 `.catch(() => null)` 在 M2e 收敛词汇时逐步去掉。
 
 ## 3. 会话识别
 
-req-kit 靠环境变量 `PASEO_AGENT_ID`、`PASEO_AGENT_CWD` 识别"当前对话"。适配器通过 `identifyOrigin` 提供同样的信息。没有"会话"概念的平台：返回 `null`，引擎仍可运行，只是进展写日志而不发回会话；或者由适配器自行定义一个"发起者"。
+req-kit 靠环境变量 `PASEO_AGENT_ID`、`PASEO_AGENT_CWD` 识别"当前对话"。适配器用 `originEnv` 声明自己的变量名（dsh 是 `DSH_SESSION_ID`）；核心用 `originFromEnv` 识别，为不属于对话的子进程用 `scrubOriginEnv` 去掉所有平台的变量。没有"会话"概念的平台：返回 `null`，引擎仍可运行，只是进展写日志而不发回会话；或者由适配器自行定义一个"发起者"。
 
 ## 4. 体检
 
 `laoshi doctor` 分两部分：
 
 - **通用体检**：安装、本机配置、项目配置、进行中的流水线、状态文件版本、集成（这些来自现在 `doctor.ts` 中与平台无关的部分）。
-- **适配器体检**：由 `adapter.doctor` 返回。Paseo 适配器会包含 daemon 连接、版本区间、profile 解析、`paseo.json` 检查这四块（现在都在 `doctor.ts` 里，与通用检查混在一起，需要拆开）。
+- **适配器体检**：`doctorPlatform` 写平台一节（Paseo：SDK 与 daemon 版本、连接、provider、profile、额度、各 agent；dsh：插件连接），`doctorProject` 写项目一节中平台的文件（Paseo：`paseo.json`）。M2a 已从 `doctor.ts` 拆到 `adapters/paseo/doctor.ts`。
+- **能力表**：通用体检列出每项可选能力的来源（平台 / laoshi 插件 / laoshi 内置 / 无）。
 
 体检项的输出格式沿用 ✓ / ⚠ / ✗ 加修复建议。
 

@@ -19,6 +19,7 @@ import { buildCodeReview, recordHumanReview, startReviewFix, type Submission } f
 import { type Answer, acceptanceFailMessage, acceptanceText, buildChecklist, recordAcceptance, verdictOf } from "./checklist.js";
 import { appendEvent, readIndex, requirementRef } from "./records.js";
 import { readState, statePath } from "./state.js";
+import { scrubOriginEnv } from "./runtime-loader.js";
 
 const ASSETS = path.join(ENGINE_DIR, "src", "review-assets");
 /** 1.15: the design system's tokens, component styles and icons, shared by the three pages (copies made by scripts/tokens-build.mjs). */
@@ -299,10 +300,7 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
 
 /** `req <approve|reply> <需求> …` in the requirement's checkout, as `req api run` does (api.ts imports this file). */
 function defaultRun(command: "approve" | "reply", repo: string, featureDir: string, extra: string[]) {
-  const env = { ...process.env };
-  delete env.PASEO_AGENT_ID;
-  delete env.PASEO_AGENT_CWD;
-  delete env.DSH_SESSION_ID;
+  const env = scrubOriginEnv();
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), command, featureDir, ...extra], {
     cwd: repo,
     env,
@@ -314,10 +312,7 @@ function defaultRun(command: "approve" | "reply", repo: string, featureDir: stri
 }
 
 function defaultTry(repo: string, featureDir: string, stop: boolean) {
-  const env = { ...process.env };
-  delete env.PASEO_AGENT_ID;
-  delete env.PASEO_AGENT_CWD;
-  delete env.DSH_SESSION_ID;
+  const env = scrubOriginEnv();
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), "try", featureDir, "--json", ...(stop ? ["--stop"] : [])], {
     cwd: repo,
     env,

@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import { type DefectHandling, PHASE_MODES, type PhaseMode, type ProfileName, type VerifyEnvironment } from "./config.js";
 import { LAUNCHER } from "./locations.js";
 import type { LaunchArgs } from "./preflight.js";
+import { originFromEnv } from "./runtime-loader.js";
 
 export { LAUNCHER };
 
@@ -112,12 +113,12 @@ export function parseLaunchArgs(argv: string[]): LaunchArgs {
   if (values.approve && (values.status || values.stop || values["spec-review"] || values.restart || values.worktree || phase || values.at)) {
     throw new Error("--approve 只用于确认等待中的方案并继续开发");
   }
-  // In a Paseo chat, the chat itself is the origin unless told otherwise; in a dsh chat (laoshi M4b),
-  // its session, whose shell runs in the chat's directory.
-  const origin = (values["origin-agent"] ?? process.env.PASEO_AGENT_ID ?? process.env.DSH_SESSION_ID)?.trim();
+  // In a platform's chat, the chat itself is the origin unless told otherwise, and its working
+  // directory (when the platform says; a dsh chat's shell already runs there) is the repository.
+  const chat = originFromEnv(process.env);
+  const origin = (values["origin-agent"] ?? chat?.id)?.trim();
   return {
-    // In a Paseo chat, the chat's working directory is the repository.
-    repo: path.resolve(values.repo ?? process.env.PASEO_AGENT_CWD ?? process.cwd()),
+    repo: path.resolve(values.repo ?? chat?.cwd ?? process.cwd()),
     featureDir: values.feature ?? "",
     originAgentId: origin ? origin : null,
     resume: (values.resume ?? false) || phase === "verify" || (values.approve ?? false) || (values["review-fix"] ?? false),

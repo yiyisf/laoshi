@@ -4,6 +4,18 @@
 
 export type AgentRole = "builder" | "reviewer";
 
+/** An agent profile the platform offers: a named set of launch settings (Paseo: Agent profiles). */
+export interface PlatformProfile {
+  id: string;
+  name: string;
+  provider: string;
+  model?: string;
+  modeId?: string;
+  thinkingOptionId?: string;
+  featureValues?: Record<string, unknown>;
+  notes?: string;
+}
+
 export interface PendingPermission {
   id: string;
   title: string;
@@ -124,8 +136,8 @@ export interface AgentRuntime {
   notifyAgent(agentId: string, text: string): Promise<void>;
   /** Interrupts the agent's current turn and gives it `text` instead (used to stop a step). */
   interruptAgent(agentId: string, text: string): Promise<void>;
-  /** The daemon's agent profiles (Paseo settings → Agent profiles); null when they cannot be read. */
-  listPaseoProfiles(): Promise<import("../../adapters/paseo/paseo-profiles.js").PaseoProfile[] | null>;
+  /** The platform's agent profiles (Paseo: settings → Agent profiles); null when they cannot be read. */
+  listProfiles(): Promise<PlatformProfile[] | null>;
   /**
    * Names of the service scripts (paseo.json) of the workspace the chat works in. Null when
    * Paseo cannot run them for us: no chat, an older daemon, or no services configured.

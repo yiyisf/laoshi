@@ -16,6 +16,7 @@ import {
 import { gitInfo } from "./git.js";
 import { samePath } from "./paths.js";
 import { currentLockHolder, isAlive, type PipelineState, readState, statePath } from "./state.js";
+import { originFromEnv } from "./runtime-loader.js";
 
 export interface LaunchArgs {
   repo: string;
@@ -97,8 +98,9 @@ export function sameRepository(worktree: string, source: string): boolean {
  * in the checkout the worktree was created from.
  */
 export function checkChatCwd(args: Pick<LaunchArgs, "originAgentId" | "sourceRepo">, repo: string, env: NodeJS.ProcessEnv = process.env): void {
-  const chatCwd = env.PASEO_AGENT_CWD?.trim();
-  if (!args.originAgentId || !chatCwd || env.PASEO_AGENT_ID?.trim() !== args.originAgentId) return;
+  const origin = originFromEnv(env);
+  const chatCwd = origin?.cwd?.trim();
+  if (!args.originAgentId || !chatCwd || origin?.id.trim() !== args.originAgentId) return;
   const chat = fs.existsSync(chatCwd) ? fs.realpathSync(chatCwd) : chatCwd;
   if (args.sourceRepo) {
     const source = fs.existsSync(args.sourceRepo) ? fs.realpathSync(args.sourceRepo) : args.sourceRepo;
