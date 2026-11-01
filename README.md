@@ -19,6 +19,7 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 | `contracts/` | 文件格式与平台能力契约（从 req-kit 1.13.0 导入，尚待中性化） |
 | `docs/design/` | 架构、适配器指南、平台词汇表、初始化与自生长、会话内编排、状态 v2、兼容迁移 |
 | `docs/adr/` | 设计决定 |
+| `docs/discovery/` | 各平台的摸底报告与探针（目前有 [dsh](docs/discovery/dsh/report.md)） |
 | `docs/extraction/` | 从 req-kit 抽取的资产清单与[实施计划](docs/extraction/plan.md) |
 | [SCOPE.md](SCOPE.md) | 范围 |
 
