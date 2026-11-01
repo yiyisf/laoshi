@@ -12,7 +12,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 - [x] 决策：ADR 0001~0005；[ADR 0006](../adr/0006-deterministic-engine-platform-capabilities.md)（确定性引擎 + 平台能力层，先手写后生成，提议）；[ADR 0007](../adr/0007-one-install-many-repos.md)（一次安装、多库共用，个人版与团队版同一设计，提议）
 - [x] 分工与阶段门槛：[workstreams.md](workstreams.md)（5~6 人小队）
 - [ ] **团队评审设计文档**，重点是各文档末尾的"待定"项（见本文末尾汇总）
-- [ ] **一个能访问 npm 的开发环境**：`npm install`、`npm run typecheck`、`npm test` 在 req-kit 1.13 上跑通，并记录基线结果（通过数、耗时）
+- [x] **一个能访问 npm 的开发环境**：`npm install`、`npm run typecheck`、`npm test` 在 req-kit 上跑通，并记录基线结果（通过数、耗时）。实际按 1.15.0 记录，见[移植记录](../porting-log.md#验证)
 - [ ] 为 req-kit 1.13 补一份 `evals` 基线（`evals/baselines/1.13.0.md`），作为"对等"的比较对象
 - [ ] 拿到**内部 agent 平台的 CLI 说明**：已知能启动任务、恢复暂停的 HITL 会话并传入输入、取消等待中的 HITL 请求；待确认的五个问题见 [internal-platform-adapter §6](../design/internal-platform-adapter.md)（状态与 HITL 语义最关键）；平台方暂无详细信息，改用[平台摸底清单](../design/platform-discovery.md)自行实验（含 ADR 0007 的安装与团队版实验）
 
@@ -21,10 +21,11 @@ npm 包名：**`laoshi`（已确认可用）**。
 ### M0 契约与文档（进行中）
 契约导入完成；设计与 ADR 完成。剩余：契约里的 Paseo 字样逐份中性化（文件格式契约不涉及流程语义，改动小）；按 ADR 0007 在使用记录、通知事件、`laoshi api` 契约中新增 `repo`、`user` 字段，状态契约增加发起人。
 
-### M1 搬运核心，行为不变
+### M1 搬运核心，行为不变（已完成，2026-11-01，见[移植记录](../porting-log.md)）
 - 搬：方法类 skill 与原则、步骤提示词、`engine/src` 的核心文件、`engine/test`、`evals/`。**文件路径和名字保持不变**（见 [architecture §5](../design/architecture.md)）。
 - 把 Paseo 实现（`paseo-runtime`、`paseo-profiles`、`paseo-json`、`daemon-check`、`daemon-version`）移到 `adapters/paseo/`；`runtime-loader.ts` 改成按配置选适配器。
 - 完成标准：`typecheck` 和 `npm test` 与基线一致；Paseo 适配器下 `evals/` 自检通过。
+- 实际情况：按 req-kit 1.15.0（`a16e1e2`）导入。安装器、文档站、Paseo 插件界面属于分发层，留在 paseo-req-kit，到 M7 处理；`req` 中依赖它们的子命令在 laoshi 中暂不可用。验证结果和路径对照见[移植记录](../porting-log.md)。
 
 ### M2 拆耦合
 - `launch.ts`、`doctor.ts`、`configure.ts`、`factory.ts`：把"连 Paseo"的部分移进适配器；体检拆成通用 + 适配器。

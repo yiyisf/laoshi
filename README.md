@@ -4,7 +4,7 @@
 
 laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit）中抽取出来的、与 agent 平台无关的需求开发体系：用对话对齐需求，由一组分工明确的 agent 完成方案设计、实现、评审和验证，每一步都有产出文件和验收门，流程由程序保证，而不是由 AI 或人即兴发挥。
 
-> **状态：起步阶段，还不能使用。** 现在库里只有契约文档、抽取计划和决策记录。req-kit 1.x 继续在原库维护，直到 laoshi 达到对等。
+> **状态：M1 完成，还不能单独使用。** 核心已从 req-kit 1.15.0 导入，Paseo 实现已移到 `adapters/paseo/`，测试和评估自检与 req-kit 一致（见[移植记录](docs/porting-log.md)）。安装、升级和插件界面在 M7 之前仍由 paseo-req-kit 提供。req-kit 1.x 继续在原库维护，直到 laoshi 达到对等。
 
 ## 设计思路
 
@@ -16,7 +16,13 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 
 | 路径 | 内容 |
 | --- | --- |
-| `contracts/` | 文件格式与平台能力契约（从 req-kit 1.13.0 导入，尚待中性化） |
+| `engine/` | 流水线引擎：`src/` 程序、`prompts/` 步骤提示词、`test/` 场景测试（`fake-runtime.ts` 模拟平台） |
+| `adapters/` | 平台适配器。`paseo/`：Paseo 运行时、profile、`paseo.json`、daemon 检查。配置 `platform.adapter` 选择使用哪个 |
+| `skills/`、`principles/` | 入口 skill、方法 skill、原则 |
+| `bin/` | `req`（`laoshi`）、`start-pipeline` 命令 |
+| `evals/` | 端到端评估：样例仓库、隐藏验收测试 |
+| `design/`、`notifiers/` | 设计系统（审查网页用）、外部通知模板 |
+| `contracts/` | 文件格式与平台能力契约（req-kit 1.15.0，尚待中性化） |
 | `docs/design/` | 架构、适配器指南、平台词汇表、初始化与自生长、会话内编排、状态 v2、兼容迁移 |
 | `docs/adr/` | 设计决定 |
 | `docs/discovery/` | 各平台的摸底报告与探针（目前有 [dsh](docs/discovery/dsh/report.md)） |
@@ -27,6 +33,15 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 
 - 抽取完成并回归通过前，req-kit 只修缺陷，新功能先进 laoshi。
 - 之后 `paseo-req-kit` 会成为依赖 laoshi 与 Paseo 适配器的薄分发包，保留 `req` 命令，已安装的用户通过升级迁移。
+
+## 开发
+
+```bash
+npm install
+npm run typecheck
+npm test                  # 引擎场景测试（模拟平台）与 skill 校验
+npm run eval:self-check   # 评估用例的参考实现能否通过隐藏验收
+```
 
 ## 许可证
 

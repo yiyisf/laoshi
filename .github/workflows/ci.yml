@@ -1,0 +1,85 @@
+# Typecheck, tests and the eval self-check on every push to main and on pull requests.
+# Ported from paseo-req-kit's ci.yml (1.15.0) without the distribution checks (npm pack, install
+# scripts, Paseo plugin), which stay in paseo-req-kit until M7.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Lockfiles must be generated against the public registry; a company mirror's
+      # address written into them would break installs here on GitHub.
+      - name: Lockfile uses the public npm registry
+        shell: bash
+        run: |
+          bad=$(grep -h '"resolved"' package-lock.json | grep -v '"https://registry.npmjs.org/' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::package-lock.json 里有非 registry.npmjs.org 的地址，请用公网 npm 源重新生成"
+            echo "$bad" | head -5
+            exit 1
+          fi
+      - run: npm ci
+      - name: Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test.log
+      # Failed tests as annotations: readable from the run page (and the API) without the full log.
+      - name: Failed tests
+        if: failure()
+        shell: bash
+        run: |
+          details=$(grep -E -A16 "^not ok" test.log | grep -vE "^\s+(at |---|\.\.\.|duration_ms|type:|location:|failureType:|stack:|code:|operator:)|^--$" | head -160 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Linux details::$details"
+          grep -E "^not ok" test.log | head -9 | sed 's/^/::error title=Linux::/' || true
+      - run: npm run typecheck
+      - run: npm run eval:self-check
+
+  # The intranet runs on Windows: the same tests must pass there.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        shell: bash
+      - name: Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test.log
+      - name: Failed tests
+        if: failure()
+        shell: bash
+        run: |
+          if ! grep -qE "^not ok" test.log; then echo "所有测试都通过了"; exit 0; fi
+          details=$(grep -E -A16 "^not ok" test.log | grep -vE "^\s+(at |---|\.\.\.|duration_ms|type:|location:|failureType:|stack:|code:|operator:)|^--$" | head -160 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Windows details::$details"
+          grep -E "^not ok" test.log | head -9 | sed 's/^/::error title=Windows::/' || true
+      - name: Commands start on Windows
+        if: always()
+        shell: bash
+        run: |
+          node bin/req.mjs --version
+          node bin/req.mjs help
+          node bin/req.mjs ui-check --help
