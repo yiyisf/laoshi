@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { loadConfig, PROJECT_CONFIG_FILE } from "../src/config.js";
-import { satisfies } from "../src/daemon-check.js";
+import { satisfies } from "../../adapters/paseo/daemon-check.js";
 
 const agents = {
   builder: { provider: "claude/m", modeId: "bypassPermissions" },

@@ -9,8 +9,15 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "noEmit": true
   },
-  "include": ["engine/src/**/*.ts", "engine/test/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "engine/src/**/*.ts",
+    "engine/test/**/*.ts",
+    "adapters/**/*.ts",
+    "test/**/*.ts"
+  ]
 }

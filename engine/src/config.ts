@@ -9,7 +9,7 @@ export interface AgentProfile {
   /**
    * Name (or ID) of a Paseo agent profile to take the settings from, e.g. "实现".
    * Resolved against the daemon when a run starts; fields written next to it win.
-   * See paseo-profiles.ts.
+   * See adapters/paseo/paseo-profiles.ts.
    */
   paseoProfile?: string;
   /**
@@ -163,6 +163,11 @@ export interface MergeRequestSettings {
 }
 
 export interface PipelineConfig {
+  /**
+   * laoshi: the agent platform the pipeline runs on. `adapter` picks the runtime under
+   * adapters/<id>/ (runtime-loader.ts); "paseo" is the only one so far.
+   */
+  platform: { adapter: string };
   daemonUrl: string;
   /** Name of the environment variable holding the daemon password, if the daemon has one. */
   daemonPasswordEnv: string;
@@ -324,6 +329,7 @@ export interface PipelineConfig {
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
+  platform: { adapter: "paseo" },
   daemonUrl: "ws://127.0.0.1:6767/ws",
   daemonPasswordEnv: "PASEO_DAEMON_PASSWORD",
   agents: {
@@ -438,6 +444,10 @@ function merge(base: PipelineConfig, raw: Record<string, unknown>): PipelineConf
     }
     merged.integrationDefaults = combined;
   }
+  // A platform that is not an object is kept as written so that validate() rejects it.
+  merged.platform = (
+    isRecord(raw.platform) ? { ...base.platform, ...raw.platform } : (raw.platform ?? base.platform)
+  ) as PipelineConfig["platform"];
   merged.push = { ...base.push, ...(isRecord(raw.push) ? raw.push : {}) } as PipelineConfig["push"];
   merged.factory = { ...base.factory, ...(isRecord(raw.factory) ? raw.factory : {}) } as PipelineConfig["factory"];
   merged.autoConfirm = { ...base.autoConfirm, ...(isRecord(raw.autoConfirm) ? raw.autoConfirm : {}) } as PipelineConfig["autoConfirm"];
@@ -699,6 +709,9 @@ function validate(config: PipelineConfig): void {
     throw new ConfigError('requiredVersion 必须是版本范围字符串，例如 ">=1.2.0 <2"');
   }
   if (config.paseoServices !== "auto" && config.paseoServices !== "off") throw new ConfigError('paseoServices 只能是 "auto" 或 "off"');
+  if (!isRecord(config.platform) || typeof config.platform.adapter !== "string" || !/^[a-z][a-z0-9-]*$/.test(config.platform.adapter)) {
+    throw new ConfigError('platform.adapter 必须是适配器名称，例如 { "adapter": "paseo" }');
+  }
   if (config.browserVerify !== "auto" && config.browserVerify !== "off") throw new ConfigError('browserVerify 只能是 "auto" 或 "off"');
   if (!["standard", "always", "off"].includes(config.specReview)) throw new ConfigError('specReview 只能是 "standard"、"always" 或 "off"');
   const proposals = config.designProposals;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { describeActivity, summarizeActivity } from "../src/activity.js";
-import { findPaseoProfile, profilesFromDaemonConfig, resolveAgentProfile } from "../src/paseo-profiles.js";
+import { findPaseoProfile, profilesFromDaemonConfig, resolveAgentProfile } from "../../adapters/paseo/paseo-profiles.js";
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 13, 10, min)).toISOString();
 

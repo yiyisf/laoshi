@@ -8,7 +8,7 @@ import { parseLaunchArgs } from "./cli-args.js";
 import { loadConfig } from "./config.js";
 import { defaultConfigPath, KIT_ROOT, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
 import { specReviewFailedMessage, specReviewMessage } from "./messages.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
+import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
 import { runSingleStep } from "./pipeline.js";
 import { normalizeFeatureDir, specProfile } from "./preflight.js";
 import { loadRuntimeFactory } from "./runtime-loader.js";

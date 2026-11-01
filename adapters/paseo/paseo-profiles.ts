@@ -8,7 +8,7 @@
 // The names are resolved against the daemon when a run starts, so changing the
 // profile in Paseo changes the next run without touching req-kit's config.
 
-import type { AgentProfile, PipelineConfig } from "./config.js";
+import type { AgentProfile, PipelineConfig } from "../../engine/src/config.js";
 
 /** The fields of Paseo's AgentProfile that req-kit uses (protocol/src/agent-profile.ts). */
 export interface PaseoProfile {

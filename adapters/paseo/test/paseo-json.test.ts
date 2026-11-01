@@ -4,9 +4,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { paseoJsonIssues, shellStyles } from "../src/paseo-json.js";
+import { paseoJsonIssues, shellStyles } from "../paseo-json.js";
 
-const ROOT = path.resolve(import.meta.dirname, "..", "..");
+const ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
 const HELPERS = path.join(ROOT, "skills", "req-setup", "templates", "paseo");
 
 const POSIX = {

@@ -7,8 +7,8 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import type { AgentProfile } from "./config.js";
-import { connect } from "./daemon-check.js";
-import { type PaseoProfile, profilesFromDaemonConfig } from "./paseo-profiles.js";
+import { connect } from "../../adapters/paseo/daemon-check.js";
+import { type PaseoProfile, profilesFromDaemonConfig } from "../../adapters/paseo/paseo-profiles.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
 
 export interface CatalogEntry {

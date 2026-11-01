@@ -1,10 +1,10 @@
 import type { PaseoAgentHandle, PaseoClient } from "@getpaseo/client";
-import { runningToolOf, toolCallsOf, summarizeActivity } from "./activity.js";
-import { type AgentProfile, isResolved, type PipelineConfig } from "./config.js";
+import { runningToolOf, toolCallsOf, summarizeActivity } from "../../engine/src/activity.js";
+import { type AgentProfile, isResolved, type PipelineConfig } from "../../engine/src/config.js";
 import { profilesFromDaemonConfig } from "./paseo-profiles.js";
-import { cronAt, localTimeZone } from "./schedule-time.js";
-import { samePath } from "./paths.js";
-import type { AgentRuntime, ManagedService, ProviderQuota, RuntimeFactory, ServiceTarget, StepAgent, WaitOutcome } from "./runtime.js";
+import { cronAt, localTimeZone } from "../../engine/src/schedule-time.js";
+import { samePath } from "../../engine/src/paths.js";
+import type { AgentRuntime, ManagedService, ProviderQuota, RuntimeFactory, ServiceTarget, StepAgent, WaitOutcome } from "../../engine/src/runtime.js";
 
 // Checked against @getpaseo/client 0.11.2 (packages/client/src/index.ts) and the
 // daemon (packages/server/src/server/session.ts, agent/create-agent/intent.ts):

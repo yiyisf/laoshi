@@ -13,7 +13,7 @@ import { type FeatureSummary, listFeatures } from "./features.js";
 import { handledCategories, type RecurringLesson, recurringLessons } from "./lessons.js";
 import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
 import { dispatchNotifiers } from "./notifiers.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
+import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
 import { loadRuntimeFactory } from "./runtime-loader.js";
 
 const GROUPS: Array<{ title: string; match: (stage: string) => boolean }> = [

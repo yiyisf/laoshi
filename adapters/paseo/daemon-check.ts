@@ -1,6 +1,6 @@
 // Checks against the real Paseo daemon, shared by the smoke test and the doctor.
 
-import type { AgentProfile, PipelineConfig } from "./config.js";
+import type { AgentProfile, PipelineConfig } from "../../engine/src/config.js";
 import { profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
 
 export type Report = (level: "ok" | "warn" | "fail", text: string, fix?: string) => void;

@@ -5,8 +5,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { DEFAULT_CONFIG } from "./config.js";
-import { defaultConfigPath } from "./locations.js";
+import { DEFAULT_CONFIG } from "../../engine/src/config.js";
+import { defaultConfigPath } from "../../engine/src/locations.js";
 
 interface ServerInfoClient {
   connect(): Promise<void>;

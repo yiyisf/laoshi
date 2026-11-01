@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { type AgentProfile, loadConfig, type PipelineConfig } from "./config.js";
-import { checkProfile as checkProfileWith, type Client, connect, type Report, resolveWithDaemon } from "./daemon-check.js";
+import { checkProfile as checkProfileWith, type Client, connect, type Report, resolveWithDaemon } from "../../adapters/paseo/daemon-check.js";
 import { defaultConfigPath } from "./locations.js";
 
 const HEARTBEAT = path.join(os.tmpdir(), "requirement-pipeline-heartbeat.json");

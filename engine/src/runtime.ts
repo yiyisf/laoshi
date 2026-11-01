@@ -1,5 +1,6 @@
-// The narrow surface the pipeline needs from Paseo. The real implementation is
-// paseo-runtime.ts; tests swap in a fake through REQ_PIPELINE_FAKE_RUNTIME.
+// The narrow surface the pipeline needs from the agent platform (contracts/agent-runtime.md).
+// Each platform adapter implements it under adapters/<id>/ (Paseo: adapters/paseo/paseo-runtime.ts);
+// tests swap in a fake through REQ_PIPELINE_FAKE_RUNTIME.
 
 export type AgentRole = "builder" | "reviewer";
 
@@ -124,7 +125,7 @@ export interface AgentRuntime {
   /** Interrupts the agent's current turn and gives it `text` instead (used to stop a step). */
   interruptAgent(agentId: string, text: string): Promise<void>;
   /** The daemon's agent profiles (Paseo settings → Agent profiles); null when they cannot be read. */
-  listPaseoProfiles(): Promise<import("./paseo-profiles.js").PaseoProfile[] | null>;
+  listPaseoProfiles(): Promise<import("../../adapters/paseo/paseo-profiles.js").PaseoProfile[] | null>;
   /**
    * Names of the service scripts (paseo.json) of the workspace the chat works in. Null when
    * Paseo cannot run them for us: no chat, an older daemon, or no services configured.

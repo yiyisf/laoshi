@@ -15,7 +15,7 @@ import {
   PROFILE_LABELS,
   PROJECT_CONFIG_FILE,
 } from "./config.js";
-import { describeAgentProfile } from "./paseo-profiles.js";
+import { describeAgentProfile } from "../../adapters/paseo/paseo-profiles.js";
 import { STEPS, type StepId } from "./steps.js";
 
 export type Layer = "default" | "machine" | "team" | "project";

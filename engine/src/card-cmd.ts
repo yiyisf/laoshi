@@ -44,7 +44,7 @@ import {
 import { loadConfig, type PipelineConfig } from "./config.js";
 import type { IntegrationConfig, Runner } from "./integrations.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
+import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
 import { loadRuntimeFactory } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
 import { readState, statePath } from "./state.js";

@@ -6,17 +6,17 @@
 // Paseo daemon, and the current project with its pipelines.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { type PaseoJson, paseoJsonIssues } from "./paseo-json.js";
+import { type PaseoJson, paseoJsonIssues } from "../../adapters/paseo/paseo-json.js";
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, DEFAULT_CONFIG, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, resolveRelatedRepo } from "./config.js";
-import { checkProfile, connect, type Report, satisfies } from "./daemon-check.js";
-import { daemonVersion } from "./daemon-version.js";
+import { checkProfile, connect, type Report, satisfies } from "../../adapters/paseo/daemon-check.js";
+import { daemonVersion } from "../../adapters/paseo/daemon-version.js";
 import { gitInfo } from "./git.js";
 import { defaultConfigPath, findDependency, KIT_ROOT, kitVersion } from "./locations.js";
 import { PROJECT_DIR } from "./prompts.js";
-import { describeAgentProfile, ProfileResolutionError, profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
+import { describeAgentProfile, ProfileResolutionError, profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
 import { isAlive, STATE_VERSION } from "./state.js";
 import { readRuns, runsFile } from "./records.js";
 import { byRequirement, dedupe } from "./stats.js";
@@ -71,6 +71,11 @@ function newer(a: string, b: string): boolean {
 
 function installation(offline: boolean): void {
   section("安装");
+  // laoshi M1: the installer stays in paseo-req-kit until M7; without it there is no installation to check.
+  if (!fs.existsSync(path.join(KIT_ROOT, "install.mjs"))) {
+    console.log("· 这个目录没有安装器（laoshi M1：安装与升级在 M7 之前由 paseo-req-kit 提供），跳过安装检查");
+    return;
+  }
   const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "install.mjs"), "--check", "--quiet"], {
     encoding: "utf8",
     windowsHide: true,

@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { PaseoProfile } from "../src/paseo-profiles.js";
+import type { PaseoProfile } from "../../adapters/paseo/paseo-profiles.js";
 import type { ActivityItem, AgentRuntime, ManagedService, ProviderQuota, RuntimeFactory, StepAgent, WaitOutcome } from "../src/runtime.js";
 
 export interface FakeBehavior {
