@@ -1,0 +1,16 @@
+/* The code review page (1.15): only what the design system (rk.css) does not cover. */
+#reviewers { width: 200px; }
+#reviewer { width: 130px; }
+.cr-files-n { font: 12px/1 var(--rk-font-mono); color: var(--rk-text-muted); }
+.cr-files-n.has-ai { color: var(--rk-ai); }
+.rk-side a.is-doc span:first-of-type { color: var(--rk-text-muted); }
+.rk-finding .rk-input { height: 32px; }
+.rk-finding textarea.rk-input { height: auto; width: 100%; }
+.rk-finding a.rk-finding__where { text-decoration: none; }
+.rk-finding a.rk-finding__where:hover { text-decoration: underline; }
+.rk-finding.is-ok { opacity: 0.7; }
+.cr-summary li::marker { color: var(--rk-status-success); }
+.cr-summary { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--rk-text-secondary); }
+@media (max-width: 640px) {
+  #reviewers, #reviewer { width: 100%; }
+}
