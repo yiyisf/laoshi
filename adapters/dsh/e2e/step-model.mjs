@@ -91,7 +91,7 @@ http
       reply = { text: "完成" };
     } else {
       reply = { text: "收到" };
-      log({ chat: prompt.slice(-160) });
+      log({ chat: prompt.slice(-1500) });
     }
 
     const base = { id: `cmpl-${Date.now()}`, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: json.model ?? "step-1" };

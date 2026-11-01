@@ -3,6 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { dshAdapter } from "../../adapters/dsh/adapter.js";
 import { paseoAdapter } from "../../adapters/paseo/adapter.js";
+import { withBuiltins } from "./builtin/index.js";
 import type { AgentProfile, PipelineConfig } from "./config.js";
 import { describeProfileDefault, type PlatformAdapter, withCapabilities } from "./platform.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
@@ -86,6 +87,6 @@ export async function loadRuntimeFactory(): Promise<RuntimeFactory> {
   }
   return async (input) => {
     const adapter = adapterFor(input.config);
-    return withCapabilities(await adapter.createRuntime(input), adapter);
+    return withCapabilities(withBuiltins(await adapter.createRuntime(input), adapter, { log: input.log }), adapter);
   };
 }

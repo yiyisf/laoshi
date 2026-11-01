@@ -13,7 +13,7 @@ if (args.length === 0) {
   console.error("用法：node scripts/paseo/with-port.mjs <命令> [参数…]（参数中的 {PORT} 换成环境变量 PASEO_PORT）");
   process.exit(2);
 }
-const port = process.env.PASEO_PORT ?? process.env.PORT;
+const port = process.env.PASEO_PORT ?? process.env.LAOSHI_PORT ?? process.env.PORT;
 if (!port && args.some((a) => a.includes("{PORT}"))) {
   console.error("没有环境变量 PASEO_PORT：它由 Paseo 提供，手工运行时请自己设置。");
   process.exit(2);

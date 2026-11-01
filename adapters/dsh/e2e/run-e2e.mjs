@@ -6,7 +6,10 @@
 //
 // Needs dsh installed: LAOSHI_E2E_DSH is a directory with node_modules/@deepseek-ai/dsh
 // (npm install @deepseek-ai/dsh@0.2.2-alpha.2 there). Run with Node.js 22.19+ (dsh declares 24.9+):
-//   LAOSHI_E2E_DSH=<dir> node adapters/dsh/e2e/run-e2e.mjs [--out <dir>]
+//   LAOSHI_E2E_DSH=<dir> node adapters/dsh/e2e/run-e2e.mjs [--out <dir>] [--worktree]
+// --worktree (laoshi M2b): start through the launcher with --worktree, so the requirement gets its
+// own worktree (builtin git worktree, setup commands from .laoshi/services.json) and verification
+// gets a builtin service.
 // Linux and macOS. On Windows dsh needs a shell setup first (docs/discovery/dsh/report.md).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -19,6 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..", "..");
 const args = process.argv.slice(2);
 const outIdx = args.indexOf("--out");
+const WORKTREE = args.includes("--worktree");
 const out = path.resolve(outIdx >= 0 ? args[outIdx + 1] : fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-dsh-e2e-")));
 const dshDir = process.env.LAOSHI_E2E_DSH;
 const dshPkg = dshDir && path.join(path.resolve(dshDir), "node_modules", "@deepseek-ai", "dsh");
@@ -79,7 +83,25 @@ fs.writeFileSync(
 // The sample project: a confirmed requirement on its own branch.
 const git = (...a) => execFileSync("git", a, { cwd: repo, stdio: "ignore" });
 git("init", "-q");
-git("checkout", "-q", "-b", "feature/20261101-e2e");
+if (WORKTREE) {
+  // On main, with a service and setup commands committed: the launcher cuts the requirement's worktree from here.
+  git("checkout", "-q", "-b", "main");
+  git("config", "user.email", "e2e@laoshi.invalid");
+  git("config", "user.name", "laoshi e2e");
+  fs.writeFileSync(
+    path.join(repo, "server.cjs"),
+    'require("http").createServer((q, s) => { s.statusCode = q.url === "/healthz" ? 200 : 404; s.end("ok"); }).listen(Number(process.argv[2]), "127.0.0.1", () => console.log("e2e service on " + process.argv[2]));\n',
+  );
+  fs.mkdirSync(path.join(repo, ".laoshi"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, ".laoshi", "services.json"),
+    JSON.stringify({ setup: [`node -e "require('fs').writeFileSync('setup-done.txt', String(process.env.LAOSHI_SOURCE_CHECKOUT_PATH))"`], services: { web: { command: "node server.cjs {PORT}", health: "/healthz" } } }, null, 2),
+  );
+  git("add", "-A");
+  git("commit", "-q", "-m", "e2e project");
+} else {
+  git("checkout", "-q", "-b", "feature/20261101-e2e");
+}
 fs.mkdirSync(path.join(repo, FEATURE), { recursive: true });
 fs.writeFileSync(
   path.join(repo, FEATURE, "spec.md"),
@@ -130,25 +152,63 @@ try {
   check("建立发起流水线的对话", chatRun.status === 0 && /^session-/.test(chat ?? ""), chatRun.status === 0 ? chat : chatRun.stderr.slice(-300));
 
   const started = Date.now();
-  const run = spawnSync(
-    process.execPath,
-    [tsx, path.join(root, "engine", "src", "main.ts"), "--repo", repo, "--feature", FEATURE, "--config", configPath, "--origin-agent", chat, "--profile", "quick"],
-    { env: { ...env, REQ_KIT_HOME: path.join(out, "kit-home") }, encoding: "utf8", timeout: 15 * 60_000 },
-  );
-  fs.writeFileSync(path.join(logs, "engine.log"), `${run.stdout}${run.stderr}`);
-  const minutes = ((Date.now() - started) / 60_000).toFixed(1);
-  check("流水线进程正常结束", run.status === 0, `退出码 ${run.status}，用时 ${minutes} 分钟（见 logs/engine.log）`);
+  const kitHome = path.join(out, "kit-home");
+  let workRepo = repo;
+  if (WORKTREE) {
+    // The launcher creates the worktree, then runs the pipeline there in the background.
+    const launch = spawnSync(
+      process.execPath,
+      [tsx, path.join(root, "engine", "src", "launch.ts"), "--repo", repo, "--feature", FEATURE, "--config", configPath, "--origin-agent", chat, "--profile", "quick", "--worktree"],
+      { env: { ...env, REQ_KIT_HOME: kitHome }, encoding: "utf8", timeout: 5 * 60_000 },
+    );
+    fs.writeFileSync(path.join(logs, "launch.log"), `${launch.stdout}${launch.stderr}`);
+    check("启动器新建了需求自己的工作区", launch.status === 0, launch.status === 0 ? launch.stdout.trim().split("\n")[0] : `${launch.stdout}${launch.stderr}`.slice(-400));
+    const list = execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repo, encoding: "utf8" });
+    const entry = list.split(/\n\n/).find((b) => b.includes("branch refs/heads/feature/20261101-e2e"));
+    workRepo = entry ? /^worktree (.+)$/m.exec(entry)[1] : repo;
+    check("工作区是内置的 git worktree（在安装目录下，分支 feature/20261101-e2e）", Boolean(entry) && workRepo.startsWith(fs.realpathSync(kitHome)), workRepo);
+    const terminal = () => {
+      try {
+        return ["completed", "failed", "waiting_for_approval", "waiting_for_business"].includes(JSON.parse(fs.readFileSync(path.join(workRepo, FEATURE, ".pipeline", "state.json"), "utf8")).status);
+      } catch {
+        return false;
+      }
+    };
+    for (let i = 0; i < 15 * 60 && !terminal(); i++) await sleep(1000);
+    const pipelineLog = path.join(workRepo, FEATURE, ".pipeline", "pipeline.log");
+    if (fs.existsSync(pipelineLog)) fs.copyFileSync(pipelineLog, path.join(logs, "engine.log"));
+    check("流水线在工作区中跑完", terminal(), `用时 ${((Date.now() - started) / 60_000).toFixed(1)} 分钟（见 logs/engine.log）`);
+  } else {
+    const run = spawnSync(
+      process.execPath,
+      [tsx, path.join(root, "engine", "src", "main.ts"), "--repo", repo, "--feature", FEATURE, "--config", configPath, "--origin-agent", chat, "--profile", "quick"],
+      { env: { ...env, REQ_KIT_HOME: kitHome }, encoding: "utf8", timeout: 15 * 60_000 },
+    );
+    fs.writeFileSync(path.join(logs, "engine.log"), `${run.stdout}${run.stderr}`);
+    const minutes = ((Date.now() - started) / 60_000).toFixed(1);
+    check("流水线进程正常结束", run.status === 0, `退出码 ${run.status}，用时 ${minutes} 分钟（见 logs/engine.log）`);
+  }
 
-  const stateFile = path.join(repo, FEATURE, ".pipeline", "state.json");
+  const stateFile = path.join(workRepo, FEATURE, ".pipeline", "state.json");
   const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, "utf8")) : null;
   check("流水线状态为 completed", state?.status === "completed", `status=${state?.status ?? "（没有状态文件）"}`);
   const keys = Object.keys(state?.results ?? {});
   check("每个步骤都有结果", keys.length >= 4, keys.join("、"));
-  check("完成报告已生成", fs.existsSync(path.join(repo, FEATURE, "report.md")));
+  check("完成报告已生成", fs.existsSync(path.join(workRepo, FEATURE, "report.md")));
+  if (WORKTREE) {
+    const done = path.join(workRepo, "setup-done.txt");
+    check("新工作区的准备命令已运行", fs.existsSync(done) && fs.readFileSync(done, "utf8") === fs.realpathSync(repo), fs.existsSync(done) ? fs.readFileSync(done, "utf8") : "没有 setup-done.txt");
+    const engineLog = fs.existsSync(path.join(logs, "engine.log")) ? fs.readFileSync(path.join(logs, "engine.log"), "utf8") : "";
+    check("验证前启动了内置服务并通过健康检查", /web → http:\/\/127\.0\.0\.1:\d+（端口 \d+），已启动，健康检查通过/.test(engineLog), /web → [^\n]*/.exec(engineLog)?.[0] ?? "日志中没有服务 web");
+    const recs = path.join(kitHome, "workspaces");
+    const web = fs.existsSync(recs) ? fs.readdirSync(recs).map((d) => path.join(recs, d, "services", "web.json")).find((f) => fs.existsSync(f)) : null;
+    check("流水线结束后服务已停止", Boolean(web) && JSON.parse(fs.readFileSync(web, "utf8")).pid === null, web ?? "没有服务记录");
+  }
 
   const pluginLog = fs.readFileSync(channelPaths(home).log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const spawned = pluginLog.filter((l) => l.spawn);
   check("步骤 agent 都挂在对话下", spawned.length >= keys.length && spawned.every((l) => l.parent === chat), `${spawned.length} 个子 agent：${spawned.map((l) => l.label).join("、")}`);
+  if (WORKTREE) check("步骤 agent 在需求的工作区中工作", spawned.length > 0 && spawned.every((l) => l.cwd === workRepo), [...new Set(spawned.map((l) => l.cwd))].join("、"));
   // The final note is queued into the chat as the engine exits: give the chat time to read it.
   const notes = () => fs.readFileSync(path.join(logs, "step-model.log"), "utf8").split("\n").filter((l) => l.includes('"chat"') && l.includes("流水线"));
   for (let i = 0; i < 60 && !notes().some((l) => l.includes("流水线已经结束")); i++) await sleep(1000);

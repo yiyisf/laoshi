@@ -27,6 +27,8 @@ interface PlatformAdapter {
 }
 ```
 
+能力来源写 `builtin` 时，运行时层用 laoshi 的内置实现替换对应方法（`engine/src/builtin/`，见 [builtin-capabilities](builtin-capabilities.md)；目前有 `services`、`worktree`）。内置服务要知道对话的工作目录时，调用运行时可选的 `agentDirectory(agentId)`。
+
 适配器放在 `adapters/<id>/`，由 [`runtime-loader.ts`](../../engine/src/runtime-loader.ts) 登记，这是核心中唯一引用适配器的文件（`engine/test/platform.test.ts` 检查）。草案中的 `vocabulary`、`skillTargets`、`configSchema`、`compatibleWith` 在 M2c/M2e 补上。
 
 ## 2. 能力声明

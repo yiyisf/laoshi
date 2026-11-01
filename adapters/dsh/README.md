@@ -40,14 +40,13 @@
 
 ## 原型的范围
 
-已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息和取消、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量。
+已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息和取消、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量。M2b 起，在新建的工作区中开发（`--worktree`）和由 laoshi 管理的服务使用 laoshi 的内置实现（`git worktree`，以及 `.laoshi/services.json` 中定义的服务，见 [builtin-capabilities](../../docs/design/builtin-capabilities.md)）。
 
 还没有实现：
 
 | 能力 | 现在的行为 | 计划 |
 | --- | --- | --- |
-| 在新建的工作区中开发（`--worktree`）、联合需求 | 报错说明不支持 | M2 的内置 worktree |
-| 由平台管理的服务 | `listServices` 返回 `null`，由步骤 agent 按 `verify.md` 自己启动 | M2 的内置服务管理 |
+| 联合需求（几个仓库各建工作区） | 用内置 worktree，单元测试覆盖了新建工作区，但还没有端到端检查 | — |
 | 按角色选择模型（builder / reviewer 的 `provider`） | 步骤 agent 使用对话的模型 | 用 dsh 的 agent 预设或子 agent 的模型选项 |
 | 定时任务的截止时间（`expiresAt`） | 忽略，在日志里说明 | — |
 | 额度、profile、provider 状态 | 返回 `null` | — |
@@ -56,11 +55,13 @@
 ## 端到端检查
 
 ```sh
-LAOSHI_E2E_DSH=<装有 @deepseek-ai/dsh 的目录> node adapters/dsh/e2e/run-e2e.mjs [--out <目录>]
+LAOSHI_E2E_DSH=<装有 @deepseek-ai/dsh 的目录> node adapters/dsh/e2e/run-e2e.mjs [--out <目录>] [--worktree]
 ```
+
+加 `--worktree` 时，样例仓库在 main 上，带一个服务和一条准备命令（`.laoshi/services.json`）。脚本通过启动器加 `--worktree` 启动流水线，额外检查以下几项：需求的工作区是安装目录下的 `git worktree`；准备命令已运行；步骤 agent 在工作区中工作；验证前内置服务已启动并通过健康检查；流水线结束后服务已停止。
 
 脚本会做这些事：建一个独立的 `DSH_HOME`，装上插件，用 `e2e/step-model.mjs` 模拟模型，启动 dsh；建一个对话；在对话里用 quick 档跑一条流水线；最后检查结果并写出 `report.md`。
 
 模拟模型对每个步骤，通过 dsh 的 bash 工具写出产出文件和合格的结果文件，所以这个检查验证的是"引擎 → 插件 → dsh 子 agent → 文件 → 引擎"整条链路是否接通，不代表模型的能力。
 
-最近一次结果（2026-11-01，Linux，dsh 0.2.2-alpha.2，Node 24.22 和 22.20 各跑一次）：8 项检查全部通过。7 个步骤（方案设计 → 方案审核 → 代码实现 → 代码评审 → 提测说明 → 功能验证 → 完成报告）都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知都发回了对话。
+最近一次结果（2026-11-01，Linux，dsh 0.2.2-alpha.2）：不加参数时 8 项检查全部通过（M4b 时 Node 24.22 和 22.20 各跑一次，M2b 时 Node 24.22）；加 `--worktree` 时 14 项全部通过（M2b，Node 24.22）。7 个步骤（方案设计 → 方案审核 → 代码实现 → 代码评审 → 提测说明 → 功能验证 → 完成报告）都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知都发回了对话。

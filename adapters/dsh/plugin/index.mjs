@@ -137,7 +137,7 @@ export function apply(ctx, config = {}) {
         (result) => (entry.settled = { ok: true, stopReason: result?.stopReason ?? null }),
         (error) => (entry.settled = { ok: false, error: String(error?.message ?? error) }),
       );
-      log({ spawn: childId, parent, label, provider });
+      log({ spawn: childId, parent, label, provider, cwd });
       return { childId };
     },
 

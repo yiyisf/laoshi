@@ -12,9 +12,9 @@ import type { AgentRuntime } from "../src/runtime.js";
 const ENGINE_SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 test("核心只在 runtime-loader.ts 中引用适配器", () => {
-  const offenders = fs
-    .readdirSync(ENGINE_SRC)
-    .filter((f) => f.endsWith(".ts") && f !== "runtime-loader.ts")
+  const offenders = (fs.readdirSync(ENGINE_SRC, { recursive: true }) as string[])
+    .map((f) => f.split(path.sep).join("/"))
+    .filter((f) => /\.(ts|mjs)$/.test(f) && f !== "runtime-loader.ts")
     .filter((f) => /from\s+["'][^"']*adapters\/|import\(\s*["'][^"']*adapters\//.test(fs.readFileSync(path.join(ENGINE_SRC, f), "utf8")));
   assert.deepEqual(offenders, []);
 });
@@ -32,7 +32,8 @@ test("每个适配器声明的能力都在能力表中", () => {
     for (const name of Object.keys(adapterFor({ platform: { adapter: id } }).capabilities)) assert.ok(name in CAPABILITIES, `${id}: ${name}`);
   }
   assert.equal(sourceOf(adapterFor({ platform: { adapter: "paseo" } }), "worktree"), "platform");
-  assert.equal(sourceOf(adapterFor({ platform: { adapter: "dsh" } }), "worktree"), "none");
+  assert.equal(sourceOf(adapterFor({ platform: { adapter: "dsh" } }), "worktree"), "builtin");
+  assert.equal(sourceOf(adapterFor({ platform: { adapter: "dsh" } }), "quota"), "none");
   assert.equal(sourceOf(adapterFor({ platform: { adapter: "dsh" } }), "scheduling"), "plugin");
 });
 

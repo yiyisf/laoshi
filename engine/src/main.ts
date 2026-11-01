@@ -224,12 +224,12 @@ async function main(): Promise<number> {
   if (state.worktree) log(`在为这个需求新建的工作区中开发：${repo}（Paseo 工作区 ${state.worktree.workspaceId}，对话所在目录 ${state.worktree.sourceRepo}）`);
 
   if (state.worktree && mode.kind === "fresh") {
-    // paseo.json's worktree.setup (installing dependencies, copying .env) runs in the background.
+    // The worktree's setup (installing dependencies, copying .env) runs in the background.
     const setup = await runtime.waitForWorkspaceSetup(state.worktree.workspaceId, 30 * 60_000).catch(() => ({ status: "none" as const, error: null }));
-    if (setup.status === "completed") log("新工作区的环境准备（paseo.json）已完成");
+    if (setup.status === "completed") log("新工作区的环境准备已完成");
     else if (setup.status === "failed" || setup.status === "timeout") {
       const why = setup.status === "timeout" ? "30 分钟内没有完成" : `失败：${setup.error ?? "原因未知"}`;
-      log(`新工作区的环境准备（paseo.json）${why}。流水线继续，步骤会按验证方法自行准备环境。`);
+      log(`新工作区的环境准备${why}。流水线继续，步骤会按验证方法自行准备环境。`);
     }
   }
 

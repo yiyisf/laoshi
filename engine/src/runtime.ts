@@ -136,6 +136,8 @@ export interface AgentRuntime {
   notifyAgent(agentId: string, text: string): Promise<void>;
   /** Interrupts the agent's current turn and gives it `text` instead (used to stop a step). */
   interruptAgent(agentId: string, text: string): Promise<void>;
+  /** The working directory of an agent's session, for laoshi's builtin services of the chat's checkout; null when unknown. */
+  agentDirectory?(agentId: string): Promise<string | null>;
   /** The platform's agent profiles (Paseo: settings → Agent profiles); null when they cannot be read. */
   listProfiles(): Promise<PlatformProfile[] | null>;
   /**

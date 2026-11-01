@@ -13,6 +13,7 @@ import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, reso
 import { gitInfo } from "./git.js";
 import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
 import { PROJECT_DIR } from "./prompts.js";
+import { readProjectServices, SERVICES_FILE } from "./builtin/project-services.js";
 import { CAPABILITIES, type CapabilityName, type DoctorTools, type PlatformAdapter, SOURCE_LABELS, sourceOf } from "./platform.js";
 import { adapterForFile, describeProfile, originFromEnv } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
@@ -258,6 +259,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
   else report("warn", "没有项目说明（包管理工具、不能改的目录、提交格式等），步骤 agent 需要自己摸索", "在项目根目录的对话中运行 /req-setup");
   verifyInstructions(repo, git.isRepo);
   adapter.doctorProject?.({ repo, isRepo: git.isRepo, tools: { report, info } });
+  if (sourceOf(adapter, "services") === "builtin" || sourceOf(adapter, "worktree") === "builtin") builtinServicesFile(repo, git.isRepo);
   if (!fs.existsSync(path.join(repo, "GLOSSARY.md")) && fs.existsSync(path.join(repo, "CONTEXT.md"))) {
     report("ok", "术语表为旧名 CONTEXT.md：会继续读取，新术语写入 GLOSSARY.md");
   } else if (fs.existsSync(path.join(repo, "GLOSSARY.md"))) {
@@ -312,6 +314,32 @@ function project(repo: string, adapter: PlatformAdapter): void {
     }
   }
   if (found === 0) report("ok", "没有运行过流水线的需求");
+}
+
+/** .laoshi/services.json, for laoshi's builtin services and worktree setup (M2b). */
+function builtinServicesFile(repo: string, isRepo: boolean): void {
+  let defs;
+  try {
+    defs = readProjectServices(repo);
+  } catch (error) {
+    report("fail", (error as Error).message, `修正 ${SERVICES_FILE}`);
+    return;
+  }
+  if (!defs) {
+    info(`没有 ${SERVICES_FILE}。可选：写上新工作区的准备命令（setup）和服务（services），laoshi 会在新建 worktree 时准备环境，并为验证启动服务、分配端口`);
+    return;
+  }
+  const names = Object.keys(defs.services);
+  report("ok", `${SERVICES_FILE}：${defs.setup.length ? `新建 worktree 时运行 ${defs.setup.length} 条准备命令；` : ""}服务 ${names.length ? names.join("、") : "（无）"}（由 laoshi 启动）`);
+  for (const [name, s] of Object.entries(defs.services)) {
+    if (s.port === undefined && !/\{PORT\}|PORT/.test(s.command)) info(`服务 ${name} 的命令里没有 {PORT}：laoshi 分配的端口通过环境变量 PORT 给出，服务要读取它，否则几个工作区同时运行时会端口冲突`);
+  }
+  if (!isRepo) return;
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", SERVICES_FILE], { cwd: repo, stdio: "ignore" });
+  } catch {
+    report("warn", `${SERVICES_FILE} 还没有提交：新建的 worktree 读取的是已提交的版本`, `提交 ${SERVICES_FILE}`);
+  }
 }
 
 /** Which optional capabilities this platform has, and who provides them (ADR 0008). */
