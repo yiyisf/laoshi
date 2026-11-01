@@ -87,6 +87,10 @@ Node 22.22，Linux。
 | `engine/src/runtime.ts` 等 | `listPaseoProfiles` 更名为 `listProfiles`，类型 `PlatformProfile` | M2a |
 | `engine/src/main.ts`、`digest.ts`、`spec-review.ts`、`card-cmd.ts`、`config-view.ts` | profile 解析与描述改用 `resolveProfiles`、`describeProfile` | M2a |
 | `engine/src/doctor.ts`、`configure.ts` | 平台相关部分改为调用适配器；体检增加"平台能力"一节 | M2a |
+| `engine/src/main.ts` | 新工作区准备的日志不再写 paseo.json | M2b |
+| `engine/src/doctor.ts` | 平台用内置能力时检查 `.laoshi/services.json` | M2b |
+| `engine/src/runtime.ts` | 新增可选的 `agentDirectory` | M2b |
+| `skills/req-setup/templates/paseo/with-port.mjs`、`copy-local-files.mjs` | 也读取 `LAOSHI_PORT`、`LAOSHI_SOURCE_CHECKOUT_PATH` | M2b |
 
 ## 移植登记
 

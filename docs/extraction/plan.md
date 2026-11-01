@@ -37,7 +37,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 完成标准：核心目录中搜不到平台名；M1 的回归全部通过；同一安装根下两个代码库的需求可同时运行，使用记录能区分代码库和使用者。
 - 分片：
   - **M2a 适配器接口**（已完成，2026-11-01）：`PlatformAdapter`（[platform.ts](../../engine/src/platform.ts)）；profile 解析、体检、配置向导、版本检查、会话识别放到接口后面；未声明的能力统一降级；体检列出能力来源。核心中只有 `runtime-loader.ts` 引用适配器（有测试）。
-  - M2b 内置能力：worktree、服务管理；本机调度的设计。
+  - **M2b 内置能力**（已完成，2026-11-01）：worktree（`git worktree`，后台准备命令）、服务管理（`.laoshi/services.json`，端口、健康检查、跨进程停止，Windows 不用 PowerShell），dsh 适配器改用这两项；本机调度已设计未实现（[builtin-capabilities](../design/builtin-capabilities.md)）。
   - M2c 配置：`LAOSHI_HOME`、安装级 → 代码库级两层、`platform.<id>`、代码库与使用者标识（ADR 0007）。
   - M2d 状态 v2 与迁移（ADR 0004）。
   - M2e 词汇：核心中的平台名、`/laoshi` 命名，CI 检查。

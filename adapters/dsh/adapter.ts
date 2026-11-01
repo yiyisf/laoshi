@@ -1,5 +1,6 @@
 // The DeepSeek Harness adapter (laoshi M4b prototype, interface from M2a). Everything goes through
-// laoshi's dsh plugin; what the plugin does not offer is degraded by the core (ADR 0008).
+// laoshi's dsh plugin; worktrees and services are laoshi's builtin ones (M2b); what neither offers
+// is degraded by the core (ADR 0008).
 
 import type { PlatformAdapter } from "../../engine/src/platform.js";
 import { channelPaths, dshHome } from "./plugin/channel.mjs";
@@ -9,6 +10,8 @@ export const dshAdapter: PlatformAdapter = {
   displayName: "DeepSeek Harness（dsh）",
   createRuntime: async (input) => (await import("./dsh-runtime.js")).createRuntime(input),
   capabilities: {
+    services: "builtin",
+    worktree: "builtin",
     scheduling: "plugin",
     sessionAgent: "plugin",
     activity: "plugin",

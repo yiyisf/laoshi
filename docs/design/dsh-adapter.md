@@ -112,7 +112,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 ## 8. 待定
 
 1. ~~引擎和插件之间选哪种认证方式~~：已决定，插件代为调用（§4）。
-2. worktree 用 laoshi 内置实现，还是启用 dsh 的实验包。
+2. ~~worktree 用 laoshi 内置实现，还是启用 dsh 的实验包~~：用内置实现（M2b）。实验包会切换会话的工作目录，和"步骤在 worktree、对话在原目录"的做法不合。
 3. builder 和 reviewer 用不同 harness 时，挂载哪些子 agent 提供方。
 4. 需求总览是否做成 dsh 的界面插件，还是先用本机网页。
 5. 内网 dsh 用哪个 Node：升级到 Node 24（可以只给 dsh 单独装一个，例如 npm 包 `node-linux-x64@24`，不影响系统的 Node 22），还是继续用 Node 22.20、接受在 dsh 声明的范围之外运行。
@@ -131,10 +131,9 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 - **单元测试**（属于 `npm test`）：插件配上模拟的 dsh 服务；运行时通过真实的 socket 调用插件。
 - **端到端检查**（`adapters/dsh/e2e`）：在真实 dsh（0.2.2-alpha.2，Linux，Node 24.22 和 22.20）上跑 quick 档流水线，只模拟模型。7 个步骤都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知发回了对话。
 
-还没有做的，见 adapters/dsh 的 README，主要有：
+M2b 起，`--worktree` 和服务改用 laoshi 的内置实现（[builtin-capabilities](builtin-capabilities.md)），端到端检查加 `--worktree` 时覆盖这两项。还没有做的，见 adapters/dsh 的 README，主要有：
 
-- `--worktree` 和联合需求；
-- 平台管理的服务；
+- 联合需求的端到端检查；
 - 按角色选择模型；
 - Windows 上的端到端检查。
 

@@ -2,8 +2,9 @@
 // Everything goes through laoshi's dsh plugin (adapters/dsh/plugin) over its local socket; the
 // engine never calls dsh's /api (ADR 0008: the plugin calls on the engine's behalf).
 //
-// Not in the prototype: worktrees (--worktree), services managed by the platform, provider quota,
-// agent profiles per role (step agents use the chat's model), recurring schedules' expiry.
+// Worktrees and services are laoshi's builtin ones (engine/src/builtin, laoshi M2b): the methods
+// below are placeholders the runtime layer replaces. Not yet: provider quota, agent profiles per
+// role (step agents use the chat's model), recurring schedules' expiry.
 import fs from "node:fs";
 import net from "node:net";
 import type { RunningTool } from "../../engine/src/scan-guard.js";
@@ -122,7 +123,7 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
     },
 
     async startAgent(input) {
-      if (input.workspaceId) throw new Error("dsh 适配器（原型）还不支持在新建的工作区中开发（--worktree）");
+      // A requirement's own worktree (builtin, "dir:<directory>"): the step works in input.cwd, which is it.
       if (!input.parentAgentId) {
         const { sessionId } = await call<{ sessionId: string }>("startSession", { cwd: input.cwd, prompt: input.prompt });
         return stepAgent(sessionId);
@@ -143,6 +144,11 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
 
     async interruptAgent(agentId, text) {
       await call("interrupt", { sessionId: agentId, text });
+    },
+
+    async agentDirectory(agentId) {
+      const s = await call<{ exists: boolean; cwd?: string | null }>("session", { sessionId: agentId });
+      return s.exists ? (s.cwd ?? null) : null;
     },
 
     listProfiles: async () => null,

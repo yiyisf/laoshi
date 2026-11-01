@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const source = process.env.PASEO_SOURCE_CHECKOUT_PATH;
+const source = process.env.PASEO_SOURCE_CHECKOUT_PATH ?? process.env.LAOSHI_SOURCE_CHECKOUT_PATH;
 const files = process.argv.slice(2);
 if (!source) {
   console.log("没有环境变量 PASEO_SOURCE_CHECKOUT_PATH（不是 Paseo 新建 worktree 时运行的），跳过。");
