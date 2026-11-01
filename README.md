@@ -17,7 +17,7 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 | 路径 | 内容 |
 | --- | --- |
 | `engine/` | 流水线引擎：`src/` 程序、`prompts/` 步骤提示词、`test/` 场景测试（`fake-runtime.ts` 模拟平台） |
-| `adapters/` | 平台适配器。`paseo/`：Paseo 运行时、profile、`paseo.json`、daemon 检查。配置 `platform.adapter` 选择使用哪个 |
+| `adapters/` | 平台适配器，配置 `platform.adapter` 选择使用哪个。`paseo/`：Paseo 运行时、profile、`paseo.json`、daemon 检查；`dsh/`：DeepSeek Harness 运行时与 laoshi 的 dsh 插件（M4b 原型） |
 | `skills/`、`principles/` | 入口 skill、方法 skill、原则 |
 | `bin/` | `req`（`laoshi`）、`start-pipeline` 命令 |
 | `evals/` | 端到端评估：样例仓库、隐藏验收测试 |

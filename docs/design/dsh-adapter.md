@@ -1,6 +1,6 @@
 # DeepSeek Harness（dsh）适配：外部引擎 + 平台插件
 
-- 状态：提议
+- 状态：提议。认证方式已定（§4）；原型已实现，见 [adapters/dsh](../../adapters/dsh/README.md)（§9）
 - 依据：[dsh 摸底报告](../discovery/dsh/report.md)（`@deepseek-ai/dsh@0.2.2-alpha.2`，没有使用真实模型）
 - 决策：[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)
 - 前置阅读：[agent-runtime.md](../../contracts/agent-runtime.md)、[adapter-guide.md](adapter-guide.md)
@@ -24,14 +24,14 @@
 dsh web host（使用者打开的界面）
  ├─ 对话会话（DSH_SESSION_ID）── /laoshi 在这里对齐需求、启动流水线
  │    └─ 步骤子 agent × N（插件创建，带标签显示在对话下）
- ├─ laoshi dsh 插件
- │    · ctx.subagents  在对话下创建步骤子 agent
- │    · ctx.schedule   预约、自动继续、等待提醒
- │    · approval/request 按策略审批，处理不了的交给人
- │    · 本地通道：接收引擎的请求，把限定权限的凭据交给引擎
- └─ /api（session、subagents、schedule …）
+ └─ laoshi dsh 插件（在 host 内）
+      · ctx.subagents          在对话下创建步骤子 agent，追问、打断它
+      · ctx.schedule           预约、自动继续、等待提醒
+      · approval/request       按策略审批，处理不了的交给人
+      · ctx.sessionController  会话的创建、发送消息、取消、状态、历史
+      · 本地通道（socket / 命名管道 + 令牌）
           ▲
-          │ 会话的创建、下发、取消、列表、追问、读事件
+          │ 引擎只调用插件，不调用 dsh 的 /api（§4）
 laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 ```
 
@@ -72,7 +72,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 1. 插件通过本地通道把一个 cookie 交给引擎。最简单，但这个 cookie 拥有使用者的全部权限。
 2. **插件代为调用**：引擎只和插件通信，插件在 host 内直接使用 `ctx.agents`、`ctx.subagents`、`ctx.schedule`，并且只开放 laoshi 需要的那几项操作。
 
-倾向第 2 种：权限最小，也让引擎不依赖 `/api` 的内部格式（`/api` 的类型由生成器产生，没有承诺稳定）。代价是插件的代码会多一些。
+**已决定（2026-11-01）：第 2 种。** 权限最小，也让引擎不依赖 `/api` 的内部格式（`/api` 的类型由生成器产生，没有承诺稳定）。代价是插件的代码多一些。原型中插件开放的操作：`hello`、`session`、`spawn`、`status`、`lastMessage`、`toolCalls`、`prompt`、`interrupt`、`startSession`、`schedule`、`cancelSchedule`；§3 表中写的 `/api` 调用，实现时都由插件在 host 内调用对应的服务完成。
 
 **通道。** 用 unix socket（Windows 上用命名管道），路径放在 `$DSH_HOME` 下，并带上会话 ID。探针中用的文件收件箱只作为实验手段。
 
@@ -111,9 +111,30 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 
 ## 8. 待定
 
-1. 引擎和插件之间选哪种认证方式（§4 的第 1 种还是第 2 种）。
+1. ~~引擎和插件之间选哪种认证方式~~：已决定，插件代为调用（§4）。
 2. worktree 用 laoshi 内置实现，还是启用 dsh 的实验包。
 3. builder 和 reviewer 用不同 harness 时，挂载哪些子 agent 提供方。
 4. 需求总览是否做成 dsh 的界面插件，还是先用本机网页。
 5. 内网 dsh 用哪个 Node：升级到 Node 24（可以只给 dsh 单独装一个，例如 npm 包 `node-linux-x64@24`，不影响系统的 Node 22），还是继续用 Node 22.20、接受在 dsh 声明的范围之外运行。
-6. 内网真实模型下的结果：用[内网摸底包](../discovery/dsh/probes/README.md)确认模型网关的兼容设置、步骤任务能否按结果文件约定完成、有没有对外连接。模型本身已经在 Paseo 上验证过，这里要验证的是"同一个模型 + dsh 的提示词和工具"能否配合好。
+6. ~~内网真实模型下的结果~~：内网第三次运行摸底包（真实模型）已确认：模型接入不需要兼容设置，三个步骤任务都按结果文件约定完成，没有对外连接（[摸底报告](../discovery/dsh/report.md)）。
+
+## 9. 原型（M4b，2026-11-01）
+
+实现在 [adapters/dsh](../../adapters/dsh/README.md)：
+
+- **插件** `laoshi-dsh-plugin`：§2 的四项能力，加上本地通道。
+- **运行时** `dsh-runtime.ts`：实现 `AgentRuntime`，只调用插件。
+- 引擎从 `DSH_SESSION_ID` 识别发起的对话。
+
+验证：
+
+- **单元测试**（属于 `npm test`）：插件配上模拟的 dsh 服务；运行时通过真实的 socket 调用插件。
+- **端到端检查**（`adapters/dsh/e2e`）：在真实 dsh（0.2.2-alpha.2，Linux，Node 24.22 和 22.20）上跑 quick 档流水线，只模拟模型。7 个步骤都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知发回了对话。
+
+还没有做的，见 adapters/dsh 的 README，主要有：
+
+- `--worktree` 和联合需求；
+- 平台管理的服务；
+- 按角色选择模型；
+- Windows 上的端到端检查。
+

@@ -71,6 +71,16 @@ Node 22.22，Linux。
 - 211 = 244 − 33。跳过的 5 项中，2 项与基线相同（本机没有浏览器），3 项是导入时改动 1 的三项检查。
 - M1 完成后多出的 2 项是新增的 `runtime-loader.test.ts`。
 
+## 导入之后对核心文件的改动
+
+移植 req-kit 的补丁时，以下 laoshi 自己的改动要一并保留：
+
+| 文件 | 改动 | 来由 |
+| --- | --- | --- |
+| `engine/src/cli-args.ts` | 没有 `PASEO_AGENT_ID` 时，从 `DSH_SESSION_ID` 识别发起的对话 | M4b dsh 原型 |
+| `engine/src/review.ts`、`api.ts`、`code-review.ts`、`eval.ts` | 为子进程清理 Paseo 变量时，同时清理 `DSH_SESSION_ID` | M4b dsh 原型 |
+| `engine/src/runtime-loader.ts` | 适配器表增加 `dsh` | M4b dsh 原型 |
+
 ## 移植登记
 
 导入之后，req-kit 中需要移植到 laoshi 的修复登记在这里。
