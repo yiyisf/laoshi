@@ -1,0 +1,12 @@
+/* The acceptance checklist page (1.15): only what the design system (rk.css) does not cover. */
+#reviewer { width: 160px; }
+.ck-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--rk-space-3); }
+.rk-check { scroll-margin-top: 64px; }
+.rk-check ul.ck-details { margin: 0; padding-left: 18px; font-size: 13px; line-height: 22px; color: var(--rk-text-secondary); }
+.rk-check textarea.rk-input { width: 100%; box-sizing: border-box; }
+.ck-services { margin: 0; padding-left: 18px; }
+.ck-howto { margin: 0; padding: 10px 12px; border-radius: var(--rk-radius-md); background: var(--rk-surface-3); font: 12.5px/20px var(--rk-font-mono); white-space: pre-wrap; overflow-x: auto; }
+#notes ul { margin: 4px 0 0; padding-left: 18px; }
+@media (max-width: 640px) {
+  #reviewer { width: 100%; }
+}
