@@ -1,21 +1,28 @@
 // laoshi M2b: builtin service management (ADR 0008, decision 3) for platforms that do not run a
 // repository's services themselves. Services come from .laoshi/services.json; each runs detached
-// from the engine (so `req try` can start one and a later `req try --stop` stop it), with its
-// output in a log file and its process, port and exit code under the kit home.
+// from the engine under a small runner (service-runner.mjs), so `req try` can start one and a later
+// `req try --stop` stop it. Its output goes to a log file; the runner's process, the port and the
+// service's exit code are kept under the kit home.
 //
 // Windows: commands run through cmd.exe and process trees are stopped with taskkill; nothing
 // here starts PowerShell (it may be blocked outright on the intranet's machines).
 
 import { execFileSync, spawn } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ManagedService, ServiceTarget } from "../runtime.js";
 import { readProjectServices, SERVICES_FILE, type ServiceDefinition } from "./project-services.js";
 import { directoryOfTarget, workspaceStateDir } from "./workspace.js";
 
+const RUNNER = path.join(path.dirname(fileURLToPath(import.meta.url)), "service-runner.mjs");
+
 interface ServiceRecord {
+  /** Which start this is: a runner only updates the record of its own start. */
+  runId: string;
   name: string;
   pid: number | null;
   port: number;
@@ -177,26 +184,23 @@ export function builtinServices(options: {
       port = previous?.port && (await portFree(previous.port)) ? previous.port : await freePort();
     }
     const command = def.command.replaceAll("{PORT}", String(port));
-    const out = fs.openSync(paths.log(name), "a");
-    fs.writeSync(out, `\n[laoshi] ${new Date().toISOString()} 启动：${command}（端口 ${port}）\n`);
-    // The system's default shell: cmd.exe on Windows (never PowerShell), /bin/sh elsewhere.
-    const child = spawn(command, {
-      cwd: directory,
-      env: { ...env, PORT: String(port), LAOSHI_PORT: String(port) },
-      shell: true,
-      detached: true,
-      stdio: ["ignore", out, out],
-      windowsHide: true,
-    });
-    fs.closeSync(out);
+    fs.appendFileSync(paths.log(name), `\n[laoshi] ${new Date().toISOString()} 启动：${command}（端口 ${port}）\n`);
+    const runId = crypto.randomUUID();
+    const jobFile = path.join(paths.dir, `${name}.job.json`);
+    fs.writeFileSync(
+      jobFile,
+      JSON.stringify({ runId, command, cwd: directory, env: { PORT: String(port), LAOSHI_PORT: String(port) }, logFile: paths.log(name), recordFile: paths.record(name) }),
+    );
+    // The runner leads its own process group (POSIX) and owns the service's process tree.
+    const child = spawn(process.execPath, [RUNNER, jobFile], { cwd: directory, env, detached: true, stdio: "ignore", windowsHide: true });
     let exited = false;
-    const rec: ServiceRecord = { name, pid: child.pid ?? null, port, command, startedAt: new Date().toISOString(), exitCode: null };
+    const rec: ServiceRecord = { runId, name, pid: child.pid ?? null, port, command, startedAt: new Date().toISOString(), exitCode: null };
     fs.writeFileSync(paths.record(name), JSON.stringify(rec));
-    child.on("exit", (code) => {
+    child.on("exit", () => {
       exited = true;
-      rec.exitCode = code;
+      // The runner wrote the service's exit code before it exited.
+      rec.exitCode = readRecord(paths.record(name))?.exitCode ?? null;
       rec.pid = null;
-      fs.writeFileSync(paths.record(name), JSON.stringify(rec));
     });
     child.on("error", (error) => options.log(`服务 ${name} 启动失败：${error.message}`));
     child.unref();
