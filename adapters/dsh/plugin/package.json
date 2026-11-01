@@ -1,0 +1,11 @@
+{
+  "name": "laoshi-dsh-plugin",
+  "version": "0.1.0-dev",
+  "private": true,
+  "description": "laoshi's plugin for the DeepSeek Harness host: creates step agents under the chat, schedules messages, answers approvals by policy, and serves the laoshi engine over a local socket (ADR 0008).",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": { ".": "./index.mjs" },
+  "files": ["index.mjs", "channel.mjs", "channel.d.mts"],
+  "license": "MIT"
+}

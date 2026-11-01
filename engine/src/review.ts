@@ -302,6 +302,7 @@ function defaultRun(command: "approve" | "reply", repo: string, featureDir: stri
   const env = { ...process.env };
   delete env.PASEO_AGENT_ID;
   delete env.PASEO_AGENT_CWD;
+  delete env.DSH_SESSION_ID;
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), command, featureDir, ...extra], {
     cwd: repo,
     env,
@@ -316,6 +317,7 @@ function defaultTry(repo: string, featureDir: string, stop: boolean) {
   const env = { ...process.env };
   delete env.PASEO_AGENT_ID;
   delete env.PASEO_AGENT_CWD;
+  delete env.DSH_SESSION_ID;
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), "try", featureDir, "--json", ...(stop ? ["--stop"] : [])], {
     cwd: repo,
     env,

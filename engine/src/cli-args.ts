@@ -112,8 +112,9 @@ export function parseLaunchArgs(argv: string[]): LaunchArgs {
   if (values.approve && (values.status || values.stop || values["spec-review"] || values.restart || values.worktree || phase || values.at)) {
     throw new Error("--approve 只用于确认等待中的方案并继续开发");
   }
-  // In a Paseo chat, the chat itself is the origin unless told otherwise.
-  const origin = (values["origin-agent"] ?? process.env.PASEO_AGENT_ID)?.trim();
+  // In a Paseo chat, the chat itself is the origin unless told otherwise; in a dsh chat (laoshi M4b),
+  // its session, whose shell runs in the chat's directory.
+  const origin = (values["origin-agent"] ?? process.env.PASEO_AGENT_ID ?? process.env.DSH_SESSION_ID)?.trim();
   return {
     // In a Paseo chat, the chat's working directory is the repository.
     repo: path.resolve(values.repo ?? process.env.PASEO_AGENT_CWD ?? process.cwd()),
