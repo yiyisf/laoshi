@@ -6,6 +6,7 @@ import type { RuntimeFactory } from "./runtime.js";
 // picks one when a runtime is created.
 const ADAPTERS: Record<string, () => Promise<{ createRuntime: RuntimeFactory }>> = {
   paseo: () => import("../../adapters/paseo/paseo-runtime.js"),
+  dsh: () => import("../../adapters/dsh/dsh-runtime.js"),
 };
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);

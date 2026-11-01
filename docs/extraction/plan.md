@@ -51,9 +51,10 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 ### M4b DeepSeek Harness（dsh）适配器
 - 形态为"外部引擎 + laoshi dsh 插件"（[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)、[dsh-adapter](../design/dsh-adapter.md)）。摸底已完成，见 [dsh 摸底报告](../discovery/dsh/report.md)。
-- 运行时通过 web host 的 `/api` 管理会话；插件负责在对话下创建子 agent、定时任务、审批和引擎认证；服务与 worktree 使用 M2 的内置实现。
+- 引擎只调用插件（插件代为调用，2026-11-01 决定）；插件在 host 内负责会话、在对话下创建子 agent、定时任务和审批；服务与 worktree 使用 M2 的内置实现。
 - 与 M4 相互独立：dsh 和摸高是两件事，摸高的底层不是 dsh。
-- 前置：M2 的运行时层能按来源选择能力；[dsh-adapter §8](../design/dsh-adapter.md) 的第 1 项有结论；[内网摸底包](../discovery/dsh/probes/README.md)在内网用真实模型跑过，P02（模型接入）和 P13（步骤任务）通过。
+- 前置（正式版）：M2 的运行时层能按来源选择能力。认证方式已定；内网摸底包用真实模型跑过，P02、P13 通过。
+- 进展（2026-11-01）：**原型已完成**，见 [adapters/dsh](../../adapters/dsh/README.md)。实现了必需能力，以及在对话下创建子 agent、定时消息、审批；在真实 dsh 上用模拟模型跑通 quick 档流水线。下一步：在内网用真实模型跑 `evals/` 用例；补上 worktree、服务、按角色选择模型（依赖 M2）；确定 Windows 上的 shell 方案（P03c 或团队插件）。
 - 完成标准：能力矩阵中除契约允许缺失的项外没有 `none`；探针测试转为自动化；用真实模型跑通至少一个 `evals/` 用例，"夸大"为零。
 
 ### M5 初始化 skill 与自检

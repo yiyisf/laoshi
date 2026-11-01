@@ -484,6 +484,7 @@ export function apiRun(command: string, repoArg: string, feature: string, extra:
   const env = { ...process.env };
   delete env.PASEO_AGENT_ID;
   delete env.PASEO_AGENT_CWD;
+  delete env.DSH_SESSION_ID;
   if (command === "start") extra = [...extra, ...startOptions(cwd, feature)];
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), command, feature, ...extra], {
     cwd,

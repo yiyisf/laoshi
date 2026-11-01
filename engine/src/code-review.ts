@@ -411,6 +411,7 @@ export function startReviewFix(repo: string, featureDir: string): { ok: boolean;
   const env = { ...process.env };
   delete env.PASEO_AGENT_ID;
   delete env.PASEO_AGENT_CWD;
+  delete env.DSH_SESSION_ID;
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), "review-fix", featureDir], { cwd, env, encoding: "utf8", timeout: 180_000, windowsHide: true });
   return { ok: r.status === 0, message: r.error ? r.error.message : `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
 }
