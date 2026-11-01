@@ -72,7 +72,12 @@ test("内置服务：分配端口、等到健康检查通过、保留输出；�
     assert.equal(web.running, true);
     assert.equal(web.health, "healthy");
     assert.equal(web.url, `http://127.0.0.1:${web.port}`);
-    assert.match(web.output ?? "", new RegExp(`listening on ${web.port} via ${web.port}`));
+    assert.match(web.output ?? "", new RegExp(`启动：node server.cjs ${web.port}（端口 ${web.port}）`));
+    // The service's own output reaches the log a moment after it answers (Windows: through cmd.exe).
+    const logFile = path.join(workspaceStateDir(repo), "services", "web.log");
+    const wanted = new RegExp(`listening on ${web.port} via ${web.port}`);
+    for (let i = 0; i < 100 && !wanted.test(fs.readFileSync(logFile, "utf8")); i++) await new Promise((r) => setTimeout(r, 100));
+    assert.match(fs.readFileSync(logFile, "utf8"), wanted, "服务的输出写进日志，端口经 {PORT} 和 LAOSHI_PORT 传给服务");
     assert.equal(broken.running, false);
     assert.equal(broken.exitCode, 3);
 
