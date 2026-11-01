@@ -8,10 +8,9 @@ import { parseLaunchArgs } from "./cli-args.js";
 import { loadConfig } from "./config.js";
 import { defaultConfigPath, KIT_ROOT, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
 import { specReviewFailedMessage, specReviewMessage } from "./messages.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
+import { loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
 import { runSingleStep } from "./pipeline.js";
 import { normalizeFeatureDir, specProfile } from "./preflight.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
 import { ensurePipelineDir, hashFile, type PipelineState, pipelineDir, STATE_VERSION } from "./state.js";
 
 function log(message: string): void {
@@ -33,7 +32,7 @@ async function main(): Promise<number> {
   };
   try {
     if (origin) await runtime.verifyOrigin(origin, repo);
-    if (usesPaseoProfiles(config)) config = resolveConfigProfiles(config, await runtime.listPaseoProfiles());
+    config = await resolveProfiles(config, runtime);
     const now = new Date().toISOString();
     // A scratch state: the review is not part of a pipeline run and must not touch state.json.
     const state: PipelineState = {

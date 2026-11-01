@@ -7,8 +7,8 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import type { AgentProfile } from "./config.js";
-import { connect } from "../../adapters/paseo/daemon-check.js";
-import { type PaseoProfile, profilesFromDaemonConfig } from "../../adapters/paseo/paseo-profiles.js";
+import { adapterFor } from "./runtime-loader.js";
+import type { PlatformProfile } from "./runtime.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
 
 export interface CatalogEntry {
@@ -16,13 +16,13 @@ export interface CatalogEntry {
   label?: string;
 }
 
-/** What the daemon offers; the real one wraps the Paseo SDK, tests use a fixed one. */
+/** What the platform offers; the real one comes from the adapter (agentCatalog), tests use a fixed one. */
 export interface Catalog {
   providers(): Promise<Array<CatalogEntry & { status: string }>>;
   models(provider: string): Promise<CatalogEntry[]>;
   modes(provider: string): Promise<CatalogEntry[]>;
-  /** Agent profiles set up in Paseo; optional. */
-  profiles?(): Promise<PaseoProfile[]>;
+  /** Agent profiles set up in the platform (Paseo); optional. */
+  profiles?(): Promise<PlatformProfile[]>;
 }
 
 export interface Choice<T> {
@@ -69,19 +69,19 @@ const ROLE_HINTS = {
 /** Offers the Paseo profiles first, when there are any; null means "choose the agent directly". */
 async function chooseProfile(
   role: "builder" | "reviewer",
-  profiles: PaseoProfile[],
+  profiles: PlatformProfile[],
   choose: Chooser,
   avoidProvider: string | null,
-): Promise<PaseoProfile | null> {
+): Promise<PlatformProfile | null> {
   const usable = profiles.filter((p) => p.model);
   if (usable.length === 0) return null;
-  const score = (p: PaseoProfile) =>
+  const score = (p: PlatformProfile) =>
     (ROLE_HINTS[role].test(`${p.name} ${p.notes ?? ""}`) ? 2 : 0) + (avoidProvider && p.provider !== avoidProvider ? 1 : 0);
   const ordered = [...usable].sort((a, b) => score(b) - score(a));
-  const picked = await choose<PaseoProfile | null>(`${ROLE_TEXT[role]}用 Paseo 中的哪个 agent profile？`, [
+  const picked = await choose<PlatformProfile | null>(`${ROLE_TEXT[role]}用 Paseo 中的哪个 agent profile？`, [
     ...ordered.map((p) => ({
       label: `「${p.name}」：${p.provider}/${p.model}${p.modeId ? `，模式 ${p.modeId}` : ""}${p.notes ? `（${p.notes.slice(0, 40)}）` : ""}`,
-      value: p as PaseoProfile | null,
+      value: p as PlatformProfile | null,
     })),
     { label: "不用 profile，直接选择 agent 和模型", value: null },
   ]);
@@ -93,7 +93,7 @@ async function chooseRole(
   catalog: Catalog,
   choose: Chooser,
   avoidProvider: string | null,
-  profiles: PaseoProfile[] = [],
+  profiles: PlatformProfile[] = [],
 ): Promise<AgentProfile> {
   const fromPaseo = await chooseProfile(role, profiles, choose, avoidProvider);
   if (fromPaseo) return { paseoProfile: fromPaseo.name };
@@ -252,24 +252,6 @@ export function applyAgents(existing: Record<string, unknown>, raw: unknown): Re
   return { ...existing, agents };
 }
 
-function daemonCatalog(client: Awaited<ReturnType<typeof connect>>): Catalog {
-  return {
-    async providers() {
-      const snapshot = await client.providers.waitForReady({ timeoutMs: 60_000 });
-      return snapshot.entries.map((e) => ({ id: e.provider, status: e.status }));
-    },
-    async models(provider) {
-      return ((await client.providers.listModels(provider)).models ?? []).map((m) => ({ id: m.id, label: m.label }));
-    },
-    async modes(provider) {
-      return ((await client.providers.listModes(provider)).modes ?? []).map((m) => ({ id: m.id, label: m.label }));
-    },
-    async profiles() {
-      return profilesFromDaemonConfig((await client.config.get()).config) ?? [];
-    },
-  };
-}
-
 async function main(): Promise<number> {
   const { values } = parseArgs({
     args: process.argv.slice(2),
@@ -290,28 +272,25 @@ async function main(): Promise<number> {
     }
   }
 
-  const settings = {
-    daemonUrl: typeof existing.daemonUrl === "string" ? existing.daemonUrl : "ws://127.0.0.1:6767/ws",
-    daemonPasswordEnv: typeof existing.daemonPasswordEnv === "string" ? existing.daemonPasswordEnv : "PASEO_DAEMON_PASSWORD",
-  };
-  if (!values["catalog-json"]) console.log(`配置向导：连接 Paseo daemon ${settings.daemonUrl} ……`);
-  let client;
-  try {
-    // A daemon that is not running must not hold up the installer: give up after 20 seconds.
-    let timer: NodeJS.Timeout | undefined;
-    client = await Promise.race([
-      connect(settings as never),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("20 秒内没有连上")), 20_000);
-      }),
-    ]).finally(() => clearTimeout(timer));
-  } catch (error) {
-    const why = `无法连接 daemon：${(error as Error).message}。请确认 Paseo 正在运行；设置了密码时，确认环境变量 ${settings.daemonPasswordEnv} 已设置。`;
+  const adapter = adapterFor(existing);
+  if (!adapter.agentCatalog) {
+    const why = `${adapter.displayName} 没有配置向导：请在配置文件中直接填写 agents。`;
     if (values["catalog-json"]) json({ ok: false, message: why });
     else console.error(why);
     return 1;
   }
-  const catalog = daemonCatalog(client);
+  let session;
+  try {
+    session = await adapter.agentCatalog(existing, (text) => {
+      if (!values["catalog-json"]) console.log(text);
+    });
+  } catch (error) {
+    const why = (error as Error).message;
+    if (values["catalog-json"]) json({ ok: false, message: why });
+    else console.error(why);
+    return 1;
+  }
+  const { catalog } = session;
   try {
     if (values["catalog-json"]) {
       const choices = await agentChoices(catalog);
@@ -347,7 +326,7 @@ async function main(): Promise<number> {
       terminal.close();
     }
   } finally {
-    await client.close().catch(() => undefined);
+    await session.close();
   }
 }
 

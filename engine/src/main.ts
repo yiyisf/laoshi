@@ -11,13 +11,12 @@ import { slotHolders, slotsDir, tryAcquireSlot } from "./queue.js";
 import { cronEvery, parseStartTime } from "./schedule-time.js";
 import { loadConfig, PHASE_MODE_LABELS, PROFILE_LABELS, REQUIREMENT_TYPE_LABELS } from "./config.js";
 import { defaultConfigPath, kitVersion, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
-import { satisfies } from "../../adapters/paseo/daemon-check.js";
-import { describeAgentProfile, resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
+import { describeProfile, loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
+import { satisfies } from "./semver.js";
 import { jointProblem } from "./joint.js";
 import { runPipeline } from "./pipeline.js";
 import { appendRun, runRecord } from "./records.js";
 import { preflight, verifyPhaseProblem } from "./preflight.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
 import {
   acquireLock,
   ensurePipelineDir,
@@ -104,7 +103,7 @@ async function main(): Promise<number> {
         if (problem) throw new Error(problem);
       }
       if (originAgentId) await runtime.verifyOrigin(originAgentId, chatDir);
-      if (usesPaseoProfiles(config)) config = resolveConfigProfiles(config, await runtime.listPaseoProfiles());
+      config = await resolveProfiles(config, runtime);
     } catch (error) {
       const reason = (error as Error).message;
       log(`未启动：${reason}`);
@@ -119,7 +118,7 @@ async function main(): Promise<number> {
     }
   }
 
-  log(`builder：${describeAgentProfile(config.agents.builder)}；reviewer：${describeAgentProfile(config.agents.reviewer)}`);
+  log(`builder：${describeProfile(config, config.agents.builder)}；reviewer：${describeProfile(config, config.agents.reviewer)}`);
 
   const previous = mode.kind === "fresh" ? null : mode.previous;
   const profile =
@@ -272,7 +271,7 @@ async function main(): Promise<number> {
         state,
         runStartedAt: now,
         title,
-        agents: { builder: describeAgentProfile(config.agents.builder), reviewer: describeAgentProfile(config.agents.reviewer) },
+        agents: { builder: describeProfile(config, config.agents.builder), reviewer: describeProfile(config, config.agents.reviewer) },
       }),
     );
   };

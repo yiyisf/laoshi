@@ -35,6 +35,12 @@ npm 包名：**`laoshi`（已确认可用）**。
 - 平台词汇表：先收敛 `messages.ts`、`launch.ts`、`control.ts`；加 CI 检查，核心里不得出现平台名。
 - 能力来源与内置能力（[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md)）：运行时层按 platform → plugin → builtin → none 的顺序选择；把 worktree、服务管理、本机调度做成内置实现，Paseo 适配器继续使用 Paseo 自己的能力。
 - 完成标准：核心目录中搜不到平台名；M1 的回归全部通过；同一安装根下两个代码库的需求可同时运行，使用记录能区分代码库和使用者。
+- 分片：
+  - **M2a 适配器接口**（已完成，2026-11-01）：`PlatformAdapter`（[platform.ts](../../engine/src/platform.ts)）；profile 解析、体检、配置向导、版本检查、会话识别放到接口后面；未声明的能力统一降级；体检列出能力来源。核心中只有 `runtime-loader.ts` 引用适配器（有测试）。
+  - M2b 内置能力：worktree、服务管理；本机调度的设计。
+  - M2c 配置：`LAOSHI_HOME`、安装级 → 代码库级两层、`platform.<id>`、代码库与使用者标识（ADR 0007）。
+  - M2d 状态 v2 与迁移（ADR 0004）。
+  - M2e 词汇：核心中的平台名、`/laoshi` 命名，CI 检查。
 
 > **顺序说明（ADR 0006）**：摸高平台就是内部平台，M4 优先于原计划，与 M3 并行；M5 的"生成"排在两个手写适配器之后。
 

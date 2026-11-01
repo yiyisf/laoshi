@@ -44,8 +44,7 @@ import {
 import { loadConfig, type PipelineConfig } from "./config.js";
 import type { IntegrationConfig, Runner } from "./integrations.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
+import { loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
 import { readState, statePath } from "./state.js";
 
@@ -102,7 +101,7 @@ function today(now = new Date()): string {
 export async function withRuntime<T>(config: PipelineConfig, use: (runtime: AgentRuntime, config: PipelineConfig) => Promise<T>): Promise<T> {
   const runtime = await (await loadRuntimeFactory())({ config, log: () => undefined });
   try {
-    const resolved = usesPaseoProfiles(config) ? resolveConfigProfiles(config, await runtime.listPaseoProfiles()) : config;
+    const resolved = await resolveProfiles(config, runtime);
     return await use(runtime, resolved);
   } finally {
     await runtime.close().catch(() => undefined);

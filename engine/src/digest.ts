@@ -13,8 +13,7 @@ import { type FeatureSummary, listFeatures } from "./features.js";
 import { handledCategories, type RecurringLesson, recurringLessons } from "./lessons.js";
 import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
 import { dispatchNotifiers } from "./notifiers.js";
-import { resolveConfigProfiles, usesPaseoProfiles } from "../../adapters/paseo/paseo-profiles.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
+import { loadRuntimeFactory, originFromEnv, resolveProfiles } from "./runtime-loader.js";
 
 const GROUPS: Array<{ title: string; match: (stage: string) => boolean }> = [
   {
@@ -63,7 +62,7 @@ async function main(): Promise<number> {
       days: { type: "string", default: "7" },
     },
   });
-  const repo = fs.realpathSync(path.resolve(values.repo ?? process.env.PASEO_AGENT_CWD ?? process.cwd()));
+  const repo = fs.realpathSync(path.resolve(values.repo ?? originFromEnv(process.env)?.cwd ?? process.cwd()));
   const configPath = values.config ? path.resolve(values.config) : defaultConfigPath();
   let config = loadConfig(configPath, repo).config;
 
@@ -75,7 +74,7 @@ async function main(): Promise<number> {
         console.log(`已取消定时任务 ${values.cancel}。`);
         return 0;
       }
-      if (usesPaseoProfiles(config)) config = resolveConfigProfiles(config, await runtime.listPaseoProfiles());
+      config = await resolveProfiles(config, runtime);
       const command = `node "${path.join(KIT_ROOT, "bin", "req.mjs").split(path.sep).join("/")}" digest --notify --repo "${repo}"${values.config ? ` --config "${configPath}"` : ""}`;
       const id = await runtime.scheduleNewAgent({
         name: `req-kit 需求总览：${path.basename(repo)}`,

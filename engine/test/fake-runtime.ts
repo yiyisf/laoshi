@@ -7,8 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { PaseoProfile } from "../../adapters/paseo/paseo-profiles.js";
-import type { ActivityItem, AgentRuntime, ManagedService, ProviderQuota, RuntimeFactory, StepAgent, WaitOutcome } from "../src/runtime.js";
+import type { ActivityItem, AgentRuntime, PlatformProfile, ManagedService, ProviderQuota, RuntimeFactory, StepAgent, WaitOutcome } from "../src/runtime.js";
 
 export interface FakeBehavior {
   result?: Record<string, unknown>;
@@ -51,7 +50,7 @@ export interface FakeScenario {
   /** startSessionAgent throws. */
   sessionFails?: boolean;
   /** Agent profiles the daemon reports; null means they cannot be read. */
-  paseoProfiles?: PaseoProfile[] | null;
+  paseoProfiles?: PlatformProfile[] | null;
   /** paseo.json service scripts of the chat's workspace. */
   services?: { names: string[]; failing?: string[]; output?: string };
   quota?: ProviderQuota[] | null;
@@ -316,7 +315,7 @@ export const createRuntime: RuntimeFactory = async () => {
       record({ type: "notify", agentId, text });
       if (scenario.notifyFails) throw new Error("agent archived");
     },
-    async listPaseoProfiles() {
+    async listProfiles() {
       return scenario.paseoProfiles === undefined ? [] : scenario.paseoProfiles;
     },
     async listServices(target) {

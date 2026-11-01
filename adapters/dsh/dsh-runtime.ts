@@ -145,7 +145,7 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
       await call("interrupt", { sessionId: agentId, text });
     },
 
-    listPaseoProfiles: async () => null,
+    listProfiles: async () => null,
     listServices: async () => null,
     startServices: async () => {
       throw new Error("dsh 不管理服务");

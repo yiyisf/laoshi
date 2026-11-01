@@ -34,6 +34,7 @@ import { scanOutcomes } from "./outcomes.js";
 import { parsePeriod, summarizeRuns } from "./stats.js";
 import { readEvents, readRuns, runsFile } from "./records.js";
 import { totals } from "./usage.js";
+import { scrubOriginEnv } from "./runtime-loader.js";
 
 export const API_SCHEMA = 1;
 
@@ -481,10 +482,7 @@ export function apiRun(command: string, repoArg: string, feature: string, extra:
   if (!fs.existsSync(repoArg)) throw new ApiError("not_found", `目录不存在：${repoArg}`);
   const cwd = fs.realpathSync(repoArg);
   // Not from a chat: the run keeps reporting to the chat that started it.
-  const env = { ...process.env };
-  delete env.PASEO_AGENT_ID;
-  delete env.PASEO_AGENT_CWD;
-  delete env.DSH_SESSION_ID;
+  const env = scrubOriginEnv();
   if (command === "start") extra = [...extra, ...startOptions(cwd, feature)];
   const r = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "req.mjs"), command, feature, ...extra], {
     cwd,

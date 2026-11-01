@@ -15,7 +15,7 @@ import {
   PROFILE_LABELS,
   PROJECT_CONFIG_FILE,
 } from "./config.js";
-import { describeAgentProfile } from "../../adapters/paseo/paseo-profiles.js";
+import { describeProfile } from "./runtime-loader.js";
 import { STEPS, type StepId } from "./steps.js";
 
 export type Layer = "default" | "machine" | "team" | "project";
@@ -61,8 +61,8 @@ const hours = (v: unknown) => (Number(v) > 0 ? `${v} 小时` : "关闭");
 const list = (v: unknown) => (Array.isArray(v) && v.length > 0 ? v.join("、") : "无");
 const profilesText = (v: unknown) => (Array.isArray(v) ? v.map((p) => PROFILE_LABELS[p as "quick"] ?? p).join("、") + "档" : String(v));
 
-function agent(p: AgentProfile | null | undefined): string {
-  return p ? describeAgentProfile(p) : "未设置";
+function agent(p: AgentProfile | null | undefined, config: unknown): string {
+  return p ? describeProfile(config, p) : "未设置";
 }
 
 interface Entry {
@@ -81,9 +81,9 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
       agents: {
         label: "agent",
         description: "builder 做方案、写代码和修复；reviewer 审方案、评审代码和验证；备用模型在主模型一直失败时接手一步。",
-        display: (v) => {
+        display: (v, config) => {
           const a = v as PipelineConfig["agents"];
-          return `builder：${agent(a.builder)}；reviewer：${agent(a.reviewer)}；备用模型：${a.fallback ? agent(a.fallback) : "不用"}`;
+          return `builder：${agent(a.builder, config)}；reviewer：${agent(a.reviewer, config)}；备用模型：${a.fallback ? agent(a.fallback, config) : "不用"}`;
         },
       },
       defaultProfile: { label: "默认档位", description: "需求说明没写档位时用哪个。", display: (v) => `${PROFILE_LABELS[v as "quick"] ?? v}档` },
