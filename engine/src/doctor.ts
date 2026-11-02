@@ -3,7 +3,7 @@
 //   node bin/req-doctor.mjs [--repo <dir>] [--no-project] [--offline] [--config <file>]
 //
 // Sections: installation (delegated to install.mjs --check), configuration,
-// Paseo daemon, and the current project with its pipelines.
+// the platform daemon, and the current project with its pipelines.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -16,7 +16,7 @@ import { defaultConfigPath, homeOf, KIT_ROOT, kitVersion } from "./locations.js"
 import { PROJECT_DIR } from "./prompts.js";
 import { readProjectServices, SERVICES_FILE } from "./builtin/project-services.js";
 import { CAPABILITIES, type CapabilityName, type DoctorTools, type PlatformAdapter, SOURCE_LABELS, sourceOf } from "./platform.js";
-import { adapterForFile, describeProfile, originFromEnv } from "./runtime-loader.js";
+import { adapterForFile, describeProfile, originFromEnv, wordsFor } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
 import { isAlive, STATE_VERSION } from "./state.js";
 import { readRuns, runsFile } from "./records.js";
@@ -250,7 +250,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
   } else if (git.detached) {
     report("warn", "当前没有处在任何分支上（detached HEAD），流水线会拒绝启动", "切换到需求的工作分支");
   } else if (git.branch && git.protectedBranches.includes(git.branch)) {
-    report("warn", `当前在默认分支 ${git.branch} 上：新需求会被建议改用独立的 worktree 工作区`, "在 Paseo 中 New workspace → Isolation 选 New worktree");
+    report("warn", `当前在默认分支 ${git.branch} 上：新需求会被建议改用独立的 worktree 工作区`, wordsFor({ platform: { adapter: adapter.id } }).newWorkspace ?? "启动时加 --worktree，让流水线为需求新建 worktree 工作区");
   } else {
     report("ok", `当前分支：${git.branch}`);
   }

@@ -1,4 +1,4 @@
-// `req api`: machine-readable output for programs (the Paseo plugin, scripts), 1.9.
+// `req api`: machine-readable output for programs (the requirements plugin, scripts), 1.9.
 // The format is a contract (contracts/cli-json.md): every command prints one JSON object,
 //   { "schema": 1, "kitVersion": "…", "data": … }        exit 0
 //   { "schema": 1, "kitVersion": "…", "error": { "code", "message" } }   exit 1
@@ -554,6 +554,7 @@ export function apiMain(argvIn: string[], cwd = process.cwd()): unknown {
         kitVersion: kitVersion(),
         kitRoot: KIT_ROOT,
         apiSchema: API_SCHEMA,
+        // platform-name: field of the external contract (contracts/cli-json.md, schema 1)
         paseo: (JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "package.json"), "utf8")) as { reqKit?: { paseo?: string } }).reqKit?.paseo ?? null,
         featuresDir: FEATURES_DIR.split(path.sep).join("/"),
       };

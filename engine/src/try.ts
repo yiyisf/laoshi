@@ -1,7 +1,7 @@
 // `req try <需求> [--stop]` (1.14): runs a finished requirement so the requester can try it,
-// without knowing how to start the project. The project's paseo.json services are started in the
-// requirement's own workspace through Paseo (each on its own port), and the addresses are given
-// with what the handoff note says about test accounts and data. Projects without Paseo-managed
+// without knowing how to start the project. The project's platform services are started in the
+// requirement's own workspace through the platform (each on its own port), and the addresses are given
+// with what the handoff note says about test accounts and data. Projects without platform-managed
 // services get the start instructions the pipeline wrote down, and the advice to ask the chat.
 import fs from "node:fs";
 import path from "node:path";
@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
 import { defaultConfigPath } from "./locations.js";
 import type { AgentRuntime, ServiceTarget } from "./runtime.js";
 import { isAlive, readState, statePath } from "./state.js";
+import { wordsFor } from "./runtime-loader.js";
 
 export interface TryResult {
   ok: boolean;
@@ -72,7 +73,7 @@ export async function tryRequirement(input: { repo: string; featureDir: string; 
     return {
       ok: false,
       message:
-        "这个项目没有用 Paseo 管理的服务脚本（paseo.json），不能一键启动。可以在这个需求的对话里说\"帮我把它跑起来\"，或按下面的方法启动；以后请开发同事运行 /req-setup 写好 paseo.json，就能一键试用。",
+        `这个项目没有用 ${wordsFor(input.config).managedServices.replace(/的服务$/, "的服务脚本")}（${wordsFor(input.config).servicesFile}），不能一键启动。可以在这个需求的对话里说"帮我把它跑起来"，或按下面的方法启动；以后请开发同事运行 /req-setup 写好 ${wordsFor(input.config).servicesFile}，就能一键试用。`,
       services: [],
       howTo,
     };

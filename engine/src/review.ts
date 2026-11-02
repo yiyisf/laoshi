@@ -2,12 +2,12 @@
 // looks at the interface prototype of a requirement, clicks on what they want changed (the page
 // records which element, its text, color, size and position, so nobody has to describe it in
 // technical words), edits texts in place, and then sends the list to the requirement's chat or
-// confirms the design. The Paseo plugin links to it; `req review <需求>` opens it from a terminal.
+// confirms the design. The requirements plugin links to it; `req review <需求>` opens it from a terminal.
 //
 // One server per machine, started on demand and stopped after a few idle hours. It listens on
 // 127.0.0.1 only and every address carries a random token (a second token gives a read-only
 // page). REQ_KIT_REVIEW_HOST / REQ_KIT_REVIEW_PORT / REQ_KIT_REVIEW_PUBLIC_URL change that, e.g.
-// when people open Paseo's web UI from other computers.
+// when people open the platform's web UI from other computers.
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -19,7 +19,7 @@ import { buildCodeReview, recordHumanReview, startReviewFix, type Submission } f
 import { type Answer, acceptanceFailMessage, acceptanceText, buildChecklist, recordAcceptance, verdictOf } from "./checklist.js";
 import { appendEvent, readIndex, requirementRef } from "./records.js";
 import { readState, statePath } from "./state.js";
-import { scrubOriginEnv } from "./runtime-loader.js";
+import { scrubOriginEnv, wordsFor } from "./runtime-loader.js";
 
 const ASSETS = path.join(ENGINE_DIR, "src", "review-assets");
 /** 1.15: the design system's tokens, component styles and icons, shared by the three pages (copies made by scripts/tokens-build.mjs). */
@@ -247,7 +247,7 @@ function inside(base: string, rel: string): string | null {
   return target === base || target.startsWith(base + path.sep) ? target : null;
 }
 
-// The page may be shown inside Paseo (the req-kit plugin embeds it): Paseo's web UI on this
+// The page may be shown inside the platform (the req-kit plugin embeds it): the platform's web UI on this
 // machine, or, with REQ_KIT_REVIEW_HOST set for other computers, any page that has the token.
 function appCsp(): string {
   const host = process.env.REQ_KIT_REVIEW_HOST?.trim();
@@ -261,7 +261,7 @@ const APP_CSP = appCsp();
 // Prototypes are written by an agent (from text the requester or a card supplied) and are served
 // next to the page's own API, so nothing in them may run: the page reads them from outside.
 // frame-ancestors is checked against every page above, so the prototype allows the same ones as
-// the review page (Paseo around it).
+// the review page (the platform around it).
 const PROTOTYPE_CSP = `default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data:; script-src 'none'; form-action 'none'; ${APP_CSP.slice(APP_CSP.indexOf("frame-ancestors"))}`;
 
 function send(res: http.ServerResponse, status: number, body: string | Buffer, type = "text/plain; charset=utf-8", csp = APP_CSP) {
@@ -343,7 +343,7 @@ export function createReviewServer(opts: ReviewServerOptions): http.Server {
     // /r/<token>/health · /r/<token>/f/<key>/<rest…>
     if (parts[1] !== "r" || !parts[2]) return send(res, 404, "没有这个页面");
     const full = sameToken(parts[2], opts.token);
-    if (!full && !sameToken(parts[2], opts.readToken)) return send(res, 403, "链接无效或已过期，请从 Paseo 的 req-kit 插件或 req review 重新打开");
+    if (!full && !sameToken(parts[2], opts.readToken)) return send(res, 403, `链接无效或已过期，请从${wordsFor().requirementView ? `${wordsFor().requirementView}或 ` : " "}req review 重新打开`);
     if (parts[3] === "health") return json(res, 200, { ok: true, version: kitVersion() });
     if (parts[3] !== "f" || !parts[4]) return send(res, 404, "没有这个页面");
     const entry = readIndex(env).find((e) => e.key === parts[4]);

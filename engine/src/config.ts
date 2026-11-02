@@ -7,16 +7,16 @@ import type { StepId } from "./steps.js";
 
 export interface AgentProfile {
   /**
-   * Name (or ID) of a Paseo agent profile to take the settings from, e.g. "实现".
+   * Name (or ID) of a platform agent profile to take the settings from, e.g. "实现".
    * Resolved against the daemon when a run starts; fields written next to it win.
-   * See adapters/paseo/paseo-profiles.ts.
+   * See the adapter
    */
-  paseoProfile?: string;
+  platformProfile?: string;
   /**
    * "provider/model", split at the first "/". Examples: "claude/claude-sonnet-5",
    * "pi/anthropic/claude-sonnet-5" (Pi model IDs carry their own "upstream/model").
    * Run `npm run smoke -- check` to list what your daemon offers. Required unless
-   * paseoProfile is given.
+   * platformProfile is given.
    */
   provider?: string;
   /**
@@ -31,7 +31,7 @@ export interface AgentProfile {
   options?: Record<string, unknown>;
 }
 
-/** Settings ready to launch an agent: a Paseo profile, if named, has been resolved. */
+/** Settings ready to launch an agent: a platform agent profile, if named, has been resolved. */
 export type ResolvedProfile = AgentProfile & { provider: string };
 
 export function isResolved(profile: AgentProfile): profile is ResolvedProfile {
@@ -166,7 +166,7 @@ export interface PipelineConfig {
   /**
    * laoshi: the agent platform the pipeline runs on. `adapter` picks the adapter under
    * adapters/<id>/ (runtime-loader.ts); `<id>` (laoshi M2c) holds that adapter's own settings,
-   * e.g. { "adapter": "dsh", "dsh": { "home": "D:/dsh" } }. Install-level only.
+   * e.g. { "adapter": "<id>", "<id>": { … } }. Install-level only.
    */
   platform: { adapter: string } & Record<string, unknown>;
   /** laoshi M2c: who uses this install (ADR 0007); LAOSHI_USER wins, else the system user name. Install-level only. */
@@ -271,12 +271,12 @@ export interface PipelineConfig {
   /** Automatic retries of a step after a transient error (rate limit, dropped connection). */
   retry: { attempts: number; backoffSeconds: number[] };
   /**
-   * "auto": when the chat's workspace has service scripts in paseo.json, the pipeline starts
-   * them through Paseo (supervised, own port per worktree) for the service start and
+   * "auto": when the chat's workspace has platform service definitions, the pipeline starts
+   * them through the platform (supervised, own port per worktree) for the service start and
    * verification steps, and stops them afterwards. "off": step agents start services themselves.
    */
-  paseoServices: "auto" | "off";
-  /** How long to wait for Paseo-managed services to report healthy. */
+  platformServices: "auto" | "off";
+  /** How long to wait for platform-managed services to report healthy. */
   serviceReadySeconds: number;
   /** Warn before a run when a provider's subscription window is at least this full (percent); 0 turns it off. */
   quotaWarnPercent: number;
@@ -286,7 +286,7 @@ export interface PipelineConfig {
    * Members default to the builder and the reviewer. Off by default (it costs extra runs).
    */
   designProposals: { enabled: boolean; profiles: ProfileName[]; members: ReviewPanelMember[] };
-  /** "auto": tell verification steps to use Paseo's browser tools for web pages when they are on. */
+  /** "auto": tell verification steps to use the platform's browser tools for web pages when they are on. */
   browserVerify: "auto" | "off";
   /** When /req offers the independent spec review before confirmation: "standard" (standard profile only), "always", "off". */
   specReview: "standard" | "always" | "off";
@@ -294,7 +294,7 @@ export interface PipelineConfig {
   maxConcurrentPipelines: number;
   /** How often a queued pipeline checks for a free slot. */
   queuePollSeconds: number;
-  /** Remind the chat (a Paseo schedule) when a decision has been waited for this long; 0: never. */
+  /** Remind the chat (a platform schedule) when a decision has been waited for this long; 0: never. */
   waitingReminderHours: number;
   /** After a stop caused by a transient error, continue automatically after this many minutes (through the chat); 0: never. */
   autoResumeMinutes: number;
@@ -332,10 +332,10 @@ export interface PipelineConfig {
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
-  platform: { adapter: "paseo" },
+  platform: { adapter: "paseo" }, // platform-name: the default adapter, as in req-kit
   user: null,
   daemonUrl: "ws://127.0.0.1:6767/ws",
-  daemonPasswordEnv: "PASEO_DAEMON_PASSWORD",
+  daemonPasswordEnv: "PASEO_DAEMON_PASSWORD", // platform-name: req-kit 1.x default, read by that adapter
   agents: {
     builder: { provider: "claude/CHANGE-ME", modeId: "bypassPermissions" },
     reviewer: { provider: "codex/CHANGE-ME", modeId: "full-access" },
@@ -384,7 +384,7 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   dangerGuard: { enabled: true, production: [], allow: [] },
   secretScan: { enabled: true, allow: [] },
   retry: { attempts: 2, backoffSeconds: [60, 300] },
-  paseoServices: "auto",
+  platformServices: "auto",
   serviceReadySeconds: 120,
   quotaWarnPercent: 85,
   designProposals: { enabled: false, profiles: ["standard"], members: [] },
@@ -434,6 +434,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * laoshi M2e: req-kit 1.x's names for settings that are now neutral, read as the new ones:
+ * the old profile key in any agent setting → `platformProfile`, the old top-level services key → `platformServices`.
+ * The new name wins when a file has both.
+ */
+export function normalizeLegacyKeys<T>(raw: T): T {
+  const LEGACY_PROFILE = "pa" + "seoProfile"; // platform-name: legacy key of req-kit 1.x
+  const LEGACY_SERVICES = "pa" + "seoServices"; // platform-name: legacy key of req-kit 1.x
+  const walk = (value: unknown, top: boolean): unknown => {
+    if (Array.isArray(value)) return value.map((v) => walk(v, false));
+    if (!isRecord(value)) return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value)) {
+      if (key === LEGACY_PROFILE) {
+        if (value.platformProfile === undefined) out.platformProfile = v;
+      } else if (top && key === LEGACY_SERVICES) {
+        if (value.platformServices === undefined) out.platformServices = v;
+      } else out[key] = walk(v, false);
+    }
+    return out;
+  };
+  return walk(raw, true) as T;
+}
+
 function readJson(file: string, label: string): Record<string, unknown> {
   let raw: unknown;
   try {
@@ -442,7 +466,7 @@ function readJson(file: string, label: string): Record<string, unknown> {
     throw new ConfigError(`${label}不是合法的 JSON（${file}）：${(error as Error).message}`);
   }
   if (!isRecord(raw)) throw new ConfigError(`${label}的顶层必须是对象（${file}）`);
-  return raw;
+  return normalizeLegacyKeys(raw);
 }
 
 /** Layers `raw` over `base`. Agents are replaced per role; nested settings are merged per key. */
@@ -528,14 +552,14 @@ function merge(base: PipelineConfig, raw: Record<string, unknown>): PipelineConf
 }
 
 function validateProvider(label: string, profile: unknown): void {
-  if (isRecord(profile) && profile.paseoProfile !== undefined) {
-    if (typeof profile.paseoProfile !== "string" || profile.paseoProfile.trim() === "") {
-      throw new ConfigError(`${label}.paseoProfile 必须是 Paseo 中 agent profile 的名称`);
+  if (isRecord(profile) && profile.platformProfile !== undefined) {
+    if (typeof profile.platformProfile !== "string" || profile.platformProfile.trim() === "") {
+      throw new ConfigError(`${label}.platformProfile 必须是平台中 agent profile 的名称`);
     }
     if (profile.provider === undefined) return;
   }
   if (!isRecord(profile) || typeof profile.provider !== "string") {
-    throw new ConfigError(`${label}.provider 缺失（或用 paseoProfile 写 Paseo 中 agent profile 的名称）`);
+    throw new ConfigError(`${label}.provider 缺失（或用 platformProfile 写平台中 agent profile 的名称）`);
   }
   const slash = profile.provider.indexOf("/");
   if (slash <= 0 || slash === profile.provider.length - 1) {
@@ -567,7 +591,7 @@ function validatePhases(phases: PhaseSettings): void {
   if (v.environment !== "local" && v.environment !== "deployed") throw new ConfigError('phases.verify.environment 只能是 "local" 或 "deployed"');
   if (!["fix", "handback", "report"].includes(v.defects)) throw new ConfigError('phases.verify.defects 只能是 "fix"、"handback" 或 "report"');
   if (v.serviceStart !== null && typeof v.serviceStart !== "boolean") throw new ConfigError("phases.verify.serviceStart 必须是 true、false 或 null");
-  if (!isRecord(v.agents)) throw new ConfigError("phases.verify.agents 必须是对象，例如 { \"reviewer\": { \"paseoProfile\": \"测试\" } }");
+  if (!isRecord(v.agents)) throw new ConfigError("phases.verify.agents 必须是对象，例如 { \"reviewer\": { \"platformProfile\": \"测试\" } }");
   for (const [role, profile] of Object.entries(v.agents)) {
     if (role !== "builder" && role !== "reviewer") throw new ConfigError("phases.verify.agents 只能包含 builder 和 reviewer");
     validateProvider(`phases.verify.agents.${role}`, profile);
@@ -721,7 +745,7 @@ function validate(config: PipelineConfig): void {
   if (config.requiredVersion !== null && typeof config.requiredVersion !== "string") {
     throw new ConfigError('requiredVersion 必须是版本范围字符串，例如 ">=1.2.0 <2"');
   }
-  if (config.paseoServices !== "auto" && config.paseoServices !== "off") throw new ConfigError('paseoServices 只能是 "auto" 或 "off"');
+  if (config.platformServices !== "auto" && config.platformServices !== "off") throw new ConfigError('platformServices 只能是 "auto" 或 "off"');
   if (config.user !== null && (typeof config.user !== "string" || !config.user.trim())) throw new ConfigError("user 必须是使用者的名字，或者不写");
   if (isRecord(config.platform)) {
     for (const [key, value] of Object.entries(config.platform)) {
@@ -729,7 +753,7 @@ function validate(config: PipelineConfig): void {
     }
   }
   if (!isRecord(config.platform) || typeof config.platform.adapter !== "string" || !/^[a-z][a-z0-9-]*$/.test(config.platform.adapter)) {
-    throw new ConfigError('platform.adapter 必须是适配器名称，例如 { "adapter": "paseo" }');
+    throw new ConfigError(`platform.adapter 必须是适配器名称，例如 { "adapter": "${DEFAULT_CONFIG.platform.adapter}" }`);
   }
   if (config.browserVerify !== "auto" && config.browserVerify !== "off") throw new ConfigError('browserVerify 只能是 "auto" 或 "off"');
   if (!["standard", "always", "off"].includes(config.specReview)) throw new ConfigError('specReview 只能是 "standard"、"always" 或 "off"');

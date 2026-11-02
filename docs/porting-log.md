@@ -98,6 +98,7 @@ Node 22.22，Linux。
 | `adapters/paseo/*` | daemon 地址改由 `settings.ts` 的 `daemonOf` 读取（`platform.paseo` 优先） | M2c |
 | `skills/`、`contracts/verify.md` | 项目配置写作 `.laoshi.json` | M2c |
 | `engine/src/state.ts` 及读取状态的各处（`main`、`pipeline`、`control`、`joint`、`api`、`reply`、`review`、`try`、`spec-review`、`records`、`worktree`、`features`） | 状态第 2 版：`originSessionId`、`workspaceRef`、`wakeups[].ref`；`adapter`；运行中的旧版文件只在内存中迁移。**移植 req-kit 补丁时**，补丁里的 `state.originAgentId`、`worktree.workspaceId`、`joint[].workspaceId`、`state.schedules` / `.id` 要改成新名；`req api`、通知、使用记录的输出字段名不变 | M2d |
+| 核心代码、`engine/prompts/` | 平台的说法改用词汇表（`words.ts`、`wordsFor`、提示词中的 `{{platform.*}}`）；注释去掉平台名；`paseo-services.md` 改名为 `managed-services.md`；配置 `platformProfile` / `platformServices`（`normalizeLegacyKeys` 读旧名）；`capabilities().platformTools`。**移植 req-kit 补丁时**，补丁里写着 Paseo 的文案要改成对应的词汇，`paseoProfile` / `paseoServices` / `paseoTools` 改成新名，否则 `platform.test.ts` 会失败 | M2e |
 
 ## 移植登记
 

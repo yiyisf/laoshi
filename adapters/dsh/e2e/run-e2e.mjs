@@ -216,6 +216,9 @@ try {
   for (let i = 0; i < 60 && !notes().some((l) => l.includes("流水线已经结束")); i++) await sleep(1000);
   const chatNotes = notes();
   check("进展和结论发回了对话", chatNotes.some((l) => l.includes("流水线已经结束")), `对话收到 ${chatNotes.length} 条流水线消息，含结束通知：${chatNotes.some((l) => l.includes("流水线已经结束"))}`);
+  // laoshi M2e: what the chat and the steps read uses dsh's words, not another platform's.
+  const read = ["engine.log", "step-model.log"].map((f) => (fs.existsSync(path.join(logs, f)) ? fs.readFileSync(path.join(logs, f), "utf8") : "")).join("\n");
+  check("对话和步骤看到的说法里没有别的平台", !/Paseo/.test(read), (read.match(/[^\n]{0,30}Paseo[^\n]{0,30}/) ?? ["没有"])[0]);
   exitCode = checks.every((c) => c.ok) ? 0 : 1;
 } catch (e) {
   check("端到端检查没有完成", false, e.message);

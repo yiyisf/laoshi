@@ -1,6 +1,6 @@
-// Turns an agent's Paseo timeline into a few plain-language lines for "做到哪了":
+// Turns an agent's platform timeline into a few plain-language lines for "做到哪了":
 // what it ran, read or changed most recently. Shapes follow
-// @getpaseo/protocol agent-types.ts (AgentTimelineItem, ToolCallDetail).
+// the platform SDK agent-types.ts (AgentTimelineItem, ToolCallDetail).
 
 import type { ActivityItem } from "./runtime.js";
 

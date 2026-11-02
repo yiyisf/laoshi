@@ -62,7 +62,7 @@
       300
     ]
   },
-  "paseoServices": "auto",
+  "platformServices": "auto",
   "serviceReadySeconds": 120,
   "quotaWarnPercent": 85,
   "specReview": "standard",

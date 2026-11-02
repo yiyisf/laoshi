@@ -38,7 +38,7 @@
 
 ## 功能验证（verify）
 
-几个仓库一起验证：`<pipeline-context>` 中有各仓库由 Paseo 启动的服务和地址；调用的一边需要指向提供接口的一边时，按各自的验证方法配置（例如环境变量），配置方法写进 `verification.md`。按端到端的验收标准从用户入口走一遍，并核对接口的实际请求和响应与 `contract.md` 一致。
+几个仓库一起验证：`<pipeline-context>` 中有各仓库由 {{platform.servicesBy}} 启动的服务和地址；调用的一边需要指向提供接口的一边时，按各自的验证方法配置（例如环境变量），配置方法写进 `verification.md`。按端到端的验收标准从用户入口走一遍，并核对接口的实际请求和响应与 `contract.md` 一致。
 
 每个缺陷写明属于哪个仓库。结果文件中加上 `defect_repos`：有缺陷的仓库名称，主仓库写 `"本仓库"`，例如 `{ "result": "defects_found", "defect_repos": ["后端"] }`。判断不了的，几个都写上。
 

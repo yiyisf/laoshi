@@ -23,6 +23,7 @@ import { dispatchNotifiers } from "./notifiers.js";
 import { type IntegrationConfig, renderArgs, runCommand, type Runner } from "./integrations.js";
 import { defaultConfigPath, ENGINE_DIR, KIT_ROOT, kitHome, kitVersion } from "./locations.js";
 import { isAlive } from "./state.js";
+import { wordsFor } from "./runtime-loader.js";
 
 const USAGE = `用法：
   req factory once      检查一次：为新卡片开始需求，把需求方的新回复转给需求会话
@@ -167,7 +168,7 @@ export async function pollOnce(configPath: string, opts: CardCmdOptions = {}, no
   let config: PipelineConfig | null = null;
   try {
     config = loadConfig(configPath).config;
-    // 1.12: Paseo, the agents and their quota must work before anything is taken on.
+    // 1.12: the platform, the agents and their quota must work before anything is taken on.
     result.problems = opts.skipHealthCheck ? [] : await healthProblems(config);
     if (result.problems.length > 0) {
       result.notes.push("自检没有通过，这次不接新卡片、不转达回复");
@@ -266,13 +267,13 @@ async function within<T>(ms: number, what: string, work: Promise<T>): Promise<T>
 }
 
 /**
- * 1.12: what keeps this machine from working on a new requirement: Paseo not reachable, an
+ * 1.12: what keeps this machine from working on a new requirement: the platform not reachable, an
  * agent provider not logged in, the subscription used up. Empty when all is well.
  */
 export async function healthProblems(config: PipelineConfig): Promise<string[]> {
   const problems: string[] = [];
   try {
-    await within(30_000, "连接 Paseo ", withRuntime(config, async (runtime, resolved) => {
+    await within(30_000, `连接 ${wordsFor(config).name} `, withRuntime(config, async (runtime, resolved) => {
       const roles: Array<[string, string]> = [
         ["builder", resolved.agents.builder.provider ?? ""],
         ["reviewer", resolved.agents.reviewer.provider ?? ""],
@@ -282,7 +283,7 @@ export async function healthProblems(config: PipelineConfig): Promise<string[]> 
         const provider = full.split("/")[0];
         if (!provider || !status) continue;
         const found = status.find((s) => s.provider === provider);
-        if (!found || found.status !== "ready") problems.push(`${role} 用的 ${provider} ${found ? `不可用（${found.status}）` : "没有安装"}：在 Paseo 中登录它`);
+        if (!found || found.status !== "ready") problems.push(`${role} 用的 ${provider} ${found ? `不可用（${found.status}）` : "没有安装"}：${wordsFor(config).signIn}`);
       }
       // A used-up subscription matters when there is nothing else to fall back on.
       const usable = [resolved.agents.builder, ...(resolved.agents.fallback ? [resolved.agents.fallback] : [])].map((p) => (p.provider ?? "").split("/")[0]).filter(Boolean);
@@ -294,7 +295,7 @@ export async function healthProblems(config: PipelineConfig): Promise<string[]> 
       }
     }));
   } catch (error) {
-    problems.push(`连不上 Paseo（${(error as Error).message}）：确认这台机器上的 Paseo 正在运行`);
+    problems.push(`连不上 ${wordsFor(config).name}（${(error as Error).message}）：确认这台机器上的 ${wordsFor(config).name} 正在运行`);
   }
   return problems;
 }
@@ -497,7 +498,7 @@ function service(configPath: string, opts: CardCmdOptions): number {
     out("然后执行：systemctl --user daemon-reload && systemctl --user enable --now req-kit-factory");
     out("（希望不登录也运行：loginctl enable-linger $USER）。macOS 可以用 launchd 或直接 req factory start。");
   }
-  out("Paseo daemon 需要同时在运行：接单器通过它创建需求会话。");
+  out(`${wordsFor().name} 需要同时在运行：接单器通过它创建需求会话。`);
   return 0;
 }
 

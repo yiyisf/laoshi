@@ -5,7 +5,7 @@ import { locate } from "./api.js";
 import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
 import { defaultConfigPath } from "./locations.js";
 import { pluginReplyMessage } from "./messages.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
+import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import { readIndex } from "./records.js";
 import { readState, statePath } from "./state.js";
 
@@ -36,7 +36,7 @@ async function main(argvIn: string[]): Promise<number> {
     return 1;
   }
   if (!state.originSessionId) {
-    console.error("这个需求不是从 Paseo 对话中开始的，没有可以转达的对话。请在终端或卡片中处理。");
+    console.error(`这个需求不是从${wordsFor().chat}中开始的，没有可以转达的对话。请在终端或卡片中处理。`);
     return 1;
   }
   return deliver(

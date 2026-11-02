@@ -24,12 +24,13 @@ interface PlatformAdapter {
   doctorPlatform?({ config, configPath, tools }): Promise<void>; // 连接、版本、profile……
   doctorProject?({ repo, isRepo, tools }): void;               // 项目里平台自己的文件
   agentCatalog?(settings, progress): Promise<{ catalog; close() }>; // 配置向导可选的 agent
+  words?: Partial<PlatformWords>;                               // 平台的说法（M2e，engine/src/words.ts）
 }
 ```
 
 能力来源写 `builtin` 时，运行时层用 laoshi 的内置实现替换对应方法（`engine/src/builtin/`，见 [builtin-capabilities](builtin-capabilities.md)；目前有 `services`、`worktree`）。内置服务要知道对话的工作目录时，调用运行时可选的 `agentDirectory(agentId)`。
 
-适配器放在 `adapters/<id>/`，由 [`runtime-loader.ts`](../../engine/src/runtime-loader.ts) 登记，这是核心中唯一引用适配器的文件（`engine/test/platform.test.ts` 检查）。草案中的 `vocabulary`、`skillTargets`、`configSchema`、`compatibleWith` 在 M2c/M2e 补上。
+适配器放在 `adapters/<id>/`，由 [`runtime-loader.ts`](../../engine/src/runtime-loader.ts) 登记，这是核心中唯一引用适配器的文件（`engine/test/platform.test.ts` 检查）。草案中的 `vocabulary` 已在 M2e 实现为 `words`；`skillTargets`、`configSchema`、`compatibleWith` 以后补上。
 
 ## 2. 能力声明
 

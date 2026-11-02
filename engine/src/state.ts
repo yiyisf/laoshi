@@ -105,7 +105,7 @@ export interface StepRecord {
   reattached?: number;
   /** 1.12.1: the step's time limit was already given its one extra period (selfHeal); a later run waiting for the same agent gets none. */
   extendedTimeout?: boolean;
-  /** 1.13: the agent the step ran with: the Paseo profile name, or "provider/model". */
+  /** 1.13: the agent the step ran with: the platform agent profile's name, or "provider/model". */
   agent?: string;
 }
 

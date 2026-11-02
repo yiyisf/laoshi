@@ -61,7 +61,7 @@ export interface FakeScenario {
   runningTool?: { kind: string; text: string; minutesAgo: number; callId?: string } | null;
   /** Tool calls every agent's timeline shows (the danger guard looks at them). */
   toolCalls?: Array<{ kind: string; text: string; status: "running" | "completed"; callId?: string }>;
-  capabilities?: { paseoTools: boolean; browser: boolean } | null;
+  capabilities?: { platformTools: boolean; browser: boolean } | null;
   setup?: { status: "completed" | "failed" | "none" | "timeout"; error: string | null };
   /** Paseo cannot schedule (older daemon). */
   noSchedules?: boolean;

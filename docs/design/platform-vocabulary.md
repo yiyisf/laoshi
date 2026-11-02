@@ -1,6 +1,6 @@
 # 平台词汇表
 
-- 状态：提议
+- 状态：**已实现**（laoshi M2e，2026-11-02）：核心和提示词。词汇表的类型与中性取值在 `engine/src/words.ts`，各适配器在 `PlatformAdapter.words` 中给出自己的说法，`wordsFor(config)`（`runtime-loader.ts`）合成：中性说法 → laoshi 内置能力的说法（例如服务来源为 `builtin` 时是"laoshi 管理的服务"）→ 适配器的说法。提示词中写 `{{platform.<键>}}`，取值为 null 的整行省略。skill 的渲染（安装时）随入口改名一起在 M2e 后半处理
 - 解决的问题：req-kit 的面向使用者的文案（`messages.ts`、`launch.ts`、`control.ts`、部分提示词与 skill）直接写着"在 Paseo 的 Schedules 中可以看到""在 Paseo 侧边栏的'需求'中打开""打开名为「X」的 agent 批准"。换平台后这些指引会错。
 
 ## 1. 做法
@@ -14,6 +14,8 @@ Paseo ：已预约在 22:00 开始（Paseo 定时任务，在 Paseo 的 Schedule
 ```
 
 ## 2. 词汇键（从 req-kit 现有文案归纳）
+
+> 实现中的键名和取值以 `engine/src/words.ts` 为准（`name`、`chat`、`schedule`、`scheduleWhere`、`managedServices`、`servicesBy`、`servicesFile`、`servicesRestart`、`approvePermission`、`signIn`、`workspaceWhere`、`newWorkspace`、`requirementPage`、`browser`、`browserWatch`、`requirementView`）。下表是最初的归纳。
 
 | 键 | 含义 | Paseo 的取值示例 |
 | --- | --- | --- |

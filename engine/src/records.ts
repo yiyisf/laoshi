@@ -2,7 +2,7 @@
 // repository. Neither is committed anywhere; both are local to the machine.
 //
 //   index/<key>.json      one file per requirement that has run here: where it lives, so
-//                         `req api list --all` and the Paseo plugin can find every requirement
+//                         `req api list --all` and the requirements plugin can find every requirement
 //                         on the machine. The overview itself is still read live (ADR 0010).
 //   usage/runs.jsonl      one line per pipeline run (a process from start to stop): steps,
 //                         time, usage, gate and review rounds. What `req stats` reports on.
@@ -161,7 +161,7 @@ export interface StepUsageRecord {
   costUsd: number | null;
   /** 1.13: input tokens served from the prompt cache (part of inputTokens), when the agent reports them. */
   cachedInputTokens?: number | null;
-  /** 1.13: the agent the step ran with (Paseo profile name or "provider/model"). */
+  /** 1.13: the agent the step ran with (platform agent profile name or "provider/model"). */
   agent?: string | null;
 }
 

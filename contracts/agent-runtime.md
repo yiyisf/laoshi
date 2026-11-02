@@ -30,7 +30,7 @@
 
 | 方法 | 平台没有时 | 现状 |
 | --- | --- | --- |
-| `listPaseoProfiles()` | 返回 `null` | 只影响用 `paseoProfile` 引用平台档案的配置：解析不了就拒绝启动并说明。只用 `provider/model` 直配时不调用 |
+| `listProfiles()`（req-kit 1.x 叫 `listPaseoProfiles`） | 返回 `null` | 只影响用 `platformProfile`（旧名 `paseoProfile`）引用平台档案的配置：解析不了就拒绝启动并说明。只用 `provider/model` 直配时不调用 |
 | `listServices(target)` | 返回 `null` | 流水线调用时都带 `.catch(() => null)`，`null` 表示"不由平台管理服务"，改用 `verify.md` 里的手工启动命令 |
 | `startServices(target, names, timeoutMs)`、`stopServices(...)` | — | 只在 `listServices` 返回名字后才调用；失败时按启动失败报告给步骤 |
 | `providerQuota(providers)` | 返回 `null` | 额度提醒关闭，不影响运行（`.catch(() => null)`） |
@@ -70,14 +70,14 @@
 
 [ADR 0008](../docs/adr/0008-capability-sources-and-platform-plugin.md) 定下了以下修订的方向，将与实现一起提交，本文暂不改动：能力标明来源（平台 / 插件 / 内置 / 降级）；新增"回答待处理的请求"与审批策略；`listPaseoProfiles` 改名为 `listProfiles`；`attachAgent` 改为"恢复步骤会话"；引入 agent 事件模型，由核心推导 `wait`、活动和用量；把对话相关的能力拆为"对话通道"。
 
-## 已知需要中性化的地方（尚未处理）
+## 中性化（laoshi M2a–M2e 已处理）
 
-这些不影响 `AgentRuntime` 的形状，但换平台时会暴露：
+req-kit 1.x 里带 Paseo 字样的地方，laoshi 中已改为中性的名称：
 
-- 类型和方法名里的 Paseo 字样：`listPaseoProfiles`、`ServiceTarget`、`ManagedService`、`capabilities().paseoTools` 等。
-- 状态文件字段：`worktree.workspaceId`、`schedules[]`、`originAgentId`（见 `state.md`）。
-- 面向使用者的文案和提示词里的"在 Paseo 的某某界面……"（`messages.ts`、`launch.ts`、`control.ts`、`engine/prompts/paseo-services.md` 等）。
-- 会话识别依赖环境变量 `PASEO_AGENT_ID`、`PASEO_AGENT_CWD`（`skills/req/SKILL.md`）。
-- 配置里的 `AgentProfile.paseoProfile`、`daemonPasswordEnv`。
+- 方法与字段：`listPaseoProfiles` → `listProfiles`（M2a），`capabilities().paseoTools` → `platformTools`（M2e）。`ServiceTarget`、`ManagedService` 本来就是中性的名字，只改了注释。
+- 状态文件字段：`originAgentId`、`worktree.workspaceId`、`schedules[]` 在第 2 版中改名（M2d，见 `state.md`）；对外契约不变。
+- 面向使用者的文案和提示词：改用适配器的词汇表（M2e，`engine/src/words.ts`，见 [platform-vocabulary](../docs/design/platform-vocabulary.md)）；`engine/prompts/paseo-services.md` 改名为 `managed-services.md`。
+- 会话识别：由适配器声明环境变量（`originEnv`，M2a）。
+- 配置：`AgentProfile.paseoProfile` → `platformProfile`，`paseoServices` → `platformServices`，旧名继续读取（M2e）；daemon 地址可写在 `platform.paseo` 中（M2c）。
 
-改动这些属于格式变更，须同时更新 `state.md`、迁移函数和 `CHANGELOG.md`。
+`engine/test/platform.test.ts` 检查核心代码和提示词里不出现平台名（有意保留的旧字段名、对外契约字段，在那一行或上一行写明 `platform-name:` 和原因）。

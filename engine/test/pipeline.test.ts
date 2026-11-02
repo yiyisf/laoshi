@@ -1220,7 +1220,7 @@ const PASEO_PROFILES = [
 ];
 
 test("Paseo profile：角色写 profile 名称，启动时按 daemon 中的 profile 解析，自己写的字段优先", () => {
-  const env = setup({ agents: { builder: { paseoProfile: "实现" }, reviewer: { paseoProfile: "评审", modeId: "full-access" } } });
+  const env = setup({ agents: { builder: { platformProfile: "实现" }, reviewer: { platformProfile: "评审", modeId: "full-access" } } });
   const { code, out } = runMain(env, { paseoProfiles: PASEO_PROFILES });
   assert.equal(code, 0, out);
   const byKey = (key: string) => events(env).find((e) => e.type === "start" && e.key === key)!;
@@ -1232,7 +1232,7 @@ test("Paseo profile：角色写 profile 名称，启动时按 daemon 中的 prof
 });
 
 test("Paseo profile：名称不存在时不启动，告诉对话现有哪些 profile", () => {
-  const env = setup({ agents: { builder: { paseoProfile: "实现者" }, reviewer: { provider: "codex/test-model", modeId: "full-access" } } });
+  const env = setup({ agents: { builder: { platformProfile: "实现者" }, reviewer: { provider: "codex/test-model", modeId: "full-access" } } });
   const { code } = runMain(env, { paseoProfiles: PASEO_PROFILES });
   assert.equal(code, 2);
   assert.ok(!fs.existsSync(path.join(env.repo, FEATURE, ".pipeline", "state.json")), "拒绝启动时不留下状态文件");
@@ -1278,7 +1278,7 @@ test("Paseo 管理的服务：启动失败时把输出写到文件交给步骤�
   assert.match(prompt, new RegExp(`web 没有启动成功（退出码 1），最后的输出见 ${FEATURE}/\\.pipeline/services/web\\.log`));
   assert.match(fs.readFileSync(path.join(env.repo, FEATURE, ".pipeline", "services", "web.log"), "utf8"), /Cannot find module/);
 
-  const off = setup({ paseoServices: "off" });
+  const off = setup({ platformServices: "off" });
   assert.equal(runMain(off, { services: { names: ["web"] } }).code, 0);
   assert.ok(!events(off).some((e) => e.type === "listServices" || e.type === "startServices"));
 
@@ -1385,19 +1385,19 @@ test("方案提案：开启后标准档先由 builder 和 reviewer 各提一份�
 
 test("浏览器验证：步骤 agent 有 Paseo 浏览器工具时，验证类步骤附上浏览器验证的做法", () => {
   const env = setup();
-  assert.equal(runMain(env, { capabilities: { paseoTools: true, browser: true } }).code, 0);
+  assert.equal(runMain(env, { capabilities: { platformTools: true, browser: true } }).code, 0);
   const prompt = (key: string) => events(env).find((e) => e.type === "start" && e.key === key)?.prompt ?? "";
-  assert.match(prompt("verify"), /浏览器：可以用 Paseo 内置浏览器/);
+  assert.match(prompt("verify"), /浏览器：可以用 Paseo 内置的浏览器/);
   assert.match(prompt("verify"), /# 用浏览器验证网页界面/);
   assert.doesNotMatch(prompt("design"), /用浏览器验证/);
 
   const off = setup({ browserVerify: "off" });
-  assert.equal(runMain(off, { capabilities: { paseoTools: true, browser: true } }).code, 0);
+  assert.equal(runMain(off, { capabilities: { platformTools: true, browser: true } }).code, 0);
   assert.doesNotMatch(events(off).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "", /用浏览器验证/);
   assert.doesNotMatch(events(off).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "", /界面检查命令/);
   // 1.13: without Paseo's browser (the web UI, no desktop app), verification still checks pages, in words.
   const none = setup();
-  assert.equal(runMain(none, { capabilities: { paseoTools: true, browser: false } }).code, 0);
+  assert.equal(runMain(none, { capabilities: { platformTools: true, browser: false } }).code, 0);
   const verify = events(none).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "";
   assert.doesNotMatch(verify, /用浏览器验证/);
   assert.match(verify, /界面检查命令：node ".*req\.mjs" ui-check/);

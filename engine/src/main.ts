@@ -11,7 +11,7 @@ import { slotHolders, slotsDir, tryAcquireSlot } from "./queue.js";
 import { cronEvery, parseStartTime } from "./schedule-time.js";
 import { loadConfig, PHASE_MODE_LABELS, PROFILE_LABELS, REQUIREMENT_TYPE_LABELS } from "./config.js";
 import { defaultConfigPath, kitVersion, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
-import { describeProfile, loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
+import { describeProfile, loadRuntimeFactory, resolveProfiles, wordsFor } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
 import { jointProblem } from "./joint.js";
 import { runPipeline } from "./pipeline.js";
@@ -225,7 +225,7 @@ async function main(): Promise<number> {
     log(`继续流水线：${featureDir}（第 ${state.attempt} 次尝试，${PROFILE_LABELS[profile]}档）—— ${why}`);
   }
   writeState(stateFile, state);
-  if (state.worktree) log(`在为这个需求新建的工作区中开发：${repo}（Paseo 工作区 ${state.worktree.workspaceRef}，对话所在目录 ${state.worktree.sourceRepo}）`);
+  if (state.worktree) log(`在为这个需求新建的工作区中开发：${repo}（工作区 ${state.worktree.workspaceRef}，对话所在目录 ${state.worktree.sourceRepo}）`);
 
   if (state.worktree && mode.kind === "fresh") {
     // The worktree's setup (installing dependencies, copying .env) runs in the background.
@@ -253,7 +253,7 @@ async function main(): Promise<number> {
   // Reminders and automatic continuations from the previous run are no longer needed.
   if (state.wakeups?.length) {
     for (const s of state.wakeups) await runtime.cancelSchedule(s.ref).catch((error: Error) => log(`取消定时任务 ${s.ref} 失败：${error.message}`));
-    log(`已取消上次运行留下的 Paseo 定时任务：${state.wakeups.map((s) => s.kind).join("、")}`);
+    log(`已取消上次运行留下的${wordsFor(config).schedule}：${state.wakeups.map((s) => s.kind).join("、")}`);
     state.wakeups = [];
     writeState(stateFile, state);
   }
@@ -341,7 +341,7 @@ async function main(): Promise<number> {
     if (watchdog) {
       state.wakeups = [...(state.wakeups ?? []), { ref: watchdog, kind: "watchdog", at: null }];
       writeState(stateFile, state);
-      log(`已预约定时检查（每 ${config.watchdogMinutes} 分钟，Paseo 定时任务 ${watchdog}）`);
+      log(`已预约定时检查（每 ${config.watchdogMinutes} 分钟，${wordsFor(config).schedule} ${watchdog}）`);
     }
   }
 
@@ -353,7 +353,7 @@ async function main(): Promise<number> {
       runtime,
       state,
       statePath: stateFile,
-      prompts: { promptsDir: PROMPTS_DIR, localPromptsDir: localPromptsDir(), principlesFile: PRINCIPLES_INDEX },
+      prompts: { promptsDir: PROMPTS_DIR, localPromptsDir: localPromptsDir(), principlesFile: PRINCIPLES_INDEX, words: wordsFor(config) },
       logPath: path.join(pipelineDir(repo, featureDir), "pipeline.log"),
       // Run from the chat, whose directory is the source checkout when the requirement has its own worktree.
       resumeCommand: commands.resume,

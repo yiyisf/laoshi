@@ -1,13 +1,13 @@
 // Configuration wizard: `node install.mjs --configure` (or `req configure`).
-// Lists what the local Paseo daemon offers and writes ~/.req-kit/config.json from
+// Lists what the local platform daemon offers and writes ~/.req-kit/config.json from
 // a few multiple-choice questions, so nobody has to hand-edit JSON or guess mode names.
 
 import fs from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
-import type { AgentProfile } from "./config.js";
-import { adapterFor } from "./runtime-loader.js";
+import { type AgentProfile, normalizeLegacyKeys } from "./config.js";
+import { adapterFor, wordsFor } from "./runtime-loader.js";
 import type { PlatformProfile } from "./runtime.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
 
@@ -21,7 +21,7 @@ export interface Catalog {
   providers(): Promise<Array<CatalogEntry & { status: string }>>;
   models(provider: string): Promise<CatalogEntry[]>;
   modes(provider: string): Promise<CatalogEntry[]>;
-  /** Agent profiles set up in the platform (Paseo); optional. */
+  /** Agent profiles set up on the platform; optional. */
   profiles?(): Promise<PlatformProfile[]>;
 }
 
@@ -66,7 +66,7 @@ const ROLE_HINTS = {
   reviewer: /评审|审核|审查|检查|review|audit/i,
 } as const;
 
-/** Offers the Paseo profiles first, when there are any; null means "choose the agent directly". */
+/** Offers the platform agent profiles first, when there are any; null means "choose the agent directly". */
 async function chooseProfile(
   role: "builder" | "reviewer",
   profiles: PlatformProfile[],
@@ -78,7 +78,7 @@ async function chooseProfile(
   const score = (p: PlatformProfile) =>
     (ROLE_HINTS[role].test(`${p.name} ${p.notes ?? ""}`) ? 2 : 0) + (avoidProvider && p.provider !== avoidProvider ? 1 : 0);
   const ordered = [...usable].sort((a, b) => score(b) - score(a));
-  const picked = await choose<PlatformProfile | null>(`${ROLE_TEXT[role]}用 Paseo 中的哪个 agent profile？`, [
+  const picked = await choose<PlatformProfile | null>(`${ROLE_TEXT[role]}用 ${wordsFor().name} 中的哪个 agent profile？`, [
     ...ordered.map((p) => ({
       label: `「${p.name}」：${p.provider}/${p.model}${p.modeId ? `，模式 ${p.modeId}` : ""}${p.notes ? `（${p.notes.slice(0, 40)}）` : ""}`,
       value: p as PlatformProfile | null,
@@ -95,10 +95,10 @@ async function chooseRole(
   avoidProvider: string | null,
   profiles: PlatformProfile[] = [],
 ): Promise<AgentProfile> {
-  const fromPaseo = await chooseProfile(role, profiles, choose, avoidProvider);
-  if (fromPaseo) return { paseoProfile: fromPaseo.name };
+  const fromPlatform = await chooseProfile(role, profiles, choose, avoidProvider);
+  if (fromPlatform) return { platformProfile: fromPlatform.name };
   const providers = (await catalog.providers()).filter((p) => p.status === "ready");
-  if (providers.length === 0) throw new Error("daemon 上没有可用的 agent。请先在 Paseo 中安装并登录至少一种 agent。");
+  if (providers.length === 0) throw new Error(`daemon 上没有可用的 agent。请先在 ${wordsFor().name} 中安装并登录至少一种 agent。`);
   // Recommend a different provider for the reviewer: a second model catches different problems.
   const ordered = avoidProvider ? [...providers.filter((p) => p.id !== avoidProvider), ...providers.filter((p) => p.id === avoidProvider)] : providers;
   const provider = await choose(
@@ -106,7 +106,7 @@ async function chooseRole(
     ordered.map((p) => ({ label: p.label ? `${p.label}（${p.id}）` : p.id, value: p.id })),
   );
   const models = await catalog.models(provider);
-  if (models.length === 0) throw new Error(`${provider} 没有列出可用的模型。请在 Paseo 中检查它的登录状态。`);
+  if (models.length === 0) throw new Error(`${provider} 没有列出可用的模型。请在 ${wordsFor().name} 中检查它的登录状态。`);
   const model = await choose(
     `${ROLE_TEXT[role]}用哪个模型？`,
     models.map((m) => ({ label: m.label && m.label !== m.id ? `${m.label}（${m.id}）` : m.id, value: m.id })),
@@ -122,7 +122,7 @@ async function chooseRole(
   return profileFor(provider, model, modeId);
 }
 
-/** One agent a role can use: a Paseo profile, or a provider's model in its unattended mode (1.12). */
+/** One agent a role can use: a platform agent profile, or a provider's model in its unattended mode (1.12). */
 export interface AgentChoice {
   id: string;
   label: string;
@@ -130,11 +130,11 @@ export interface AgentChoice {
   profile: AgentProfile;
 }
 
-/** Everything the daemon offers that can run unattended; Paseo profiles first. */
+/** Everything the daemon offers that can run unattended; platform agent profiles first. */
 export async function agentChoices(catalog: Catalog): Promise<AgentChoice[]> {
   const out: AgentChoice[] = [];
   for (const p of ((await catalog.profiles?.().catch(() => [])) ?? []).filter((x) => x.model)) {
-    out.push({ id: `paseo:${p.name}`, label: `Paseo profile「${p.name}」：${p.provider}/${p.model}`, provider: p.provider ?? "", profile: { paseoProfile: p.name } });
+    out.push({ id: `profile:${p.name}`, label: `${wordsFor().name} profile「${p.name}」：${p.provider}/${p.model}`, provider: p.provider ?? "", profile: { platformProfile: p.name } });
   }
   for (const provider of (await catalog.providers()).filter((p) => p.status === "ready")) {
     const modes = await catalog.modes(provider.id).catch(() => []);
@@ -172,7 +172,7 @@ export interface WizardResult {
 /** Asks the questions and returns the new config (existing settings are kept). */
 export async function runWizard(existing: Record<string, unknown>, catalog: Catalog, choose: Chooser): Promise<WizardResult> {
   const profiles = (await catalog.profiles?.().catch(() => [])) ?? [];
-  const providerOf = (p: AgentProfile) => (p.provider ?? profiles.find((x) => x.name === p.paseoProfile)?.provider ?? "").split("/")[0];
+  const providerOf = (p: AgentProfile) => (p.provider ?? profiles.find((x) => x.name === p.platformProfile)?.provider ?? "").split("/")[0];
   const builder = await chooseRole("builder", catalog, choose, null, profiles);
   const reviewer = await chooseRole("reviewer", catalog, choose, providerOf(builder), profiles);
   const choices = await agentChoices(catalog);
@@ -196,8 +196,8 @@ export async function runWizard(existing: Record<string, unknown>, catalog: Cata
   ]);
   const config = { ...existing, agents: { builder, reviewer, ...(fallback ? { fallback } : {}) }, defaultProfile, notifyMilestones };
   const describe = (p: AgentProfile) =>
-    p.paseoProfile
-      ? `Paseo profile「${p.paseoProfile}」（在 Paseo 中修改这个 profile 即可换模型）`
+    p.platformProfile
+      ? `${wordsFor().name} profile「${p.platformProfile}」（在 ${wordsFor().name} 中修改这个 profile 即可换模型）`
       : `${p.provider}${p.modeId ? `（模式 ${p.modeId}）` : ""}${p.featureValues ? "，自动接受权限请求" : ""}`;
   return {
     config,
@@ -226,9 +226,11 @@ function terminalChooser(): { choose: Chooser; close: () => void } {
 }
 
 function readConfigFile(configPath: string): Record<string, unknown> {
-  return fs.existsSync(configPath)
-    ? (JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>)
-    : (JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "config.example.json"), "utf8")) as Record<string, unknown>);
+  return normalizeLegacyKeys(
+    fs.existsSync(configPath)
+      ? (JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>)
+      : (JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "config.example.json"), "utf8")) as Record<string, unknown>),
+  );
 }
 
 function writeConfigFile(configPath: string, config: Record<string, unknown>): void {
@@ -239,11 +241,11 @@ function writeConfigFile(configPath: string, config: Record<string, unknown>): v
 
 /** The agents the plugin's settings page chose (1.12): checked, then written to the local config. */
 export function applyAgents(existing: Record<string, unknown>, raw: unknown): Record<string, unknown> {
-  const input = (raw ?? {}) as { builder?: unknown; reviewer?: unknown; fallback?: unknown };
+  const input = normalizeLegacyKeys(raw ?? {}) as { builder?: unknown; reviewer?: unknown; fallback?: unknown };
   const isProfile = (p: unknown): p is AgentProfile => {
     if (!p || typeof p !== "object") return false;
     const q = p as AgentProfile;
-    return (typeof q.paseoProfile === "string" && q.paseoProfile.trim() !== "") || (typeof q.provider === "string" && /^[^/]+\/.+/.test(q.provider) && !q.provider.includes("CHANGE-ME"));
+    return (typeof q.platformProfile === "string" && q.platformProfile.trim() !== "") || (typeof q.provider === "string" && /^[^/]+\/.+/.test(q.provider) && !q.provider.includes("CHANGE-ME"));
   };
   if (!isProfile(input.builder) || !isProfile(input.reviewer)) throw new Error("builder 和 reviewer 都要选一个 agent");
   if (input.fallback !== null && input.fallback !== undefined && !isProfile(input.fallback)) throw new Error("备用模型的设置不对");
@@ -303,7 +305,7 @@ async function main(): Promise<number> {
       writeConfigFile(configPath, config);
       console.log("已按推荐自动选好 agent：");
       for (const line of summary) console.log(`  ${line}`);
-      console.log(`写入 ${configPath}。要换：运行 req configure，或在 Paseo 的 设置 → 插件 → req-kit 中修改。`);
+      console.log(`写入 ${configPath}。要换：运行 req configure${wordsFor(existing).requirementView ? `，或在${wordsFor(existing).requirementView}的设置中修改` : ""}。`);
       return 0;
     }
     const terminal = terminalChooser();
