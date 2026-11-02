@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { paseoJsonIssues, shellStyles } from "../paseo-json.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
-const HELPERS = path.join(ROOT, "skills", "req-setup", "templates", "paseo");
+const HELPERS = path.join(ROOT, "adapters", "paseo", "skill", "templates");
 
 const POSIX = {
   worktree: { setup: ["npm ci", '[ -f "$PASEO_SOURCE_CHECKOUT_PATH/.env" ] && cp "$PASEO_SOURCE_CHECKOUT_PATH/.env" .env'] },
@@ -43,7 +43,7 @@ test("paseo.json 体检：按 Paseo 在各系统用的 shell 判断，各系统�
   for (const platform of ["win32", "darwin", "linux"] as const) assert.deepEqual(paseoJsonIssues(PORTABLE, platform), []);
 });
 
-test("/req-setup 的辅助脚本：with-port 替换端口并设置 PORT；copy-local-files 复制存在的本地文件、跳过已有的", () => {
+test("/laoshi-setup 的辅助脚本：with-port 替换端口并设置 PORT；copy-local-files 复制存在的本地文件、跳过已有的", () => {
   const ran = spawnSync(process.execPath, [path.join(HELPERS, "with-port.mjs"), process.execPath, "-e", "console.log(process.argv[1], process.env.PORT)", "{PORT}"], {
     encoding: "utf8",
     env: { ...process.env, PASEO_PORT: "4123" },

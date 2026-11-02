@@ -1,6 +1,6 @@
 ---
 name: principle-fix-root-cause
-description: req-kit 工作原则：修根因。找到问题真正的原因再改，不削弱检查来让它通过。在使用 /req 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: req-kit 工作原则：修根因。找到问题真正的原因再改，不削弱检查来让它通过。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 修根因
@@ -28,6 +28,6 @@ description: req-kit 工作原则：修根因。找到问题真正的原因再�
 
 ## 用在哪里
 
-评审问题修复、缺陷修复、/req-retro（按"CI → 配置 → 项目说明 → 提示词"的顺序选择落点）。
+评审问题修复、缺陷修复、/laoshi-retro（按"CI → 配置 → 项目说明 → 提示词"的顺序选择落点）。
 
 所有原则的一句话版本见 `{{REQ_KIT_ROOT}}/principles/INDEX.md`。

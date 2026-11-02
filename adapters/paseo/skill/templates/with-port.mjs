@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Written into the project by req-kit's /req-setup. Runs a command with {PORT} replaced by
+// Written into the project by req-kit's /laoshi-setup. Runs a command with {PORT} replaced by
 // the port Paseo assigned (PASEO_PORT), the same way on macOS, Linux and Windows, whatever
 // shell Paseo uses there (bash, sh, cmd.exe). Also sets PORT for programs that read it.
 //

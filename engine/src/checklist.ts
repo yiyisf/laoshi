@@ -1,7 +1,7 @@
 // The acceptance checklist (1.14): what the requester checks by hand, built from the spec's
 // acceptance criteria, with what the pipeline found for each one. People tick each item on a
 // page (or read it with `req checklist`); the result is written as acceptance.md, the same record
-// the /req acceptance playbook writes. Plain parsing, no model.
+// the /laoshi acceptance playbook writes. Plain parsing, no model.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -235,7 +235,7 @@ export function acceptanceFailMessage(featureDir: string, list: Checklist, answe
     "不通过的项：",
     ...failed.map((i) => `- ${i.id} ${i.title}${by.get(i.id)?.note?.trim() ? `：${by.get(i.id)!.note!.trim()}` : ""}`),
     "",
-    `请按 /req 的"验收"手册第 5 步，和需求方逐项确定处理方式（实现与需求不符 / 需求本身要改 / 接受现状），记入 acceptance.md 的"不通过的处理"一节，再按对应的手册继续。`,
+    `请按 /laoshi 的"验收"手册第 5 步，和需求方逐项确定处理方式（实现与需求不符 / 需求本身要改 / 接受现状），记入 acceptance.md 的"不通过的处理"一节，再按对应的手册继续。`,
   ].join("\n");
 }
 

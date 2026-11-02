@@ -1,6 +1,6 @@
 ---
 name: acceptance-criteria
-description: req-kit 方法：把功能需求（FR）拆成可以亲手试用、也可以直接转为测试用例的验收标准（AC-n.m），覆盖正常流程、异常和边界。由 /req 的手册和 spec-writing 调用。
+description: req-kit 方法：把功能需求（FR）拆成可以亲手试用、也可以直接转为测试用例的验收标准（AC-n.m），覆盖正常流程、异常和边界。由 /laoshi 的手册和 spec-writing 调用。
 ---
 
 # 验收标准

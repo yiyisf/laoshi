@@ -55,7 +55,7 @@ export function permissionMessage(input: {
     ...input.requests.map((r) => `- ${r}`),
     "",
     `请告诉用户：${fill((input.words ?? wordsFor()).approvePermission, { agent: input.agentTitle })}。`,
-    "如果这类等待经常出现，说明流水线配置中的 agent 模式还会询问权限，需要把配置中的 agent 改成免确认模式（运行 /req-doctor 可以查看当前配置）。",
+    "如果这类等待经常出现，说明流水线配置中的 agent 模式还会询问权限，需要把配置中的 agent 改成免确认模式（运行 /laoshi-doctor 可以查看当前配置）。",
   ].join("\n");
 }
 
@@ -132,7 +132,7 @@ export function completedMessage(input: {
       `研发报告：${input.reportPath}`,
       `提测说明：${input.handoffPath}`,
       "",
-      "请把结论和摘要转告用户，说明接下来需要人工测试：按 /req 的验收手册，以提测说明中的“建议重点测试”和验收标准为线索，带用户逐条测试。",
+      "请把结论和摘要转告用户，说明接下来需要人工测试：按 /laoshi 的验收手册，以提测说明中的“建议重点测试”和验收标准为线索，带用户逐条测试。",
       "如果之后想让流水线做测试验证，在用户同意后执行继续命令并加上 --phase verify。",
     ].join("\n");
   }
@@ -286,7 +286,7 @@ export function scheduledStartPrompt(input: { featureDir: string; command: strin
     "【需求开发流水线通知】这是用户之前预约的开发开始时间，不是用户现在发的消息。",
     "",
     `功能目录：${input.featureDir}`,
-    "请执行下面的启动命令，然后用一句话告诉用户预约的开发已经开始（输出\"未启动\"时，按 /req 中的说明处理并告诉用户原因）：",
+    "请执行下面的启动命令，然后用一句话告诉用户预约的开发已经开始（输出\"未启动\"时，按 /laoshi 中的说明处理并告诉用户原因）：",
     "",
     input.command,
   ].join("\n");
@@ -322,8 +322,8 @@ export function phaseDoneMessage(input: {
     "1. 告诉用户研发已完成、可以提测，用两三句话讲提测说明里\"这次改了什么\"和\"建议重点测试\"。",
     `2. ${ENVIRONMENT_HINT[input.environment]}`,
     input.verifyAt
-      ? `3. 已预约在 ${input.verifyAt} 自动开始测试验证（${(input.words ?? wordsFor()).schedule}）。用户想提前开始或改用别的方式时，按 /req 的"开始测试验证"手册处理；想取消预约，执行暂停命令。`
-      : "3. 用户（或测试同事）准备好之后，按 /req 的\"开始测试验证\"手册处理；确认后执行下面的命令：",
+      ? `3. 已预约在 ${input.verifyAt} 自动开始测试验证（${(input.words ?? wordsFor()).schedule}）。用户想提前开始或改用别的方式时，按 /laoshi 的"开始测试验证"手册处理；想取消预约，执行暂停命令。`
+      : "3. 用户（或测试同事）准备好之后，按 /laoshi 的\"开始测试验证\"手册处理；确认后执行下面的命令：",
     "",
     input.verifyCommand,
     ...(input.reminderHours && !input.verifyAt ? ["", `（如果 ${input.reminderHours} 小时内还没有开始测试验证，会在这个对话里提醒一次。）`] : []),
@@ -455,8 +455,8 @@ export function pluginReplyMessage(input: { featureDir: string; waitingFor: "bus
     "</plugin-reply>",
     "",
     input.waitingFor === "approval"
-      ? "请这样处理：回复是同意的，执行\"确认方案后继续\"命令；是修改意见的，按 /req 中\"方案要改\"的做法更新需求说明，再执行继续命令。拿不准时在对话里问用户。"
-      : "请这样处理：按 /req 中\"需要需求方决定\"的做法，把回答记入 alignment.md 并更新 spec.md；回答已经覆盖全部问题时，向用户简要复述后执行继续命令；还缺的，在对话里接着问。",
+      ? "请这样处理：回复是同意的，执行\"确认方案后继续\"命令；是修改意见的，按 /laoshi 中\"方案要改\"的做法更新需求说明，再执行继续命令。拿不准时在对话里问用户。"
+      : "请这样处理：按 /laoshi 中\"需要需求方决定\"的做法，把回答记入 alignment.md 并更新 spec.md；回答已经覆盖全部问题时，向用户简要复述后执行继续命令；还缺的，在对话里接着问。",
   ].join("\n");
 }
 
@@ -466,7 +466,7 @@ export function notStartedNotice(featureDir: string): string {
     "【需求开发流水线提示】这条消息来自 req-kit 的后台检查，不是用户发的。",
     "",
     `需求 ${featureDir} 的需求说明已经确认超过 30 分钟，但开发流水线还没有启动。`,
-    "如果用户确实要开发它：请按 /req 的手册启动开发（或者告诉用户可以在插件\"等你处理\"里点\"开始开发\"）。",
+    "如果用户确实要开发它：请按 /laoshi 的手册启动开发（或者告诉用户可以在插件\"等你处理\"里点\"开始开发\"）。",
     "如果是用户有意先不开发、还要再改需求，或者已经在别处开始了：用一句话确认即可，不需要其他操作。这个提醒只发一次。",
   ].join("\n");
 }

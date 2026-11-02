@@ -27,7 +27,7 @@
 - 端口的传法：命令里的 `{PORT}` 会被替换成端口号，同时设置环境变量 `PORT` 和 `LAOSHI_PORT`。
 - 准备命令可以读到两个环境变量：`LAOSHI_SOURCE_CHECKOUT_PATH`（对话所在的原仓库）和 `LAOSHI_WORKTREE_PATH`（新工作区）。
 
-**shell**：命令用系统默认的 shell 执行，Windows 上是 `cmd.exe`，其他系统是 `/bin/sh`。**任何情况下都不启动 PowerShell**，因为内网机器上它会被直接禁止运行。所以命令最好写成普通的程序调用，例如 `node scripts/x.mjs`，在各个系统上都一样能用。`/req-setup` 的两个辅助脚本（`with-port.mjs`、`copy-local-files.mjs`）现在也认 `LAOSHI_PORT` 和 `LAOSHI_SOURCE_CHECKOUT_PATH`。
+**shell**：命令用系统默认的 shell 执行，Windows 上是 `cmd.exe`，其他系统是 `/bin/sh`。**任何情况下都不启动 PowerShell**，因为内网机器上它会被直接禁止运行。所以命令最好写成普通的程序调用，例如 `node scripts/x.mjs`，在各个系统上都一样能用。`/laoshi-setup` 会为使用内置服务的平台写 `.laoshi/services.json`，需要复制本地配置时用 `skills/laoshi-setup/templates/copy-local-files.mjs`（读 `LAOSHI_SOURCE_CHECKOUT_PATH`）；Paseo 的辅助脚本在 `adapters/paseo/skill/templates/`，也认 `LAOSHI_PORT` 和 `LAOSHI_SOURCE_CHECKOUT_PATH`。
 
 `laoshi doctor` 的项目一节会检查这个文件：格式、服务是否用了分配的端口、文件是否已提交（只在平台用内置能力时检查）。
 

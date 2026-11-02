@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
+import os from "node:os";
+import { BUILTIN_SETUP, parseFragments, renderSkills, skillValues } from "../engine/src/skills-render.js";
+import { NEUTRAL_WORDS } from "../engine/src/words.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const SKILLS = path.join(ROOT, "skills");
@@ -26,12 +29,19 @@ test("每个 skill 的 frontmatter：name 与目录名一致，有 description�
   }
 });
 
+// laoshi M2e: skill text also names the platform's words and sections (engine/src/skills-render.ts).
+const WORDS = new Set(Object.keys(NEUTRAL_WORDS));
+const FRAGMENT_FILES = [BUILTIN_SETUP, path.join(ROOT, "adapters", "paseo", "skill", "setup.md")];
+const FRAGMENTS = new Set(FRAGMENT_FILES.flatMap((f) => Object.keys(parseFragments(fs.readFileSync(f, "utf8")))));
+
 test("skill 中只用已知的占位符，引用的安装目录内文件都存在", () => {
-  for (const file of markdownFiles(SKILLS)) {
+  for (const file of [...markdownFiles(SKILLS), ...FRAGMENT_FILES]) {
     const text = fs.readFileSync(file, "utf8");
     for (const placeholder of text.match(/\{\{[A-Z_]+\}\}/g) ?? []) {
       assert.ok(KNOWN.has(placeholder), `${file}：未知占位符 ${placeholder}`);
     }
+    for (const [, word] of text.matchAll(/\{\{platform\.(\w+)\}\}/g)) assert.ok(WORDS.has(word), `${file}：未知的平台词 ${word}`);
+    for (const [, name] of text.matchAll(/\{\{fragment\.(\w+)\}\}/g)) assert.ok(FRAGMENTS.has(name), `${file}：未知的片段 ${name}`);
     for (const [, rel] of text.matchAll(/\{\{REQ_KIT_ROOT\}\}\/([\w./-]+)/g)) {
       assert.ok(fs.existsSync(path.join(ROOT, rel)), `${file} 引用了不存在的 ${rel}`);
     }
@@ -45,14 +55,30 @@ test("原则索引中的七条原则都有对应的 skill", () => {
   for (const name of names) assert.ok(fs.existsSync(path.join(SKILLS, name, "SKILL.md")), `缺少 ${name}`);
 });
 
-test("/req 的每本手册都有\"步骤\"一节，且都在入口的路由表中", () => {
-  const dir = path.join(SKILLS, "req", "playbooks");
-  const entry = fs.readFileSync(path.join(SKILLS, "req", "SKILL.md"), "utf8");
+test("/laoshi 的每本手册都有\"步骤\"一节，且都在入口的路由表中", () => {
+  const dir = path.join(SKILLS, "laoshi", "playbooks");
+  const entry = fs.readFileSync(path.join(SKILLS, "laoshi", "SKILL.md"), "utf8");
   const playbooks = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
   assert.equal(playbooks.length, 9);
   for (const file of playbooks) {
     const text = fs.readFileSync(path.join(dir, file), "utf8");
     assert.match(text, /^## 步骤\n\n1\. /m, `${file} 缺少"步骤"一节`);
-    assert.ok(entry.includes(`skills/req/playbooks/${file}`), `${file} 不在 /req 的路由表中`);
+    assert.ok(entry.includes(`skills/laoshi/playbooks/${file}`), `${file} 不在 /laoshi 的路由表中`);
+  }
+});
+
+test("skill 按平台渲染（laoshi M2e）：占位符都替换掉；dsh 用 laoshi 内置的工作区设置，看不到别的平台", () => {
+  for (const [adapter, config] of [["paseo", { platform: { adapter: "paseo" } }], ["dsh", { platform: { adapter: "dsh" } }]] as const) {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), `laoshi-skills-${adapter}-`));
+    const written = renderSkills(out, skillValues(config, "/opt/laoshi"));
+    assert.ok(written.includes(path.join("laoshi", "SKILL.md")) && written.includes(path.join("laoshi-setup", "SKILL.md")));
+    for (const file of markdownFiles(out)) {
+      const text = fs.readFileSync(file, "utf8");
+      assert.doesNotMatch(text, /\{\{/, `${adapter}：${file} 还有占位符`);
+      if (adapter === "dsh") assert.doesNotMatch(text, /paseo/i, `${adapter}：${file} 提到了 Paseo`);
+    }
+    const setup = fs.readFileSync(path.join(out, "laoshi-setup", "SKILL.md"), "utf8");
+    assert.match(setup, adapter === "paseo" ? /paseo\.json/ : /\.laoshi\/services\.json/);
+    assert.match(setup, /\/opt\/laoshi\/contracts\/verify\.md/);
   }
 });

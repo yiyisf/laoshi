@@ -118,7 +118,7 @@ test("req start --from：读卡片、建功能目录和需求会话；publish �
   assert.match(fs.readFileSync(path.join(feature, "card-source.md"), "utf8"), /<card-description>\n# 业务活动 PRD/);
   const session = log().find((e) => e.type === "startSession");
   assert.equal(fs.realpathSync(session.cwd), fs.realpathSync(repo));
-  assert.match(session.prompt, /^\/req 无人值守/);
+  assert.match(session.prompt, /^\/laoshi 无人值守/);
   assert.match(session.prompt, /playbooks\/unattended\.md/);
   assert.match(session.prompt, new RegExp(`card publish "ALM:${CARD}"`));
 
@@ -290,7 +290,7 @@ test("从卡片开始的需求跑完流水线：不建卡，状态改为开发�
   assert.match(r.stdout, /卡片 CMASTER-BUSINESS#9902 的 AI 区已更新（需求方已确认，开发中/);
 });
 
-test("按子系统选仓库：仓库在 /req-setup 写 cardSource 并登记；同一子系统有几个仓库时按标题关键字；匹配不到或分不清时说明原因", async () => {
+test("按子系统选仓库：仓库在 /laoshi-setup 写 cardSource 并登记；同一子系统有几个仓库时按标题关键字；匹配不到或分不清时说明原因", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "req-card-route-"));
   const env = { ...process.env, REQ_KIT_HOME: path.join(dir, "home") };
   const repoWith = (name: string, cardSource: unknown) => {

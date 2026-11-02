@@ -113,7 +113,7 @@ export const REQUIREMENT_TYPE_LABELS: Record<RequirementType, string> = { defect
 
 /**
  * One project check the engine runs itself (the quality gate): formatting, lint, type
- * check, tests, build. Commands should read the same on every system (see /req-setup).
+ * check, tests, build. Commands should read the same on every system (see /laoshi-setup).
  */
 export interface CheckDef {
   /** Short name, e.g. "lint", "web 测试". */
@@ -232,7 +232,7 @@ export interface PipelineConfig {
    */
   push: { enabled: boolean; remote: string; branchPrefix: string; mergeRequest?: MergeRequestSettings | null };
   /**
-   * Which cards this repository takes (1.10, written by /req-setup in the project's file): the
+   * Which cards this repository takes (1.10, written by /laoshi-setup in the project's file): the
    * system, its space (project id) and subsystems; `titleKeywords` tells apart repositories
    * that share a subsystem (e.g. "message-service", "后端").
    */
@@ -288,7 +288,7 @@ export interface PipelineConfig {
   designProposals: { enabled: boolean; profiles: ProfileName[]; members: ReviewPanelMember[] };
   /** "auto": tell verification steps to use the platform's browser tools for web pages when they are on. */
   browserVerify: "auto" | "off";
-  /** When /req offers the independent spec review before confirmation: "standard" (standard profile only), "always", "off". */
+  /** When /laoshi offers the independent spec review before confirmation: "standard" (standard profile only), "always", "off". */
   specReview: "standard" | "always" | "off";
   /** Machine-wide limit on pipelines running at once; later ones queue. 0: no limit. */
   maxConcurrentPipelines: number;
@@ -306,7 +306,7 @@ export interface PipelineConfig {
   phases: PhaseSettings;
   /** Requirement types whose playbook is used; a type left out runs the normal flow. */
   requirementTypes: RequirementType[];
-  /** Project checks for the quality gate; empty: no gate. Usually in the project config, written by /req-setup. */
+  /** Project checks for the quality gate; empty: no gate. Usually in the project config, written by /laoshi-setup. */
   checks: CheckDef[];
   qualityGate: QualityGateSettings;
   /**

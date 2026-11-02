@@ -1,4 +1,4 @@
-// req-kit doctor: read-only health check, run by the /req-doctor skill.
+// req-kit doctor: read-only health check, run by the /laoshi-doctor skill.
 //
 //   node bin/req-doctor.mjs [--repo <dir>] [--no-project] [--offline] [--config <file>]
 //
@@ -126,7 +126,7 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
         report(
           "warn",
           "没有配置质量门的检查（checks）：流水线不会自己运行 lint、测试等检查，只能依靠各步骤自己的记录",
-          "在项目根目录的对话中运行 /req-setup，它会把实际跑通的检查命令写进项目配置",
+          "在项目根目录的对话中运行 /laoshi-setup，它会把实际跑通的检查命令写进项目配置",
         );
       }
       for (const r of relatedRepos) {
@@ -215,7 +215,7 @@ function verifyInstructions(repo: string, isRepo: boolean): void {
   const rel = `${PROJECT_DIR}/verify.md`;
   const file = path.join(repo, PROJECT_DIR, "verify.md");
   if (!fs.existsSync(file)) {
-    report("warn", "没有验证方法说明，服务启动和功能验证步骤需要自己摸索，耗时更长、结果更不稳定", "在项目根目录的对话中运行 /req-setup");
+    report("warn", "没有验证方法说明，服务启动和功能验证步骤需要自己摸索，耗时更长、结果更不稳定", "在项目根目录的对话中运行 /laoshi-setup");
     return;
   }
   if (!isRepo) {
@@ -229,7 +229,7 @@ function verifyInstructions(repo: string, isRepo: boolean): void {
     report("warn", `验证方法 ${rel} 还没有提交，其他工作区看不到它`, "确认内容后提交，并合并到主分支");
   } else if (buildTime !== null && buildTime > verifyTime) {
     const day = (ms: number) => new Date(ms).toLocaleDateString("zh-CN");
-    report("warn", `验证方法可能过时：构建文件在 ${day(buildTime)} 改过，验证方法最后更新于 ${day(verifyTime)}`, "运行 /req-setup 更新，或确认内容仍然准确");
+    report("warn", `验证方法可能过时：构建文件在 ${day(buildTime)} 改过，验证方法最后更新于 ${day(verifyTime)}`, "运行 /laoshi-setup 更新，或确认内容仍然准确");
   } else {
     report("ok", `验证方法：${rel}`);
   }
@@ -258,7 +258,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
   if (fs.existsSync(projectConfig)) report("ok", `项目配置：${path.basename(projectConfig)}${path.basename(projectConfig) === PROJECT_CONFIG_FILE ? "" : `（旧名，可以改名为 ${PROJECT_CONFIG_FILE}）`}`);
   const notes = path.join(repo, PROJECT_DIR, "project-notes.md");
   if (fs.existsSync(notes)) report("ok", `项目说明：${PROJECT_DIR}/project-notes.md`);
-  else report("warn", "没有项目说明（包管理工具、不能改的目录、提交格式等），步骤 agent 需要自己摸索", "在项目根目录的对话中运行 /req-setup");
+  else report("warn", "没有项目说明（包管理工具、不能改的目录、提交格式等），步骤 agent 需要自己摸索", "在项目根目录的对话中运行 /laoshi-setup");
   verifyInstructions(repo, git.isRepo);
   adapter.doctorProject?.({ repo, isRepo: git.isRepo, tools: { report, info } });
   if (sourceOf(adapter, "services") === "builtin" || sourceOf(adapter, "worktree") === "builtin") builtinServicesFile(repo, git.isRepo);
@@ -267,7 +267,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
   } else if (fs.existsSync(path.join(repo, "GLOSSARY.md"))) {
     report("ok", "术语表：GLOSSARY.md");
   } else {
-    report("warn", "没有术语表 GLOSSARY.md：需求方的说法和代码里的叫法对不上时容易做偏", "在项目根目录的对话中运行 /req-setup，它会整理主要的业务词和代码中的名字");
+    report("warn", "没有术语表 GLOSSARY.md：需求方的说法和代码里的叫法对不上时容易做偏", "在项目根目录的对话中运行 /laoshi-setup，它会整理主要的业务词和代码中的名字");
   }
 
   const featuresDir = path.join(repo, "docs", "features");
@@ -297,7 +297,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
     switch (raw.status) {
       case "running":
         if (raw.pid && isAlive(raw.pid)) report("ok", `${label}：运行中（进程 ${raw.pid}）${migrate}`);
-        else report("warn", `${label}：状态为运行中，但进程已不在${migrate}`, `在该需求的对话中对 /req 说"继续开发"，或执行 start-pipeline --feature ${label} --resume`);
+        else report("warn", `${label}：状态为运行中，但进程已不在${migrate}`, `在该需求的对话中对 /laoshi 说"继续开发"，或执行 start-pipeline --feature ${label} --resume`);
         break;
       case "waiting_for_approval":
         report("warn", `${label}：方案等待需求方确认${migrate}`, "在该需求的对话中看 preview.md 并确认（或修改需求）");

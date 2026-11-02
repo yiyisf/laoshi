@@ -127,7 +127,7 @@ export function doctorProject({ repo, isRepo, tools }: { repo: string; isRepo: b
   const { report, info } = tools;
   const file = path.join(repo, "paseo.json");
   if (!fs.existsSync(file)) {
-    info("没有 paseo.json。可选：/req-setup 可以生成它，让 Paseo 在新建 worktree 时自动安装依赖，并由 Paseo 管理服务和端口（几个需求同时验证也不会端口冲突）");
+    info("没有 paseo.json。可选：/laoshi-setup 可以生成它，让 Paseo 在新建 worktree 时自动安装依赖，并由 Paseo 管理服务和端口（几个需求同时验证也不会端口冲突）");
     return;
   }
   let raw: PaseoJson;
@@ -145,7 +145,7 @@ export function doctorProject({ repo, isRepo, tools }: { repo: string; isRepo: b
   );
   for (const [name, s] of services) {
     if (s.port === undefined && !/PASEO_PORT|\{PORT\}|with-port/.test(String(s.command ?? ""))) {
-      report("warn", `paseo.json 中的服务 ${name} 没有使用 Paseo 分配的端口（PASEO_PORT），几个工作区同时运行时会端口冲突`, `让服务监听 Paseo 分配的端口，例如 "node scripts/paseo/with-port.mjs npm run dev -- --port {PORT}"（/req-setup 会写入这个脚本）`);
+      report("warn", `paseo.json 中的服务 ${name} 没有使用 Paseo 分配的端口（PASEO_PORT），几个工作区同时运行时会端口冲突`, `让服务监听 Paseo 分配的端口，例如 "node scripts/paseo/with-port.mjs npm run dev -- --port {PORT}"（/laoshi-setup 会写入这个脚本）`);
     }
   }
   for (const issue of paseoJsonIssues(raw)) {

@@ -52,7 +52,7 @@ async function main(): Promise<number> {
   log(`req-kit ${kitVersion()}；配置：${sources.join(" → ")}`);
   if (ignored.length > 0) log(`${ignored.join("、")} 只能在本机配置中设置，已忽略`);
   if (config.requiredVersion && !satisfies(kitVersion(), config.requiredVersion)) {
-    log(`提醒：团队或项目要求 req-kit ${config.requiredVersion}，当前为 ${kitVersion()}。流水线照常运行，请找时间升级（见 /req-doctor）。`);
+    log(`提醒：团队或项目要求 req-kit ${config.requiredVersion}，当前为 ${kitVersion()}。流水线照常运行，请找时间升级（见 /laoshi-doctor）。`);
   }
 
   ensurePipelineDir(repo, featureDir);

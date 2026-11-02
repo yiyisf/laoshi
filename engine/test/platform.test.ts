@@ -112,9 +112,11 @@ test("核心与提示词里不写平台名（laoshi M2e）：平台的说法来�
   const names = [...ADAPTER_IDS, "DeepSeek"];
   const pattern = new RegExp(`\\b(${names.join("|")})(?!-req-kit)`, "i");
   const offenders: string[] = [];
-  for (const dir of ["src", "prompts"]) {
+  // The core: engine/src, the prompts, laoshi's skill sections, and the skills (laoshi M2e).
+  for (const dir of ["src", "prompts", "skill-fragments", "../skills"]) {
     for (const rel of fs.readdirSync(path.join(root, dir), { recursive: true }) as string[]) {
       const file = path.join(root, dir, rel);
+      if (fs.statSync(file).isDirectory()) continue;
       if (!/\.(ts|mjs|js|md|html|css)$/.test(rel) || rel.endsWith("runtime-loader.ts")) continue;
       const lines = fs.readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {

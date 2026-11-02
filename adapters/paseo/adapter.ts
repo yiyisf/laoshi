@@ -1,6 +1,7 @@
 // The Paseo adapter (laoshi M2a): what the core needs to know about Paseo besides its runtime.
 // Paseo provides every optional capability itself (ADR 0008: source "platform").
 
+import { fileURLToPath } from "node:url";
 import type { Catalog } from "../../engine/src/configure.js";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
 import { connect } from "./daemon-check.js";
@@ -68,7 +69,9 @@ export const paseoAdapter: PlatformAdapter = {
     browser: "Paseo 内置的浏览器（`browser_*` 工具）",
     browserWatch: "需求方可以在 Paseo 桌面端实时看到你在浏览器中的操作。",
     requirementView: "Paseo 的 req-kit 插件",
+    connectFix: "确认 Paseo 桌面端或 daemon 在运行；设置了密码时，确认环境变量（默认 `PASEO_DAEMON_PASSWORD`）已设置。",
   },
+  skillSetup: fileURLToPath(new URL("./skill/setup.md", import.meta.url)),
   doctorTitle: "Paseo daemon",
   doctorPlatform: async (input) => (await import("./doctor.js")).doctorPlatform(input),
   doctorProject,

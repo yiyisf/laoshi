@@ -145,7 +145,7 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
     title: "质量",
     description: "流水线自己运行的检查，以及可以参考的其他仓库。",
     keys: {
-      checks: { label: "质量门的检查", description: "写代码和修复后，流水线自己运行这些命令，比较改动前后。通常由 /req-setup 写在项目配置中。", display: (v) => (Array.isArray(v) && v.length > 0 ? (v as Array<{ name: string; command: string }>).map((c) => `${c.name}（${c.command}）`).join("、") : "没有（不运行质量门）") },
+      checks: { label: "质量门的检查", description: "写代码和修复后，流水线自己运行这些命令，比较改动前后。通常由 /laoshi-setup 写在项目配置中。", display: (v) => (Array.isArray(v) && v.length > 0 ? (v as Array<{ name: string; command: string }>).map((c) => `${c.name}（${c.command}）`).join("、") : "没有（不运行质量门）") },
       qualityGate: { label: "质量门的修复", description: "检查发现新失败时，同一个 agent 修几次；每项检查的时限。", display: (v) => { const q = v as PipelineConfig["qualityGate"]; return `最多修 ${q.fixAttempts} 次，每项 ${q.timeoutMinutes} 分钟`; } },
       relatedRepos: { label: "关联仓库", description: "步骤 agent 可以读、不会修改的其他仓库（例如前端项目的后端）。", display: (v) => (Array.isArray(v) && v.length > 0 ? (v as Array<{ name: string; path: string }>).map((r) => `${r.name}（${r.path}）`).join("、") : "无") },
     },
@@ -184,7 +184,7 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
     keys: {
       integrations: { label: "对接的外部系统", description: "用命令读写需求管理系统中的卡片。", display: (v) => (Array.isArray(v) && v.length > 0 ? (v as Array<{ name: string; command: string } & Record<string, unknown>>).map((i) => `${i.name}（${i.command}；${["create", "status", "query", "describe", "list"].filter((k) => i[k]).join("、")}）`).join("；") : "无") },
       integrationDefaults: { label: "对接字段的默认值", description: "按系统填卡片字段的固定值（例如项目编号）。", display: (v) => { const n = Object.keys(v as object).length; return n > 0 ? `${n} 个系统` : "无"; } },
-      cardSource: { label: "这个仓库接哪些卡片", description: "系统、空间和子系统，由 /req-setup 写在项目配置中。", display: (v) => { if (!v) return "未设置"; const c = v as NonNullable<PipelineConfig["cardSource"]>; return `${c.system}${c.projectId ? ` 空间 ${c.projectId}` : ""}；子系统 ${list(c.subsystems)}${c.titleKeywords.length ? `；标题关键字 ${list(c.titleKeywords)}` : ""}`; } },
+      cardSource: { label: "这个仓库接哪些卡片", description: "系统、空间和子系统，由 /laoshi-setup 写在项目配置中。", display: (v) => { if (!v) return "未设置"; const c = v as NonNullable<PipelineConfig["cardSource"]>; return `${c.system}${c.projectId ? ` 空间 ${c.projectId}` : ""}；子系统 ${list(c.subsystems)}${c.titleKeywords.length ? `；标题关键字 ${list(c.titleKeywords)}` : ""}`; } },
       push: { label: "推送分支", description: "从卡片开始的需求研发完成后，推送到 req/ 前缀的分支（可以再建草稿合并请求）。不强推、不合并。", display: (v) => { const p = v as PipelineConfig["push"]; return p.enabled ? `推送到 ${p.remote}/${p.branchPrefix}<卡号>${p.mergeRequest ? `，用 ${p.mergeRequest.command} 建草稿合并请求` : ""}` : "关"; } },
       factory: { label: "接单器", description: "多久检查一次、认哪些标题标识、每次最多接几张。", display: (v) => { const f = v as PipelineConfig["factory"]; return `每 ${f.pollMinutes} 分钟；标识 ${list(f.titleTags)}；每次最多 ${f.maxNewPerPoll} 个`; } },
       autoConfirm: { label: "小改动自动确认", description: "快速档、没有待答问题的卡片，过这么久没有异议就开始。", display: (v) => hours((v as PipelineConfig["autoConfirm"]).hours) },

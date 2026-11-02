@@ -1,7 +1,7 @@
 // `req integration` and `req sync` (1.9, ADR 0028).
 //
 //   req integration test [需求]   what each configured integration would run, without running it
-//   req integration fields        the card fields /req confirms with the spec (card.json)
+//   req integration fields        the card fields /laoshi confirms with the spec (card.json)
 //   req sync <需求>               bring the requirement's cards up to date now: send what failed,
 //                                 create a missing card, set the state for where the requirement is
 
