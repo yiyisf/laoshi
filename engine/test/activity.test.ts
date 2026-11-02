@@ -37,14 +37,14 @@ test("Paseo profile 解析：按名称（不区分大小写）或 ID 查找；�
   assert.equal(list.length, 2);
   assert.equal(findPaseoProfile("review", list)?.id, "a1");
   assert.equal(findPaseoProfile("a2", list)?.name, "草稿");
-  assert.deepEqual(resolveAgentProfile("x", { paseoProfile: "Review", featureValues: { other: 1 } }, list), {
-    paseoProfile: "Review",
+  assert.deepEqual(resolveAgentProfile("x", { platformProfile: "Review", featureValues: { other: 1 } }, list), {
+    platformProfile: "Review",
     provider: "codex/gpt-x",
     modeId: "full-access",
     featureValues: { fast_mode: true, other: 1 },
   });
-  assert.throws(() => resolveAgentProfile("x", { paseoProfile: "草稿" }, list), /没有选择模型/);
-  assert.throws(() => resolveAgentProfile("x", { paseoProfile: "Review" }, null), /无法从 daemon 读取/);
+  assert.throws(() => resolveAgentProfile("x", { platformProfile: "草稿" }, list), /没有选择模型/);
+  assert.throws(() => resolveAgentProfile("x", { platformProfile: "Review" }, null), /无法从 daemon 读取/);
   assert.deepEqual(profilesFromDaemonConfig({}), []);
   assert.deepEqual(resolveAgentProfile("x", { provider: "claude/y" }, null), { provider: "claude/y" });
 });

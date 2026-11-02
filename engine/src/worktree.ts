@@ -1,4 +1,4 @@
-// --worktree: develop a requirement in a Paseo worktree workspace created for it.
+// --worktree: develop a requirement in a platform worktree workspace created for it.
 // The chat stays where it is (its working directory never changes); the spec moves
 // to the new worktree, is committed there on its own branch, and the step agents are
 // placed in that workspace while remaining subagents of the chat. See ADR 0018.
@@ -174,8 +174,8 @@ export async function moveToOwnWorktree(input: {
         `分支 ${branch} 已经存在，但没有对应的工作区目录。如果它是以前没有启动成功留下的空分支，请开发同事确认后删除它（git branch -D ${branch}）再重新开始；否则请把功能目录换一个名字。`,
       );
     }
-    if (!input.runtime.openWorkspace) throw new Error(`分支 ${branch} 已经有工作区 ${dir}，但这个 Paseo 版本不能接手已有的目录。请在 Paseo 中打开那个工作区，在那里的对话中开始开发。`);
-    // A worktree made by an older version (no record): let Paseo take the directory as a workspace.
+    if (!input.runtime.openWorkspace) throw new Error(`分支 ${branch} 已经有工作区 ${dir}，但这个平台版本不能接手已有的目录。请在平台上打开那个工作区，在那里的对话中开始开发。`);
+    // A worktree made by an older version (no record): let the platform take the directory as a workspace.
     workspaceId = (await input.runtime.openWorkspace(dir)).workspaceId;
     repo = fs.realpathSync(dir);
     reused = true;
@@ -189,7 +189,7 @@ export async function moveToOwnWorktree(input: {
   writeRecord({ schema: 1, sourceRepo: fs.realpathSync(sourceRepo), featureDir, repo, workspaceId, branch, baseRef: record?.baseRef ?? baseRef, createdAt: record?.createdAt ?? new Date().toISOString(), originAgentId: input.originAgentId }, env);
 
   // The plugin lists it where it now lives, still under the chat's project.
-  registerRequirement({ repo, featureDir, worktree: { workspaceId, sourceRepo: fs.realpathSync(sourceRepo) } }, env, input.originAgentId);
+  registerRequirement({ repo, featureDir, worktree: { workspaceRef: workspaceId, sourceRepo: fs.realpathSync(sourceRepo) } }, env, input.originAgentId);
 
   // The spec and interview notes were written in the chat's checkout; move them over.
   const from = path.join(sourceRepo, featureDir);

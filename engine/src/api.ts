@@ -1,4 +1,4 @@
-// `req api`: machine-readable output for programs (the Paseo plugin, scripts), 1.9.
+// `req api`: machine-readable output for programs (the requirements plugin, scripts), 1.9.
 // The format is a contract (contracts/cli-json.md): every command prints one JSON object,
 //   { "schema": 1, "kitVersion": "…", "data": … }        exit 0
 //   { "schema": 1, "kitVersion": "…", "error": { "code", "message" } }   exit 1
@@ -204,7 +204,7 @@ function item(repo: string, branch: string | null, featureDir: string, extra: { 
     codebase: codebaseOf(extra.sourceRepo ?? repo),
     repo,
     sourceRepo: extra.sourceRepo,
-    workspaceId: extra.workspaceId ?? state?.worktree?.workspaceId ?? null,
+    workspaceId: extra.workspaceId ?? state?.worktree?.workspaceRef ?? null,
     featureDir: summary.featureDir,
     name,
     title: summary.title,
@@ -241,7 +241,7 @@ function waitingOf(repo: string, featureDir: string, state: PipelineState | null
     reason: permission ? `「${permission.stepTitle}」步骤在等待权限批准，批准前会一直停在这里` : state.stopReason,
     ...(permission ? { agentId: permission.agentId } : {}),
     card,
-    canReply: Boolean(state.originAgentId) && (state.status === "waiting_for_business" || state.status === "waiting_for_approval"),
+    canReply: Boolean(state.originSessionId) && (state.status === "waiting_for_business" || state.status === "waiting_for_approval"),
   };
 }
 
@@ -253,7 +253,7 @@ export function apiList(input: { repo: string; all: boolean }): ListItem[] {
       .map((f) => {
         const state = readStateSafe(f.worktree, f.featureDir);
         const source = state?.worktree?.sourceRepo ?? null;
-        return item(f.worktree, f.branch, f.featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceId ?? null, project: path.basename(source ?? repo) });
+        return item(f.worktree, f.branch, f.featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceRef ?? null, project: path.basename(source ?? repo) });
       })
       .filter((x): x is ListItem => x !== null);
     return onePerRequirement(items);
@@ -303,7 +303,7 @@ export function apiList(input: { repo: string; all: boolean }): ListItem[] {
     for (const f of found) {
       const state = readStateSafe(f.worktree, f.featureDir);
       const source = state?.worktree?.sourceRepo ?? (samePathSafe(f.worktree, dir) ? null : dir);
-      const x = item(f.worktree, f.branch, f.featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceId ?? null, project: path.basename(dir) });
+      const x = item(f.worktree, f.branch, f.featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceRef ?? null, project: path.basename(dir) });
       if (x && !seen.has(x.key)) {
         seen.add(x.key);
         out.push(x);
@@ -376,7 +376,7 @@ export function apiStatus(repoArg: string, feature: string) {
   const { repo, featureDir, sourceRepo } = locate(repoArg, feature);
   const state = readStateSafe(repo, featureDir);
   const source = sourceRepo ?? state?.worktree?.sourceRepo ?? null;
-  const base = item(repo, state?.branch ?? null, featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceId ?? null, project: path.basename(source ?? repo) });
+  const base = item(repo, state?.branch ?? null, featureDir, { sourceRepo: source, workspaceId: state?.worktree?.workspaceRef ?? null, project: path.basename(source ?? repo) });
   if (!base) throw new ApiError("not_found", `${featureDir} 中没有 spec.md`);
   const dir = path.join(repo, featureDir);
   return {
@@ -394,7 +394,7 @@ export function apiStatus(repoArg: string, feature: string) {
           queuedSince: state.queuedSince ?? null,
           verifyAt: state.verifyAt ?? null,
           approval: state.approval ?? null,
-          originAgentId: state.originAgentId,
+          originAgentId: state.originSessionId,
         }
       : null,
     steps: state ? state.history.map((h) => stepJson(h, state)) : [],
@@ -404,7 +404,7 @@ export function apiStatus(repoArg: string, feature: string) {
     humanReview: humanReviewOf(repo, featureDir),
     gate: state?.gate ?? null,
     external: Object.entries(state?.external ?? {}).map(([name, r]) => ({ name, id: r.id, url: r.url, status: r.status, syncedAt: r.syncedAt, pending: r.pending.length, lastError: r.pending.at(-1)?.error ?? null })),
-    joint: (state?.joint ?? []).map((j) => ({ name: j.name, slug: j.slug, repo: j.repo, sourceRepo: j.sourceRepo, branch: j.branch, workspaceId: j.workspaceId, gate: j.gate ?? null })),
+    joint: (state?.joint ?? []).map((j) => ({ name: j.name, slug: j.slug, repo: j.repo, sourceRepo: j.sourceRepo, branch: j.branch, workspaceId: j.workspaceRef, gate: j.gate ?? null })),
   };
 }
 
@@ -554,6 +554,7 @@ export function apiMain(argvIn: string[], cwd = process.cwd()): unknown {
         kitVersion: kitVersion(),
         kitRoot: KIT_ROOT,
         apiSchema: API_SCHEMA,
+        // platform-name: field of the external contract (contracts/cli-json.md, schema 1)
         paseo: (JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "package.json"), "utf8")) as { reqKit?: { paseo?: string } }).reqKit?.paseo ?? null,
         featuresDir: FEATURES_DIR.split(path.sep).join("/"),
       };

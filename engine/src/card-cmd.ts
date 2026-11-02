@@ -44,7 +44,7 @@ import {
 import { loadConfig, type PipelineConfig } from "./config.js";
 import type { IntegrationConfig, Runner } from "./integrations.js";
 import { defaultConfigPath, KIT_ROOT } from "./locations.js";
-import { loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
+import { loadRuntimeFactory, resolveProfiles, wordsFor } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
 import { readState, statePath } from "./state.js";
 
@@ -243,7 +243,7 @@ async function startFromCard(argv: string[], opts: CardCmdOptions): Promise<numb
   if (result.routed) out(`按子系统选择仓库：${result.repo}`);
   out(`已从卡片 ${id}「${result.title}」开始需求。`);
   out(`功能目录：${path.join(result.repo, result.featureDir)}`);
-  out(`需求会话：agent ${result.sessionAgentId}（在 Paseo 中打开它可以看到整理需求的过程）。`);
+  out(`需求会话：agent ${result.sessionAgentId}（在 ${wordsFor().name} 中打开它可以看到整理需求的过程）。`);
   out(`需求说明和问题会写进卡片描述末尾的 AI 区；需求方回复后运行 req card check ${integration.name}:${id}（接单器会定时运行它）。`);
   return 0;
 }

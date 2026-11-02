@@ -16,7 +16,7 @@ import {
 import { gitInfo } from "./git.js";
 import { samePath } from "./paths.js";
 import { currentLockHolder, isAlive, type PipelineState, readState, statePath } from "./state.js";
-import { originFromEnv } from "./runtime-loader.js";
+import { originFromEnv, wordsFor } from "./runtime-loader.js";
 
 export interface LaunchArgs {
   repo: string;
@@ -39,14 +39,14 @@ export interface LaunchArgs {
   reviewFix?: boolean;
   /** --spec-review: independent review of the draft spec, before confirmation. */
   specReview: boolean;
-  /** --worktree: create a Paseo worktree workspace for this requirement and develop there. */
+  /** --worktree: create a platform worktree workspace for this requirement and develop there. */
   worktree: boolean;
   /**
    * The checkout the chat works in, when the pipeline runs in a worktree created for it
    * (repo is then that worktree). Set by the launcher; the chat's cwd must be this.
    */
   sourceRepo: string | null;
-  /** Paseo workspace of that worktree. */
+  /** The platform workspace of that worktree. */
   workspaceId: string | null;
   /** --at: schedule the start for later instead of starting now. */
   at: string | null;
@@ -327,7 +327,7 @@ export function preflight(
     throw new PreflightError(
       `当前在默认分支 ${git.branch} 上，流水线不会在默认分支上提交代码。` +
         "可以加 --worktree，让流水线为这个需求新建一个 worktree 工作区并在那里开发（这个对话不用动）；" +
-        "或者在 Paseo 中自己新建一个 worktree 工作区（New workspace → Isolation 选 New worktree），在那里的对话中重新开始；" +
+        (wordsFor().newWorkspace ? `或者自己新建一个 worktree 工作区（${wordsFor().newWorkspace}），在那里的对话中重新开始；` : "") +
         "或者先切换到这个需求的功能分支。",
     );
   }

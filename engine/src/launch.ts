@@ -19,7 +19,7 @@ import { describeLiveActivity, describeStatus, stopPipeline } from "./control.js
 import { trackRequirement } from "./records.js";
 import { describeFeatures, featuresWithRuns, findWorktreeRun, listFeatures, resolveFeatureArg } from "./features.js";
 import { checkChatCwd, normalizeFeatureDir, preflight, type PreflightResult, specProfile, verifyPhaseProblem } from "./preflight.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
+import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
 import { remainingLine, typical, typicalLine } from "./estimate.js";
 import { ensurePipelineDir, hashFile, isAlive, pipelineDir, readState, statePath } from "./state.js";
@@ -60,7 +60,7 @@ async function withRuntime<T>(config: PipelineConfig, use: (runtime: AgentRuntim
   })();
   return Promise.race([
     work,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("连接 Paseo 超时")), timeoutMs).unref()),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`连接 ${wordsFor().name} 超时`)), timeoutMs).unref()),
   ]);
 }
 
@@ -101,7 +101,7 @@ if (args.track) {
     const dir = path.join(repo, featureDir);
     if (!fs.existsSync(dir)) throw new Error(`功能目录不存在：${featureDir}`);
     trackRequirement(repo, featureDir, args.originAgentId);
-    console.log(`已登记需求：${featureDir}（Paseo 的 req-kit 插件里能看到它，状态"对齐中"${args.originAgentId ? "，关联这个对话" : ""}）`);
+    console.log(`已登记需求：${featureDir}（${wordsFor().requirementView ? `${wordsFor().requirementView}里能看到它，` : ""}状态"对齐中"${args.originAgentId ? "，关联这个对话" : ""}）`);
     process.exit(0);
   } catch (error) {
     console.error(`没能登记需求：${(error as Error).message}`);
@@ -173,16 +173,16 @@ if (args.status || args.stop) {
     const state = readState(file);
     const reservation = readReservation(repo, featureDir);
     if (!state && reservation) {
-      console.log(`需求：${featureDir}\n状态：已预约在 ${describeTime(new Date(reservation.at))} 开始开发（Paseo 定时任务，到时由这个对话执行启动命令）。取消预约：执行暂停命令。`);
+      console.log(`需求：${featureDir}\n状态：已预约在 ${describeTime(new Date(reservation.at))} 开始开发（${wordsFor().schedule}，到时由这个对话执行启动命令）。取消预约：执行暂停命令。`);
       process.exit(0);
     }
     console.log(describeStatus(state, featureDir));
     // 1.13: what to expect, from this machine's completed requirements of the same profile.
     const estimate = state ? remainingLine(state, typical(state.profile ?? "standard")) : null;
     if (estimate) console.log(estimate);
-    if (state && reservation) console.log(`已预约：${describeTime(new Date(reservation.at))} 开始（Paseo 定时任务，到时由对话执行；执行暂停命令可以取消）`);
+    if (state && reservation) console.log(`已预约：${describeTime(new Date(reservation.at))} 开始（${wordsFor().schedule}，到时由对话执行；执行暂停命令可以取消）`);
     if (args.sourceRepo) console.log(`位置：为这个需求新建的工作区 ${repo}（需求文件在 ${path.join(repo, featureDir)}）`);
-    // Live detail from Paseo, best effort: the plain status above never depends on the daemon.
+    // Live detail from the platform, best effort: the plain status above never depends on the daemon.
     if (state?.status === "running") {
       const fetchLive = async (): Promise<string[]> => {
         const runtime = await (await loadRuntimeFactory())({ config: loadConfig(configPath, repo).config, log: () => undefined });
@@ -285,7 +285,7 @@ try {
 if (args.verifyAt) {
   const at = parseStartTime(args.verifyAt);
   if (!at) fail(`看不懂测试验证的开始时间"${args.verifyAt}"。可以写 22:00、明天 8:30、2026-10-14 08:30 或 +2h`);
-  if (!args.originAgentId) fail("预约测试验证需要在 Paseo 的对话中执行：到时由这个对话执行开始测试验证的命令。");
+  if (!args.originAgentId) fail(`预约测试验证需要在${wordsFor(loaded?.config).chat}中执行：到时由这个对话执行开始测试验证的命令。`);
   if (args.phases === "develop-only") fail("只做研发时没有测试验证阶段，--verify-at 不适用");
   args.verifyAt = at.toISOString();
 }
@@ -302,7 +302,7 @@ if (args.at) {
   if (!at) fail(`看不懂开始时间"${args.at}"。可以写 22:00、明天 8:30、2026-10-14 08:30 或 +2h`);
   if (at.getTime() < Date.now() + 60_000) fail("开始时间要在至少 1 分钟之后");
   const origin = args.originAgentId;
-  if (!origin) fail("预约开始需要在 Paseo 的对话中执行：到时由这个对话执行启动命令。");
+  if (!origin) fail(`预约开始需要在${wordsFor(loaded?.config).chat}中执行：到时由这个对话执行启动命令。`);
   const command = args.phase
     ? verifyCommand({ repo: checked.repo, featureDir: checked.featureDir, configPath: args.configPath, verifyEnv: args.verifyEnv, defects: args.defects })
     : startCommand({
@@ -328,13 +328,13 @@ if (args.at) {
   } catch (error) {
     fail(`没能预约：${(error as Error).message}`);
   }
-  if (!scheduleId) fail("这个 Paseo 版本不支持定时任务，无法预约。可以到时再启动。");
+  if (!scheduleId) fail(`这个 ${wordsFor(loaded?.config).name} 版本不支持定时任务，无法预约。可以到时再启动。`);
   ensurePipelineDir(checked.repo, checked.featureDir);
   const reservation: Reservation = { scheduleId, at: at.toISOString(), command, createdAt: new Date().toISOString() };
   fs.writeFileSync(reservationFile(checked.repo, checked.featureDir), `${JSON.stringify(reservation, null, 2)}\n`);
   console.log(
     [
-      `已预约在 ${describeTime(at)} 开始${args.phase ? "测试验证" : "开发"}（Paseo 定时任务，在 Paseo 的 Schedules 中可以看到）。到时会在这个对话里自动执行启动命令。`,
+      `已预约在 ${describeTime(at)} 开始${args.phase ? "测试验证" : "开发"}（${[wordsFor(loaded?.config).schedule, wordsFor(loaded?.config).scheduleWhere].filter(Boolean).join("，")}）。到时会在这个对话里自动执行启动命令。`,
       `功能目录：${checked.featureDir}`,
       "查看：查看进度命令；取消：暂停命令。在那之前修改需求说明也没关系，开始时以最新的为准。",
     ].join("\n"),
@@ -363,7 +363,7 @@ if (args.worktree) {
       create(),
       // 1.14: big repositories (Windows especially) can take minutes to check out. Giving up early
       // left a branch with only the spec on it; now it waits, and a later start continues there.
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("连接 Paseo 新建工作区超过 15 分钟没有完成。工作区可能稍后才建好：再执行一次启动命令，会在已建好的工作区里接着开始")), 15 * 60_000).unref()),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`连接 ${wordsFor(loaded?.config).name} 新建工作区超过 15 分钟没有完成。工作区可能稍后才建好：再执行一次启动命令，会在已建好的工作区里接着开始`)), 15 * 60_000).unref()),
     ]);
   } catch (error) {
     fail(`没能为这个需求新建工作区：${(error as Error).message}`);
@@ -422,7 +422,7 @@ console.log(
         ? "只做研发：写好提测说明和研发报告后结束，测试由人完成。"
         : null,
     ownWorktree
-      ? `${ownWorktree.reused ? "在上次已建好的工作区中开始" : "已为这个需求新建工作区"}：${ownWorktree.repo}（分支 ${ownWorktree.branch}，在 Paseo 侧边栏中可以看到）。开发在那里进行，步骤仍挂在这个对话下；这个对话的工作目录不变。` +
+      ? `${ownWorktree.reused ? "在上次已建好的工作区中开始" : "已为这个需求新建工作区"}：${ownWorktree.repo}（分支 ${ownWorktree.branch}${wordsFor(loaded?.config).workspaceWhere ? `，${wordsFor(loaded?.config).workspaceWhere}` : ""}）。开发在那里进行，步骤仍挂在这个对话下；这个对话的工作目录不变。` +
         `需求文件已移到 ${path.join(ownWorktree.repo, checked.featureDir)}${ownWorktree.removedSource ? "" : "（这里原有的已提交版本保留不动）"}，之后读写需求文件请用这个路径。` +
         (ownWorktree.carried.length ? `\n访谈中改过的 ${ownWorktree.carried.join("、")} 也一起带过去提交了；这里的未提交改动保留不动，确认无误后可以撤销。` : "") +
         ownWorktree.warnings.map((w) => `\n注意：${w}`).join("")

@@ -1,7 +1,7 @@
 // Continuing pipelines whose background process died (1.13), without asking a model: a plain
 // check of this machine's requirements that runs `req resume` for each one whose state says
-// "running" but whose process is gone. The Paseo plugin runs it every few minutes inside the
-// daemon (`req api watchdog`), and the card factory on each poll. Before 1.13 this was a Paseo
+// "running" but whose process is gone. The requirements plugin runs it every few minutes inside the
+// daemon (`req api watchdog`), and the card factory on each poll. Before 1.13 this was a platform
 // schedule that woke the chat agent every hour to look — a model turn each time, and a recovery
 // that depended on the model understanding the prompt.
 import fs from "node:fs";

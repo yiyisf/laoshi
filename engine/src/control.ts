@@ -8,6 +8,7 @@ import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
 import { currentLockHolder, isAlive, type PipelineState, readState, type StepRecord, writeState } from "./state.js";
 import { stepTitle } from "./playbooks.js";
 import { describeTotals, totals } from "./usage.js";
+import { wordsFor } from "./runtime-loader.js";
 
 export function duration(fromIso: string, to: Date = new Date()): string {
   const minutes = Math.floor((to.getTime() - new Date(fromIso).getTime()) / 60_000);
@@ -83,10 +84,10 @@ export function describeStatus(state: PipelineState | null, featureDir: string, 
   for (const j of state.joint ?? []) lines.push(`联合开发：${j.name} 在工作区 ${j.repo}（分支 ${j.branch}）`);
   for (const l of describeExternal(state.external)) lines.push(`外部系统 ${l}`);
   const KIND_TEXT = { reminder: "提醒", "auto-resume": "自动继续", watchdog: "定时检查", "verify-start": "开始测试验证", "approval-continue": "未确认时按方案继续" } as const;
-  for (const s of state.schedules ?? []) {
+  for (const s of state.wakeups ?? []) {
     if (s.kind === "watchdog" && !running) continue;
     const when = s.at ? `${new Date(s.at).toLocaleString("zh-CN", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} ` : "";
-    lines.push(`已预约：${when}${KIND_TEXT[s.kind]}（Paseo 定时任务，执行暂停命令可以取消）`);
+    lines.push(`已预约：${when}${KIND_TEXT[s.kind]}（${wordsFor().schedule}，执行暂停命令可以取消）`);
   }
 
   const records = state.history.filter((h) => h.attempt === state.attempt);
@@ -136,20 +137,20 @@ export interface StopInput {
 }
 
 /** Stops a running pipeline and its current step agent. Returns the message for the user. */
-/** Cancels the Paseo schedules a run left (reminder, automatic continuation, watchdog). */
+/** Cancels the platform schedules a run left (reminder, automatic continuation, watchdog). */
 async function cancelSchedules(input: StopInput, state: PipelineState): Promise<number> {
-  const schedules = state.schedules ?? [];
+  const schedules = state.wakeups ?? [];
   if (schedules.length === 0) return 0;
   try {
     const runtime = await input.createRuntime({ config: input.config, log: input.log });
-    for (const s of schedules) await runtime.cancelSchedule(s.id).catch((error: Error) => input.log(`无法取消定时任务 ${s.id}：${error.message}`));
+    for (const s of schedules) await runtime.cancelSchedule(s.ref).catch((error: Error) => input.log(`无法取消定时任务 ${s.ref}：${error.message}`));
     await runtime.close().catch(() => undefined);
   } catch (error) {
-    input.log(`无法连接 Paseo 取消定时任务：${(error as Error).message}`);
+    input.log(`无法连接 ${wordsFor(input.config).name} 取消定时任务：${(error as Error).message}`);
     return 0;
   }
   const latest = readState(input.statePath) ?? state;
-  latest.schedules = [];
+  latest.wakeups = [];
   writeState(input.statePath, latest);
   return schedules.length;
 }
@@ -218,7 +219,7 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
       }
       await runtime.close().catch(() => undefined);
     } catch (error) {
-      input.log(`无法连接 Paseo 停止当前步骤的 agent：${(error as Error).message}`);
+      input.log(`无法连接 ${wordsFor(input.config).name} 停止当前步骤的 agent：${(error as Error).message}`);
     }
   }
 
@@ -232,7 +233,7 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
 }
 
 /**
- * What the running step agents did most recently, read from Paseo. Empty when the
+ * What the running step agents did most recently, read from the platform. Empty when the
  * pipeline is not running or the daemon cannot be reached within `timeoutMs`.
  */
 export async function describeLiveActivity(

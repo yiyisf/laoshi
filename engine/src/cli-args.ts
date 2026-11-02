@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { type DefectHandling, PHASE_MODES, type PhaseMode, type ProfileName, type VerifyEnvironment } from "./config.js";
 import { LAUNCHER } from "./locations.js";
 import type { LaunchArgs } from "./preflight.js";
-import { originFromEnv } from "./runtime-loader.js";
+import { originEnvNames, originFromEnv } from "./runtime-loader.js";
 
 export { LAUNCHER };
 
@@ -12,10 +12,10 @@ export const USAGE = `用法：
   start-pipeline [--feature <功能目录>] --status   查看进度（不写 --feature 时：工作区里只有一个需求运行过就看它）
   start-pipeline --feature <功能目录> --stop       停止（之后可用 --resume 继续）
   start-pipeline --list                           列出这个项目所有工作区中的需求
-  start-pipeline --feature <功能目录> --track     开始谈需求时登记它，Paseo 插件里从"对齐中"就能看到（1.14）
+  start-pipeline --feature <功能目录> --track     开始谈需求时登记它，需求总览里从"对齐中"就能看到（1.14）
   start-pipeline --card-fields                    团队对接了外部系统时，确认需求说明时要一并确认的卡片字段
   start-pipeline --feature <功能目录> --spec-review  确认前请另一个模型独立审阅需求说明草稿（后台进行，结果发回对话）
-  start-pipeline --feature <功能目录> --worktree     为这个需求新建 Paseo worktree 工作区并在那里开发（对话目录不变）
+  start-pipeline --feature <功能目录> --worktree     为这个需求新建 worktree 工作区并在那里开发（对话目录不变）
   start-pipeline --feature <功能目录> --at 22:00     预约在指定时间开始（也可以写"明天 8:30""2026-10-14 08:30""+2h"）
   start-pipeline --feature <功能目录> --phases gated  分阶段：研发完成后停下等待测试验证（continuous | gated | develop-only）
   start-pipeline --feature <功能目录> --phase verify  开始测试验证阶段（研发阶段完成后；可以加 --at 预约）
@@ -25,8 +25,8 @@ export const USAGE = `用法：
 
   --feature       功能目录，相对于仓库目录，例如 docs/features/20261012-sms-login；
                   也可以只写目录名（20261012-sms-login）或其中能唯一确定的一部分（sms-login）
-  --repo          仓库目录。在 Paseo 的聊天中运行时默认为该聊天的工作目录，否则为当前目录
-  --origin-agent  发起对话的 agent ID。在 Paseo 的聊天中运行时默认为该聊天（PASEO_AGENT_ID），
+  --repo          仓库目录。在平台的对话中运行时默认为该对话的工作目录，否则为当前目录
+  --origin-agent  发起对话的 agent ID。在平台的对话中运行时默认为该对话（环境变量 ${originEnvNames().join("、")}），
                   流水线会把进展和结果发回这个对话；在聊天之外运行且不传时，只写日志。
   --profile       档位：quick（快速，小改动）或 standard（标准）。不传时读取 spec 中的"档位"，
                   再不行用配置中的 defaultProfile
@@ -114,7 +114,7 @@ export function parseLaunchArgs(argv: string[]): LaunchArgs {
     throw new Error("--approve 只用于确认等待中的方案并继续开发");
   }
   // In a platform's chat, the chat itself is the origin unless told otherwise, and its working
-  // directory (when the platform says; a dsh chat's shell already runs there) is the repository.
+  // directory (when the platform says; otherwise the chat's shell already runs there) is the repository.
   const chat = originFromEnv(process.env);
   const origin = (values["origin-agent"] ?? chat?.id)?.trim();
   return {

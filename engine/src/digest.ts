@@ -1,7 +1,7 @@
 // Requirement overview for a project, for people who are not in the chat:
 //   req digest [--repo <dir>]                 print it
 //   req digest --notify                       also send it to the configured notifiers (event "digest")
-//   req digest --schedule "0 9 * * 1"         have Paseo run "req digest --notify" on a schedule (fresh agent)
+//   req digest --schedule "0 9 * * 1"         have the platform run "req digest --notify" on a schedule (fresh agent)
 //   req digest --cancel <schedule ID>         stop that schedule
 // The schedule starts a short-lived agent (the builder, or digest.profile) only to run the command.
 
@@ -13,7 +13,7 @@ import { type FeatureSummary, listFeatures } from "./features.js";
 import { handledCategories, type RecurringLesson, recurringLessons } from "./lessons.js";
 import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
 import { dispatchNotifiers } from "./notifiers.js";
-import { loadRuntimeFactory, originFromEnv, resolveProfiles } from "./runtime-loader.js";
+import { loadRuntimeFactory, originFromEnv, resolveProfiles, wordsFor } from "./runtime-loader.js";
 
 const GROUPS: Array<{ title: string; match: (stage: string) => boolean }> = [
   {
@@ -84,7 +84,7 @@ async function main(): Promise<number> {
         prompt: `运行下面的命令，然后直接结束。不要做其他任何事，不要修改文件：\n\n${command}`,
       });
       if (!id) {
-        console.error("这个 Paseo 版本不支持定时任务。");
+        console.error(`这个 ${wordsFor(config).name} 版本不支持定时任务。`);
         return 1;
       }
       console.log(`已创建定时任务 ${id}：按"${values.schedule}"（本机时区）把需求总览发到配置的外部通知。取消：req digest --cancel ${id}`);

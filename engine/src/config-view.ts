@@ -9,6 +9,7 @@ import {
   DEFAULT_CONFIG,
   loadConfig,
   MACHINE_ONLY_KEYS,
+  normalizeLegacyKeys,
   NOT_IN_PROJECT_KEYS,
   PHASE_MODE_LABELS,
   type PipelineConfig,
@@ -114,8 +115,8 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
       specReview: { label: "需求说明审阅", description: "开发前由另一个模型审一遍需求说明。", display: (v) => ({ off: "关", standard: "标准档", always: "所有档位" })[String(v)] ?? String(v) },
       requirementTypes: { label: "按类型的做法", description: "缺陷、重构、评估各走自己的做法。", display: (v) => list((v as string[]).map((t) => ({ defect: "缺陷", refactor: "重构", assessment: "评估" })[t] ?? t)) },
       slices: { label: "按切片实现", description: "方案分几片时逐片实现。", display: (v) => { const s = v as PipelineConfig["slices"]; return `${profilesText(s.profiles)}，最多 ${s.max} 片`; } },
-      browserVerify: { label: "检查网页界面", description: "功能验证时用界面检查命令（不靠看图）检查网页；Paseo 有内置浏览器时也用它操作。", display: (v) => ({ auto: "自动", off: "关" })[String(v)] ?? String(v) },
-      paseoServices: { label: "由 Paseo 启动服务", description: "用 paseo.json 中的服务脚本启动和重启服务。", display: (v) => ({ auto: "自动", off: "关" })[String(v)] ?? String(v) },
+      browserVerify: { label: "检查网页界面", description: "功能验证时用界面检查命令（不靠看图）检查网页；平台有内置浏览器时也用它操作。", display: (v) => ({ auto: "自动", off: "关" })[String(v)] ?? String(v) },
+      platformServices: { label: "由平台启动服务", description: "用平台的服务定义（平台没有时用 .laoshi/services.json）启动和重启服务。", display: (v) => ({ auto: "自动", off: "关" })[String(v)] ?? String(v) },
       serviceReadySeconds: { label: "等服务就绪", description: "启动服务后最多等多久。", display: (v) => `${v} 秒` },
       budget: {
         label: "每个需求的 token 预算",
@@ -202,10 +203,10 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
   {
     id: "machine",
     title: "连接与运行",
-    description: "这台机器怎么连 Paseo，以及步骤 agent 怎么创建。",
+    description: "这台机器怎么连平台，以及步骤 agent 怎么创建。",
     keys: {
-      daemonUrl: { label: "Paseo 地址", description: "本机 Paseo daemon 的地址。" },
-      daemonPasswordEnv: { label: "Paseo 密码的环境变量", description: "daemon 设置了密码时，从这个环境变量读取（这里只显示变量名）。" },
+      daemonUrl: { label: "平台 daemon 地址", description: "本机平台 daemon 的地址（req-kit 的写法；新写法见 platform.<适配器>）。" },
+      daemonPasswordEnv: { label: "daemon 密码的环境变量", description: "daemon 设置了密码时，从这个环境变量读取（这里只显示变量名）。" },
       teamConfig: { label: "团队配置", description: "团队共用的配置文件。", display: (v) => (v ? String(v) : "未使用") },
       requiredVersion: { label: "版本要求", description: "团队或项目要求的 req-kit 版本范围。", display: (v) => (v ? String(v) : "无") },
       attachToOriginChat: { label: "步骤挂在发起的对话下", description: "步骤 agent 作为子 agent 显示在发起的对话中。", display: onOff },
@@ -233,7 +234,7 @@ export function masked(value: unknown, key = ""): unknown {
 function readRaw(file: string): Record<string, unknown> | null {
   try {
     const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-    return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? normalizeLegacyKeys(raw as Record<string, unknown>) : null;
   } catch {
     return null;
   }

@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { wordsFor } from "./runtime-loader.js";
+import { type PlatformWords, renderWords } from "./words.js";
 
 // Prompt sources, from least to most specific:
 //   <kit>/engine/prompts/<file>                    shipped with this version
@@ -15,6 +17,8 @@ export interface PromptLocations {
   promptsDir: string;
   localPromptsDir: string;
   principlesFile: string;
+  /** laoshi M2e: the platform's words for {{platform.*}} in prompts; the configured platform's when absent. */
+  words?: PlatformWords;
 }
 
 export interface PromptSources extends PromptLocations {
@@ -24,7 +28,7 @@ export interface PromptSources extends PromptLocations {
 export function readToolPrompt(sources: PromptSources, file: string): string {
   const local = path.join(sources.localPromptsDir, file);
   const shipped = path.join(sources.promptsDir, file);
-  return fs.readFileSync(fs.existsSync(local) ? local : shipped, "utf8").trim();
+  return renderWords(fs.readFileSync(fs.existsSync(local) ? local : shipped, "utf8").trim(), sources.words ?? wordsFor());
 }
 
 /** The shared principles, as a prompt section, or null when the index is missing. */

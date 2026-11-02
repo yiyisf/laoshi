@@ -684,7 +684,7 @@ test("在对话中用 node 启动器、只传 --feature：对话 ID 和仓库目
   }
   assert.equal(state(env).status, "completed");
   assert.equal(state(env).repo, fs.realpathSync(env.repo));
-  assert.equal(state(env).originAgentId, ORIGIN);
+  assert.equal(state(env).originSessionId, ORIGIN);
   assert.ok(events(env).filter((e) => e.type === "start").every((e) => e.parentAgentId === ORIGIN));
 });
 
@@ -1220,7 +1220,7 @@ const PASEO_PROFILES = [
 ];
 
 test("Paseo profile：角色写 profile 名称，启动时按 daemon 中的 profile 解析，自己写的字段优先", () => {
-  const env = setup({ agents: { builder: { paseoProfile: "实现" }, reviewer: { paseoProfile: "评审", modeId: "full-access" } } });
+  const env = setup({ agents: { builder: { platformProfile: "实现" }, reviewer: { platformProfile: "评审", modeId: "full-access" } } });
   const { code, out } = runMain(env, { paseoProfiles: PASEO_PROFILES });
   assert.equal(code, 0, out);
   const byKey = (key: string) => events(env).find((e) => e.type === "start" && e.key === key)!;
@@ -1232,7 +1232,7 @@ test("Paseo profile：角色写 profile 名称，启动时按 daemon 中的 prof
 });
 
 test("Paseo profile：名称不存在时不启动，告诉对话现有哪些 profile", () => {
-  const env = setup({ agents: { builder: { paseoProfile: "实现者" }, reviewer: { provider: "codex/test-model", modeId: "full-access" } } });
+  const env = setup({ agents: { builder: { platformProfile: "实现者" }, reviewer: { provider: "codex/test-model", modeId: "full-access" } } });
   const { code } = runMain(env, { paseoProfiles: PASEO_PROFILES });
   assert.equal(code, 2);
   assert.ok(!fs.existsSync(path.join(env.repo, FEATURE, ".pipeline", "state.json")), "拒绝启动时不留下状态文件");
@@ -1278,7 +1278,7 @@ test("Paseo 管理的服务：启动失败时把输出写到文件交给步骤�
   assert.match(prompt, new RegExp(`web 没有启动成功（退出码 1），最后的输出见 ${FEATURE}/\\.pipeline/services/web\\.log`));
   assert.match(fs.readFileSync(path.join(env.repo, FEATURE, ".pipeline", "services", "web.log"), "utf8"), /Cannot find module/);
 
-  const off = setup({ paseoServices: "off" });
+  const off = setup({ platformServices: "off" });
   assert.equal(runMain(off, { services: { names: ["web"] } }).code, 0);
   assert.ok(!events(off).some((e) => e.type === "listServices" || e.type === "startServices"));
 
@@ -1385,19 +1385,19 @@ test("方案提案：开启后标准档先由 builder 和 reviewer 各提一份�
 
 test("浏览器验证：步骤 agent 有 Paseo 浏览器工具时，验证类步骤附上浏览器验证的做法", () => {
   const env = setup();
-  assert.equal(runMain(env, { capabilities: { paseoTools: true, browser: true } }).code, 0);
+  assert.equal(runMain(env, { capabilities: { platformTools: true, browser: true } }).code, 0);
   const prompt = (key: string) => events(env).find((e) => e.type === "start" && e.key === key)?.prompt ?? "";
-  assert.match(prompt("verify"), /浏览器：可以用 Paseo 内置浏览器/);
+  assert.match(prompt("verify"), /浏览器：可以用 Paseo 内置的浏览器/);
   assert.match(prompt("verify"), /# 用浏览器验证网页界面/);
   assert.doesNotMatch(prompt("design"), /用浏览器验证/);
 
   const off = setup({ browserVerify: "off" });
-  assert.equal(runMain(off, { capabilities: { paseoTools: true, browser: true } }).code, 0);
+  assert.equal(runMain(off, { capabilities: { platformTools: true, browser: true } }).code, 0);
   assert.doesNotMatch(events(off).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "", /用浏览器验证/);
   assert.doesNotMatch(events(off).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "", /界面检查命令/);
   // 1.13: without Paseo's browser (the web UI, no desktop app), verification still checks pages, in words.
   const none = setup();
-  assert.equal(runMain(none, { capabilities: { paseoTools: true, browser: false } }).code, 0);
+  assert.equal(runMain(none, { capabilities: { platformTools: true, browser: false } }).code, 0);
   const verify = events(none).find((e) => e.type === "start" && e.key === "verify")?.prompt ?? "";
   assert.doesNotMatch(verify, /用浏览器验证/);
   assert.match(verify, /界面检查命令：node ".*req\.mjs" ui-check/);
@@ -1442,7 +1442,7 @@ test("自动新建工作区：在主分支上用 --worktree 启动，需求移�
   }
   const finished = JSON.parse(fs.readFileSync(stateFile, "utf8"));
   assert.equal(finished.status, "completed");
-  assert.deepEqual(finished.worktree, { workspaceId: "fake-wks-1", sourceRepo: source });
+  assert.deepEqual(finished.worktree, { workspaceRef: "fake-wks-1", sourceRepo: source });
   assert.equal(finished.branch, "feature/20261012-sms-login");
   const steps = events(env).filter((e) => e.type === "start") as Array<FakeEvent & { workspaceId: string; cwd: string }>;
   assert.ok(steps.length > 0 && steps.every((e) => e.workspaceId === "fake-wks-1" && e.cwd === worktree && e.parentAgentId === ORIGIN));
@@ -1477,13 +1477,13 @@ test("等待提醒：需要需求方决定时预约 24 小时后在对话里提�
   assert.ok(hours > 23.9 && hours < 24.1, `约 24 小时后：${hours}`);
   assert.match(scheduled.prompt ?? "", /已经超过 24 小时[\s\S]*验证码有效期多久/);
   assert.match(notifications(env).at(-1)?.text ?? "", /24 小时内还没有回答，会在这个对话里提醒一次/);
-  assert.deepEqual(state(env).schedules.map((s: { kind: string }) => s.kind), ["reminder"]);
+  assert.deepEqual(state(env).wakeups.map((s: { kind: string }) => s.kind), ["reminder"]);
   assert.match(spawnSync(process.execPath, [NODE_LAUNCHER, "--repo", env.repo, "--feature", FEATURE, "--status"], { encoding: "utf8" }).stdout, /已预约：.* 提醒/);
 
   fs.appendFileSync(path.join(env.repo, FEATURE, "spec.md"), "\n- **AC-1.2** 有效期 5 分钟\n");
   assert.equal(runMain(env, {}, ["--resume"]).code, 0);
   assert.ok(events(env).some((e) => e.type === "cancelSchedule" && e.id === scheduled.id));
-  assert.deepEqual(state(env).schedules, []);
+  assert.deepEqual(state(env).wakeups, []);
 });
 
 test("自动继续：临时错误中断后预约在对话里自动继续（每次尝试最多 2 次）；其他错误不预约；暂停命令取消预约", () => {
@@ -1501,7 +1501,7 @@ test("自动继续：临时错误中断后预约在对话里自动继续（每�
     env: fakeEnv(env, {}),
   });
   assert.match(stop.stdout, /已取消预约的提醒或自动继续（1 个）/);
-  assert.deepEqual(state(env).schedules, []);
+  assert.deepEqual(state(env).wakeups, []);
 
   assert.equal(runMain(env, flaky, ["--resume"]).code, 1);
   assert.equal(runMain(env, flaky, ["--resume"]).code, 1);
@@ -1586,7 +1586,7 @@ test("定时检查（可选）：开启后运行期间预约对话定时检查�
   assert.equal(watch.cron, "*/30 * * * *");
   assert.match(watch.prompt ?? "", /定时检查[\s\S]*已中断（后台进程意外退出/);
   assert.ok(events(env).some((e) => e.type === "cancelSchedule" && e.id === watch.id));
-  assert.deepEqual(state(env).schedules, []);
+  assert.deepEqual(state(env).wakeups, []);
 });
 
 test("定时检查（1.13）：req-kit 插件最近检查过时，不再预约对话的定时检查（插件会直接继续）", () => {
@@ -1682,7 +1682,7 @@ test("分阶段：研发完成写提测说明后停在闸口，通知对话；--
   // Waiting at the gate is reminded like an unanswered question.
   const reminder = events(env).find((e) => e.type === "scheduleMessage");
   assert.match(reminder?.prompt ?? "", /一直在等待测试验证/);
-  assert.equal(s.schedules[0].kind, "reminder");
+  assert.equal(s.wakeups[0].kind, "reminder");
 
   // Without --resume the launch is refused with a hint.
   const refused = runMain(env, {});
@@ -1851,7 +1851,7 @@ test("--verify-at：研发完成后预约开始测试验证；时间已过则直
   assert.equal(scheduled.length, 1, "预约了测试验证就不再另外提醒");
   assert.match(scheduled[0].prompt ?? "", /预约的测试验证开始时间/);
   assert.match(scheduled[0].prompt ?? "", /--phase verify/);
-  assert.equal(s.schedules[0].kind, "verify-start");
+  assert.equal(s.wakeups[0].kind, "verify-start");
   assert.match(notifications(env).at(-1)?.text ?? "", /已预约在 .* 自动开始测试验证/);
 
   const env2 = setup({ phases: { mode: "gated" } });
@@ -2373,7 +2373,7 @@ test("联合需求：每个仓库一个工作区，同时实现和评审；提�
 
   const child = events(env).find((e) => e.type === "start" && e.key === `implement@${slug}`) as FakeEvent & { workspaceId: string };
   assert.equal(child.cwd, wt.repo);
-  assert.equal(child.workspaceId, wt.workspaceId);
+  assert.equal(child.workspaceId, wt.workspaceRef);
   assert.equal(child.parentAgentId, ORIGIN);
   assert.equal(child.title, "[20261012-sms-login] 5-代码实现（后端）");
   assert.match(child.prompt ?? "", new RegExp(`仓库目录：${wt.repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
@@ -2541,4 +2541,29 @@ test("密钥扫描（1.14）：实现写进的密钥发回给 agent 去掉；去
   const s = (state(stuck).secretScans as Array<{ key: string; passed: boolean }>).find((r) => r.key === "implement")!;
   assert.equal(s.passed, false);
   assert.ok(events(stuck).some((e) => e.type === "notify" && /密钥扫描仍发现 1 处疑似密钥/.test(String(e.text))));
+});
+
+test("状态文件 v2（laoshi M2d）：req-kit 1.x 写的 v1 状态，查看进度和继续的结果与迁移前一致", () => {
+  const env = setup();
+  assert.equal(runMain(env, BLOCKED).code, 3);
+  const scheduled = events(env).find((e) => e.type === "scheduleMessage")!;
+  const status = () => spawnSync(process.execPath, [NODE_LAUNCHER, "--repo", env.repo, "--feature", FEATURE, "--status"], { encoding: "utf8" }).stdout;
+  const before = status();
+  // What req-kit 1.x would have written for the same run.
+  const file = path.join(env.repo, FEATURE, ".pipeline", "state.json");
+  const v2 = JSON.parse(fs.readFileSync(file, "utf8"));
+  const { originSessionId, wakeups, adapter: _adapter, ...rest } = v2;
+  const v1 = { ...rest, version: 1, originAgentId: originSessionId, schedules: wakeups.map(({ ref, ...w }: { ref: string }) => ({ id: ref, ...w })) };
+  fs.writeFileSync(file, JSON.stringify(v1, null, 2));
+
+  assert.equal(status(), before, "迁移前后看到的进度一样");
+  assert.ok(fs.existsSync(`${file}.bak-v1`));
+  assert.equal(state(env).version, 2);
+  assert.equal(state(env).originSessionId, ORIGIN);
+
+  fs.appendFileSync(path.join(env.repo, FEATURE, "spec.md"), "\n- **AC-1.2** 有效期 5 分钟\n");
+  assert.equal(runMain(env, {}, ["--resume"]).code, 0);
+  assert.ok(events(env).some((e) => e.type === "cancelSchedule" && e.id === scheduled.id), "继续时取消了旧版本预约的提醒");
+  assert.equal(state(env).status, "completed");
+  assert.deepEqual(state(env).wakeups, []);
 });

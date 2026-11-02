@@ -7,6 +7,7 @@
 import path from "node:path";
 import { apiIndex } from "./api.js";
 import { indexDir, readIndex } from "./records.js";
+import { wordsFor } from "./runtime-loader.js";
 
 const argv = process.argv.slice(2);
 const prune = argv.includes("--prune");
@@ -24,7 +25,7 @@ if (rebuildAt >= 0 || prune) {
   if (entries.length === 0) {
     console.log("本机还没有记录任何需求。1.9 之前运行过的需求：在项目目录运行 req index --rebuild。");
   } else {
-    console.log(`本机记录的需求（${entries.length} 个；查看进度用 req api list --all 或 Paseo 插件）：`);
+    console.log(`本机记录的需求（${entries.length} 个；查看进度用 req api list --all${wordsFor().requirementView ? ` 或 ${wordsFor().requirementView}` : ""}）：`);
     for (const e of entries) {
       console.log(`- ${e.project}：${path.basename(e.featureDir)}${e.present ? "" : "（目录已不在，req index --prune 可以移除）"}`);
       console.log(`  ${path.join(e.repo, e.featureDir)}`);

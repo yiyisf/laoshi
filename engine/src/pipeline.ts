@@ -43,6 +43,8 @@ import { principlesSection, projectAdditions, type PromptLocations, readToolProm
 import type { AgentRuntime, ManagedService, ServiceTarget, StepAgent, WaitOutcome } from "./runtime.js";
 import { type CheckOutcome, type GateRun, type JointRepo, type PhaseName, type PipelineState, type Recovery, type SecretScanRun, type RunPhases, type StepRecord, type StopKind, writeState } from "./state.js";
 import { type PanelStep, STEPS, type StepDef, type StepId, stepKey, validateResult, VERIFY_PHASE_STEPS } from "./steps.js";
+import { wordsFor } from "./runtime-loader.js";
+import type { PlatformWords } from "./words.js";
 
 export interface PipelineContext {
   repo: string;
@@ -54,7 +56,7 @@ export interface PipelineContext {
   prompts: PromptLocations;
   logPath: string;
   resumeCommand: string;
-  /** Command to see progress; used in prompts that Paseo schedules send to the chat. */
+  /** Command to see progress; used in prompts that platform schedules send to the chat. */
   statusCommand?: string;
   /** Command that starts the verify phase (gated runs). */
   verifyCommand?: string;
@@ -64,15 +66,15 @@ export interface PipelineContext {
   sleep: (ms: number) => Promise<void>;
   /** Runs integration commands; tests replace it. Default: the real command line. */
   integrationRunner?: Runner;
-  /** Paseo-managed services of this run (filled in by the pipeline). */
+  /** Platform-managed services of this run (filled in by the pipeline). */
   services?: { names: string[] | null | undefined; started: Set<string> };
-  /** Paseo tools the step agents get; looked up once (undefined: not yet). */
-  capabilities?: { paseoTools: boolean; browser: boolean } | null;
+  /** Platform tools the step agents get; looked up once (undefined: not yet). */
+  capabilities?: { platformTools: boolean; browser: boolean } | null;
   /** Related repositories found on this machine, looked up once (undefined: not yet). */
   related?: Array<{ name: string; dir: string; role: string | null; ref: string | null }>;
   /** Joint requirement: the related repositories the spec says this requirement also changes. */
   jointNames?: string[];
-  /** Paseo-managed services started in the joint repositories' worktrees, by workspace. */
+  /** Platform-managed services started in the joint repositories' worktrees, by workspace. */
   jointServices?: Map<string, string[]>;
   /** Quality-gate checks of the joint repositories, read once. */
   jointChecksCache?: Map<string, PipelineConfig["checks"]>;
@@ -221,7 +223,7 @@ async function checkBudget(ctx: PipelineContext, stepTitle: string): Promise<voi
 }
 
 export function noUsageMessage(featureDir: string, limit: number): string {
-  return `【需求开发流水线通知】${featureDir} 设了每个需求 ${tokenText(limit)} tokens 的预算，但已完成的步骤里 agent 都没有报告 token 用量，所以预算不会起作用，token 统计和预计也没有数据。流水线照常继续。要让预算生效，请换用会报告用量的 agent（Paseo 里能看到用量的那种）；不需要预算时可以在配置里把 budget.tokens 设为 null。这条消息只是告知，不需要处理。`;
+  return `【需求开发流水线通知】${featureDir} 设了每个需求 ${tokenText(limit)} tokens 的预算，但已完成的步骤里 agent 都没有报告 token 用量，所以预算不会起作用，token 统计和预计也没有数据。流水线照常继续。要让预算生效，请换用会报告用量的 agent（平台上能看到用量的那种）；不需要预算时可以在配置里把 budget.tokens 设为 null。这条消息只是告知，不需要处理。`;
 }
 
 class BusinessDecisionNeeded extends Error {
@@ -244,7 +246,7 @@ function save(ctx: PipelineContext): void {
 }
 
 async function notifyOrigin(ctx: PipelineContext, text: string): Promise<void> {
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   ctx.log(`通知：\n${text}`);
   if (!origin) {
     ctx.log("没有发起对话的 agent ID，通知只写入日志。");
@@ -277,6 +279,11 @@ interface StepExtras {
   target?: StepTarget;
 }
 
+/** laoshi M2e: the platform's words for this run's messages (engine/src/words.ts). */
+function words(ctx: PipelineContext): PlatformWords {
+  return ctx.prompts.words ?? wordsFor(ctx.config);
+}
+
 /** The joint repositories this run works in (empty: an ordinary requirement). */
 function jointTargets(ctx: PipelineContext): StepTarget[] {
   return activeJoint(ctx.state, ctx.jointNames ?? []).map((j) => ({
@@ -284,7 +291,7 @@ function jointTargets(ctx: PipelineContext): StepTarget[] {
     slug: j.slug,
     repo: j.repo,
     featureDir: ctx.featureDir,
-    workspaceId: j.workspaceId,
+    workspaceId: j.workspaceRef,
     branch: j.branch,
     joint: j,
   }));
@@ -468,7 +475,7 @@ async function notifyExternal(ctx: PipelineContext, type: NotifierEventType, tex
       repo: ctx.repo,
       branch: ctx.state.branch,
       profile: ctx.state.profile,
-      originAgentId: ctx.state.originAgentId,
+      originAgentId: ctx.state.originSessionId,
       text,
       details,
       people: (() => {
@@ -788,7 +795,7 @@ async function waitForTurn(ctx: PipelineContext, agent: StepAgent, def: StepDef,
           for (const p of fresh) notifiedPermissions.add(p.id);
           await notifyOrigin(
             ctx,
-            permissionMessage({ stepTitle: def.title, agentTitle, requests: fresh.map((p) => p.title) }),
+            permissionMessage({ stepTitle: def.title, agentTitle, requests: fresh.map((p) => p.title), words: words(ctx) }),
           );
           await notifyExternal(ctx, "permission", `「${def.title}」步骤在等待权限批准，批准前会一直停在这里。`, {
             stepTitle: def.title,
@@ -961,10 +968,10 @@ async function runStepOnce(
         "pipeline-step": key,
         ...(target ? { "joint-repo": target.slug } : {}),
       },
-      parentAgentId: ctx.config.attachToOriginChat ? ctx.state.originAgentId : null,
-      // Always passed: the run's config has Paseo profile names resolved; the runtime's may not.
+      parentAgentId: ctx.config.attachToOriginChat ? ctx.state.originSessionId : null,
+      // Always passed: the run's config has platform agent profile names resolved; the runtime's may not.
       profile: stepProfile,
-      workspaceId: target ? target.workspaceId : (ctx.state.worktree?.workspaceId ?? null),
+      workspaceId: target ? target.workspaceId : (ctx.state.worktree?.workspaceRef ?? null),
     });
     record.agentId = agent.id;
     ctx.state.history.push(record);
@@ -1128,7 +1135,7 @@ function mergeExtras(
 /** How a step's agent is named in records and statistics (1.13). */
 export function agentName(profile: AgentProfile | null | undefined): string | undefined {
   if (!profile) return undefined;
-  return profile.paseoProfile?.trim() || profile.provider?.trim() || undefined;
+  return profile.platformProfile?.trim() || profile.provider?.trim() || undefined;
 }
 
 /** Steps that check the result the way a user would. */
@@ -1136,7 +1143,7 @@ const BROWSER_STEPS: readonly StepId[] = ["verify", "defect_fix", "reverify"];
 
 /**
  * How verification looks at web pages: `req ui-check` (1.13; reports in words, needs no vision
- * and no Paseo desktop) always, plus Paseo's built-in browser when the step agents have it.
+ * and no platform desktop) always, plus the platform's built-in browser when the step agents have it.
  */
 async function browserExtras(ctx: PipelineContext, id: StepId): Promise<{ contextLines: string[]; sections: string[] } | null> {
   if (!BROWSER_STEPS.includes(id) || ctx.config.browserVerify === "off") return null;
@@ -1147,7 +1154,7 @@ async function browserExtras(ctx: PipelineContext, id: StepId): Promise<{ contex
   };
   if (ctx.capabilities === undefined) ctx.capabilities = await ctx.runtime.capabilities().catch(() => null);
   if (ctx.capabilities?.browser) {
-    out.contextLines.push("浏览器：可以用 Paseo 内置浏览器（browser_* 工具）验证网页界面");
+    out.contextLines.push(`浏览器：可以用 ${words(ctx).browser ?? "浏览器工具"} 验证网页界面`);
     out.sections.push(readToolPrompt(prompts, "browser-verify.md"));
   }
   return out;
@@ -1161,33 +1168,33 @@ function serviceState(ctx: PipelineContext): NonNullable<PipelineContext["servic
   return ctx.services;
 }
 
-/** The workspace whose paseo.json services the steps use: the requirement's own worktree, or the chat's. */
+/** The workspace whose platform services the steps use: the requirement's own worktree, or the chat's. */
 function serviceTarget(ctx: PipelineContext): ServiceTarget | null {
-  if (ctx.state.worktree) return { workspaceId: ctx.state.worktree.workspaceId };
-  const origin = ctx.state.originAgentId;
+  if (ctx.state.worktree) return { workspaceId: ctx.state.worktree.workspaceRef };
+  const origin = ctx.state.originSessionId;
   return origin && ctx.config.attachToOriginChat ? { agentId: origin } : null;
 }
 
-/** Service scripts from paseo.json that Paseo can run for this pipeline; null when not used. */
+/** Service scripts that the platform can run for this pipeline; null when not used. */
 async function serviceNames(ctx: PipelineContext): Promise<string[] | null> {
   const state = serviceState(ctx);
   if (state.names !== undefined) return state.names;
   const target = serviceTarget(ctx);
-  if (ctx.config.paseoServices === "off" || !target) {
+  if (ctx.config.platformServices === "off" || !target) {
     state.names = null;
     return null;
   }
   state.names = await ctx.runtime.listServices(target).catch(() => null);
-  if (state.names) ctx.log(`项目在 paseo.json 中定义了服务（${state.names.join("、")}），服务启动和验证相关的步骤由流水线通过 Paseo 启动它们`);
+  if (state.names) ctx.log(`项目在 ${words(ctx).servicesFile} 中定义了服务（${state.names.join("、")}），服务启动和验证相关的步骤由流水线通过 ${words(ctx).servicesBy} 启动它们`);
   return state.names;
 }
 
-function describeService(s: ManagedService, logFile: string | null): string {
-  const where = `${s.url ?? "（Paseo 没有给出地址）"}${s.port ? `（端口 ${s.port}）` : ""}`;
+function describeService(s: ManagedService, logFile: string | null, w: PlatformWords): string {
+  const where = `${s.url ?? `（${w.servicesBy} 没有给出地址）`}${s.port ? `（端口 ${s.port}）` : ""}`;
   const output = logFile ? `，最后的输出见 ${logFile}` : "";
-  if (!s.running) return `Paseo 管理的服务：${s.name} 没有启动成功${s.exitCode !== null ? `（退出码 ${s.exitCode}）` : ""}${output}`;
-  if (s.health === "unhealthy") return `Paseo 管理的服务：${s.name} → ${where}，已启动但健康检查没有通过${output}`;
-  return `Paseo 管理的服务：${s.name} → ${where}，已启动${s.health === "healthy" ? "，健康检查通过" : ""}`;
+  if (!s.running) return `${w.managedServices}：${s.name} 没有启动成功${s.exitCode !== null ? `（退出码 ${s.exitCode}）` : ""}${output}`;
+  if (s.health === "unhealthy") return `${w.managedServices}：${s.name} → ${where}，已启动但健康检查没有通过${output}`;
+  return `${w.managedServices}：${s.name} → ${where}，已启动${s.health === "healthy" ? "，健康检查通过" : ""}`;
 }
 
 /** Starts the services (fresh, with the current code) before a step that needs them. */
@@ -1196,14 +1203,14 @@ async function serviceExtras(ctx: PipelineContext, id: StepId): Promise<{ contex
   const names = await serviceNames(ctx);
   const target = serviceTarget(ctx);
   if (!names || !target) return null;
-  const sections = [readToolPrompt({ ...ctx.prompts, repo: ctx.repo }, "paseo-services.md")];
+  const sections = [readToolPrompt({ ...ctx.prompts, repo: ctx.repo }, "managed-services.md")];
   let services: ManagedService[];
   try {
     services = await ctx.runtime.startServices(target, names, ctx.config.serviceReadySeconds * 1000);
   } catch (error) {
-    ctx.log(`通过 Paseo 启动服务失败：${(error as Error).message}`);
+    ctx.log(`通过 ${words(ctx).servicesBy} 启动服务失败：${(error as Error).message}`);
     return {
-      contextLines: [`Paseo 管理的服务：这次没能通过 Paseo 启动（${(error as Error).message}），请按验证方法或 service-start.md 自己启动，用完关掉`],
+      contextLines: [`${words(ctx).managedServices}：这次没能通过 ${words(ctx).servicesBy} 启动（${(error as Error).message}），请按验证方法或 service-start.md 自己启动，用完关掉`],
       sections: [],
     };
   }
@@ -1216,15 +1223,15 @@ async function serviceExtras(ctx: PipelineContext, id: StepId): Promise<{ contex
       logFile = `${ctx.featureDir}/.pipeline/services/${s.name}.log`;
       fs.writeFileSync(path.join(ctx.repo, logFile), `${s.output}\n`);
     }
-    return describeService(s, logFile);
+    return describeService(s, logFile, words(ctx));
   });
   ctx.log(lines.join("；"));
   return { contextLines: lines, sections };
 }
 
-/** Joint requirement: the other repositories' paseo.json services, started with their current code too. */
+/** Joint requirement: the other repositories' platform services, started with their current code too. */
 async function jointServiceExtras(ctx: PipelineContext, id: StepId): Promise<{ contextLines: string[]; sections: string[] } | null> {
-  if (!SERVICE_STEPS.includes(id) || deployed(ctx) || ctx.config.paseoServices === "off") return null;
+  if (!SERVICE_STEPS.includes(id) || deployed(ctx) || ctx.config.platformServices === "off") return null;
   const joint = jointTargets(ctx);
   if (joint.length === 0) return null;
   ctx.jointServices ??= new Map();
@@ -1233,15 +1240,15 @@ async function jointServiceExtras(ctx: PipelineContext, id: StepId): Promise<{ c
     if (!t.workspaceId) continue;
     const names = await ctx.runtime.listServices({ workspaceId: t.workspaceId }).catch(() => null);
     if (!names || names.length === 0) {
-      lines.push(`联合仓库「${t.name}」：paseo.json 中没有定义服务，需要它的服务时按它的验证方法自己启动（在 ${t.repo}），用完关掉`);
+      lines.push(`联合仓库「${t.name}」：${words(ctx).servicesFile} 中没有定义服务，需要它的服务时按它的验证方法自己启动（在 ${t.repo}），用完关掉`);
       continue;
     }
     try {
       const services = await ctx.runtime.startServices({ workspaceId: t.workspaceId }, names, ctx.config.serviceReadySeconds * 1000);
       ctx.jointServices.set(t.workspaceId, names);
-      for (const service of services) lines.push(`联合仓库「${t.name}」的${describeService(service, null)}`);
+      for (const service of services) lines.push(`联合仓库「${t.name}」的${describeService(service, null, words(ctx))}`);
     } catch (error) {
-      lines.push(`联合仓库「${t.name}」的服务这次没能通过 Paseo 启动（${(error as Error).message}），需要时按它的验证方法自己启动，用完关掉`);
+      lines.push(`联合仓库「${t.name}」的服务这次没能通过 ${words(ctx).servicesBy} 启动（${(error as Error).message}），需要时按它的验证方法自己启动，用完关掉`);
     }
   }
   if (lines.length > 0) ctx.log(lines.join("；"));
@@ -1251,7 +1258,7 @@ async function jointServiceExtras(ctx: PipelineContext, id: StepId): Promise<{ c
 async function stopManagedServices(ctx: PipelineContext): Promise<void> {
   for (const [workspaceId, names] of ctx.jointServices ?? []) {
     await ctx.runtime.stopServices({ workspaceId }, names).catch((error: Error) => ctx.log(`停止联合仓库的服务失败：${error.message}`));
-    ctx.log(`已停止联合仓库中由 Paseo 管理的服务：${names.join("、")}`);
+    ctx.log(`已停止联合仓库中由 ${words(ctx).servicesBy} 管理的服务：${names.join("、")}`);
   }
   ctx.jointServices?.clear();
   const started = [...(ctx.services?.started ?? [])];
@@ -1259,13 +1266,13 @@ async function stopManagedServices(ctx: PipelineContext): Promise<void> {
   if (started.length === 0 || !target) return;
   await ctx.runtime.stopServices(target, started).catch((error: Error) => ctx.log(`停止服务失败：${error.message}`));
   ctx.services?.started.clear();
-  ctx.log(`已停止 Paseo 管理的服务：${started.join("、")}`);
+  ctx.log(`已停止 ${words(ctx).managedServices}：${started.join("、")}`);
 }
 
-/** A Paseo schedule that reminds the chat about unanswered questions; returns the hours, or null. */
+/** A platform schedule that reminds the chat about unanswered questions; returns the hours, or null. */
 async function scheduleReminder(ctx: PipelineContext, what: string[] | "phase" | "approval"): Promise<number | null> {
   const hours = ctx.config.waitingReminderHours;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (hours <= 0 || !origin) return null;
   const at = new Date(Date.now() + hours * 3600_000);
   const shown = shownFeatureDir(ctx);
@@ -1282,9 +1289,9 @@ async function scheduleReminder(ctx: PipelineContext, what: string[] | "phase" |
             : waitingReminderMessage({ featureDir: shown, hours, questions: what, resumeCommand: ctx.resumeCommand }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "reminder", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "reminder", at: at.toISOString() }];
     save(ctx);
-    ctx.log(`已预约 ${hours} 小时后的提醒（Paseo 定时任务 ${id}）`);
+    ctx.log(`已预约 ${hours} 小时后的提醒（${words(ctx).schedule} ${id}）`);
     return hours;
   } catch (error) {
     ctx.log(`预约提醒失败：${(error as Error).message}`);
@@ -1296,9 +1303,9 @@ function shortTime(at: Date): string {
   return at.toLocaleString("zh-CN", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-/** --verify-at: a Paseo schedule that has the chat start the verify phase; returns the time as text, or null. */
+/** --verify-at: a platform schedule that has the chat start the verify phase; returns the time as text, or null. */
 async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null> {
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (!ctx.state.verifyAt || !origin) return null;
   const at = new Date(ctx.state.verifyAt);
   try {
@@ -1314,9 +1321,9 @@ async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null>
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "verify-start", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "verify-start", at: at.toISOString() }];
     save(ctx);
-    ctx.log(`已预约在 ${shortTime(at)} 开始测试验证（Paseo 定时任务 ${id}）`);
+    ctx.log(`已预约在 ${shortTime(at)} 开始测试验证（${words(ctx).schedule} ${id}）`);
     return shortTime(at);
   } catch (error) {
     ctx.log(`预约测试验证失败：${(error as Error).message}`);
@@ -1324,10 +1331,10 @@ async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null>
   }
 }
 
-/** designApproval.autoContinueHours: a Paseo schedule that has the chat approve the design if nobody did; returns the time, or null. */
+/** designApproval.autoContinueHours: a platform schedule that has the chat approve the design if nobody did; returns the time, or null. */
 async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | null> {
   const hours = ctx.config.designApproval.autoContinueHours;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (hours <= 0 || !origin) return null;
   const at = new Date(Date.now() + hours * 3600_000);
   try {
@@ -1343,9 +1350,9 @@ async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | 
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "approval-continue", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "approval-continue", at: at.toISOString() }];
     save(ctx);
-    ctx.log(`已预约 ${hours} 小时后仍未确认时按方案继续（Paseo 定时任务 ${id}）`);
+    ctx.log(`已预约 ${hours} 小时后仍未确认时按方案继续（${words(ctx).schedule} ${id}）`);
     return shortTime(at);
   } catch (error) {
     ctx.log(`预约按方案继续失败：${(error as Error).message}`);
@@ -1353,12 +1360,12 @@ async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | 
   }
 }
 
-/** A Paseo schedule that has the chat continue the run later; returns the time as text, or null. */
+/** A platform schedule that has the chat continue the run later; returns the time as text, or null. */
 /** Rate limits and used-up subscriptions, as opposed to network trouble. */
 const QUOTA_ERROR = /rate.?limit|too many requests|\b429\b|quota|usage limit|额度|限流/i;
 
 /**
- * 1.12: when a step stopped on rate limits and Paseo says when a used-up subscription window
+ * 1.12: when a step stopped on rate limits and the platform says when a used-up subscription window
  * resets, the time to continue (5 minutes after the reset, within 24 hours); null otherwise.
  */
 async function quotaResetTime(ctx: PipelineContext, reason: string): Promise<Date | null> {
@@ -1376,7 +1383,7 @@ async function quotaResetTime(ctx: PipelineContext, reason: string): Promise<Dat
 
 async function scheduleAutoResume(ctx: PipelineContext, reason: string): Promise<string | null> {
   const minutes = ctx.config.autoResumeMinutes;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (minutes <= 0 || !origin) return null;
   const used = ctx.state.autoResumes?.attempt === ctx.state.attempt ? ctx.state.autoResumes.count : 0;
   if (used >= ctx.config.autoResumeMax) {
@@ -1398,12 +1405,12 @@ async function scheduleAutoResume(ctx: PipelineContext, reason: string): Promise
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "auto-resume", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "auto-resume", at: at.toISOString() }];
     ctx.state.autoResumes = { attempt: ctx.state.attempt, count: used + 1 };
     save(ctx);
     const when = at.toLocaleString("zh-CN", { hour12: false });
-    if (reset) recover(ctx, "pipeline", "quota_wait", `额度用完，Paseo 显示会恢复；已预约在 ${when} 自动继续（Paseo 定时任务 ${id}）`);
-    else recover(ctx, "pipeline", "auto_resume", `已预约 ${minutes} 分钟后自动继续（Paseo 定时任务 ${id}）`);
+    if (reset) recover(ctx, "pipeline", "quota_wait", `额度用完，${words(ctx).name} 显示会恢复；已预约在 ${when} 自动继续（${words(ctx).schedule} ${id}）`);
+    else recover(ctx, "pipeline", "auto_resume", `已预约 ${minutes} 分钟后自动继续（${words(ctx).schedule} ${id}）`);
     return at.toLocaleString("zh-CN", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch (error) {
     ctx.log(`预约自动继续失败：${(error as Error).message}`);
@@ -2378,6 +2385,7 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
       await notifyOrigin(
         ctx,
         phaseDoneMessage({
+          words: words(ctx),
           featureDir: shownFeatureDir(ctx),
           handoffPath: `${shownFeatureDir(ctx)}/handoff.md`,
           verifyCommand: verifyCommandOf(ctx),
@@ -2409,6 +2417,7 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
       await notifyOrigin(
         ctx,
         approvalMessage({
+          words: words(ctx),
           featureDir: shownFeatureDir(ctx),
           previewPath: `${shownFeatureDir(ctx)}/preview.md`,
           prototypePath: fs.existsSync(prototype) ? `${shownFeatureDir(ctx)}/prototype/` : null,
@@ -2486,6 +2495,7 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
     await notifyOrigin(
       ctx,
       failedMessage({
+        words: words(ctx),
         stepTitle,
         reason: (error as Error).message,
         logPath: ctx.logPath,

@@ -5,7 +5,7 @@ import { locate } from "./api.js";
 import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
 import { defaultConfigPath } from "./locations.js";
 import { pluginReplyMessage } from "./messages.js";
-import { loadRuntimeFactory } from "./runtime-loader.js";
+import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import { readIndex } from "./records.js";
 import { readState, statePath } from "./state.js";
 
@@ -24,7 +24,7 @@ async function main(argvIn: string[]): Promise<number> {
   const { repo, featureDir } = locate(process.cwd(), feature);
   const state = readState(statePath(repo, featureDir));
   if (notice) {
-    const chat = state?.originAgentId ?? readIndex().find((e) => e.featureDir === featureDir && [e.repo, e.sourceRepo].includes(repo))?.chatAgentId ?? null;
+    const chat = state?.originSessionId ?? readIndex().find((e) => e.featureDir === featureDir && [e.repo, e.sourceRepo].includes(repo))?.chatAgentId ?? null;
     if (!chat) {
       console.error("这个需求没有登记过对话，没有可以转达的对话。");
       return 1;
@@ -35,13 +35,13 @@ async function main(argvIn: string[]): Promise<number> {
     console.error(`${featureDir} 现在没有在等待回答或确认，不用回复。`);
     return 1;
   }
-  if (!state.originAgentId) {
-    console.error("这个需求不是从 Paseo 对话中开始的，没有可以转达的对话。请在终端或卡片中处理。");
+  if (!state.originSessionId) {
+    console.error(`这个需求不是从${wordsFor().chat}中开始的，没有可以转达的对话。请在终端或卡片中处理。`);
     return 1;
   }
   return deliver(
     repo,
-    state.originAgentId,
+    state.originSessionId,
     acceptance
       ? text.slice(0, 8000)
       : pluginReplyMessage({

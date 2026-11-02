@@ -6,7 +6,7 @@
 
 下一步由另一个 agent 在新的会话中执行，你启动的进程不会保留到那时。所以这一步要交付的是两样东西：**"能否启动"的结论**，和**一份照着做就能启动的方法**。结束前请把你启动的进程关掉。
 
-**服务由 Paseo 管理时**（`<pipeline-context>` 中有"Paseo 管理的服务"）：服务已经由流水线启动，不要自己再启动，也不需要关闭。跳过下面的第 2、3、6 步，从第 4 步（就绪判断）开始检查给出的地址；`service-start.md` 的"启动命令"写 `paseo.json` 中的脚本名和命令，"停止方法"写"由流水线通过 Paseo 管理"。
+**服务由 {{platform.servicesBy}} 管理时**（`<pipeline-context>` 中有"{{platform.managedServices}}"）：服务已经由流水线启动，不要自己再启动，也不需要关闭。跳过下面的第 2、3、6 步，从第 4 步（就绪判断）开始检查给出的地址；`service-start.md` 的"启动命令"写 `{{platform.servicesFile}}` 中的脚本名和命令，"停止方法"写"由流水线通过 {{platform.servicesBy}} 管理"。
 
 ## 做法
 

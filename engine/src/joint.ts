@@ -1,7 +1,7 @@
 // Joint requirements (ADR 0025): one requirement that also changes other repositories
 // (e.g. the backend of a frontend project). The run in the chat's repository coordinates:
 // it designs the whole change and the interface contract, then each other repository gets
-// a Paseo worktree on the requirement's branch where its own implementation, code review
+// a platform worktree on the requirement's branch where its own implementation, code review
 // and fixes run (in parallel with this repository's); handoff, verification and the report
 // stay here. Everything is committed locally only.
 
@@ -101,7 +101,7 @@ export async function ensureJointRepos(input: {
       baseRef,
       branchName: branch,
       title: `${input.title}（${name}）`,
-      callerAgentId: state.originAgentId,
+      callerAgentId: state.originSessionId,
     });
     const repo = fs.realpathSync(created.directory);
     ensurePipelineDir(repo, input.featureDir);
@@ -110,7 +110,7 @@ export async function ensureJointRepos(input: {
       slug: slugFor(sourceRepo, state.joint.map((j) => j.slug)),
       sourceRepo,
       repo,
-      workspaceId: created.workspaceId,
+      workspaceRef: created.workspaceId,
       branch,
       specHash: null,
     };

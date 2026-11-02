@@ -5,6 +5,7 @@
 import type { AgentProfile, PipelineConfig } from "./config.js";
 import type { Catalog } from "./configure.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
+import type { PlatformWords } from "./words.js";
 
 /** Optional and on-demand AgentRuntime capabilities (contracts/agent-runtime.md). */
 export const CAPABILITIES = {
@@ -36,9 +37,9 @@ export interface DoctorTools {
 }
 
 export interface PlatformAdapter {
-  /** Name in the config's platform.adapter, e.g. "paseo". */
+  /** Name in the config's platform.adapter, e.g. the adapter directory's name. */
   id: string;
-  /** For people, e.g. "Paseo". */
+  /** For people, e.g. the platform's product name. */
   displayName: string;
   createRuntime: RuntimeFactory;
   /** Sources of the optional capabilities; an undeclared one is "none" and degrades as the contract says. */
@@ -52,11 +53,13 @@ export interface PlatformAdapter {
   resolveProfiles?(config: PipelineConfig, runtime: AgentRuntime): Promise<PipelineConfig>;
   /** One line for an agent's settings, e.g. "claude/opus（模式 bypassPermissions）". */
   describeProfile?(profile: AgentProfile): string;
+  /** laoshi M2e: the platform's words in messages and prompts (engine/src/words.ts); the rest are neutral. */
+  words?: Partial<PlatformWords>;
   /** Heading of the platform section in `doctor`. */
   doctorTitle: string;
   /** The platform section of `doctor` (connection, versions, profiles), when not --offline. */
   doctorPlatform?(input: { config: PipelineConfig | null; configPath: string; tools: DoctorTools }): Promise<void>;
-  /** The platform's files in the project, for `doctor` (Paseo: paseo.json). */
+  /** The platform's files in the project, for `doctor` . */
   doctorProject?(input: { repo: string; isRepo: boolean; tools: DoctorTools }): void;
   /**
    * What agents the configuration wizard can offer. `settings` is the raw machine config;

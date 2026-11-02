@@ -1,10 +1,10 @@
 // The narrow surface the pipeline needs from the agent platform (contracts/agent-runtime.md).
-// Each platform adapter implements it under adapters/<id>/ (Paseo: adapters/paseo/paseo-runtime.ts);
+// Each platform adapter implements it under adapters/<id>/ ;
 // tests swap in a fake through REQ_PIPELINE_FAKE_RUNTIME.
 
 export type AgentRole = "builder" | "reviewer";
 
-/** An agent profile the platform offers: a named set of launch settings (Paseo: Agent profiles). */
+/** An agent profile the platform offers: a named set of launch settings . */
 export interface PlatformProfile {
   id: string;
   name: string;
@@ -48,13 +48,13 @@ export interface StartAgentInput {
   labels: Record<string, string>;
   /** Attach the step agent under this chat agent (shows in its Subagents track). */
   parentAgentId: string | null;
-  /** Agent settings to launch with (the role's, or a review panel member's), Paseo profiles resolved. */
+  /** Agent settings to launch with (the role's, or a review panel member's), platform agent profiles resolved. */
   profile?: import("./config.js").AgentProfile;
-  /** Place the agent in this Paseo workspace (a worktree created for the requirement); still a subagent of parentAgentId. */
+  /** Place the agent in this platform workspace (a worktree created for the requirement); still a subagent of parentAgentId. */
   workspaceId?: string | null;
 }
 
-/** Where Paseo-managed services live: the chat's workspace, or the requirement's own worktree. */
+/** Where platform-managed services live: the chat's workspace, or the requirement's own worktree. */
 export type ServiceTarget = { agentId: string } | { workspaceId: string };
 
 export interface WorktreeRequest {
@@ -64,14 +64,14 @@ export interface WorktreeRequest {
   baseRef: string;
   branchName: string;
   title: string;
-  /** The chat; Paseo shows the workspace as created from it. */
+  /** The chat; the platform shows the workspace as created from it. */
   callerAgentId: string | null;
 }
 
-/** A paseo.json service the pipeline runs through Paseo (supervised, own port per worktree). */
+/** A service the pipeline runs through the platform (supervised, own port per worktree). */
 export interface ManagedService {
   name: string;
-  /** Address to use: Paseo's proxy URL when there is one, otherwise http://127.0.0.1:<port>. */
+  /** Address to use: the platform's proxy URL when there is one, otherwise http://127.0.0.1:<port>. */
   url: string | null;
   port: number | null;
   running: boolean;
@@ -81,7 +81,7 @@ export interface ManagedService {
   output: string | null;
 }
 
-/** One subscription window of a provider (Paseo's provider usage), e.g. "5 小时" at 92%. */
+/** One subscription window of a provider (the platform's provider usage), e.g. "5 小时" at 92%. */
 export interface ProviderQuota {
   provider: string;
   displayName: string;
@@ -119,7 +119,7 @@ export interface ScheduledAgent {
 export interface AgentRuntime {
   /**
    * Checks that the chat which launched the pipeline exists and works in `cwd`.
-   * Step agents are created under that chat, and Paseo gives a subagent its parent's
+   * Step agents are created under that chat, and the platform gives a subagent its parent's
    * working directory, so the two must match. Throws with a user-facing reason otherwise.
    */
   verifyOrigin(agentId: string, cwd: string): Promise<void>;
@@ -138,23 +138,23 @@ export interface AgentRuntime {
   interruptAgent(agentId: string, text: string): Promise<void>;
   /** The working directory of an agent's session, for laoshi's builtin services of the chat's checkout; null when unknown. */
   agentDirectory?(agentId: string): Promise<string | null>;
-  /** The platform's agent profiles (Paseo: settings → Agent profiles); null when they cannot be read. */
+  /** The platform's agent profiles ; null when they cannot be read. */
   listProfiles(): Promise<PlatformProfile[] | null>;
   /**
-   * Names of the service scripts (paseo.json) of the workspace the chat works in. Null when
-   * Paseo cannot run them for us: no chat, an older daemon, or no services configured.
+   * Names of the service scripts (the platform's service definitions) of the workspace the chat works in. Null when
+   * the platform cannot run them for us: no chat, an older daemon, or no services configured.
    */
   listServices(target: ServiceTarget): Promise<string[] | null>;
   /** (Re)starts the services so they run the current code, and waits until they are ready or failed. */
   startServices(target: ServiceTarget, names: string[], readyTimeoutMs: number): Promise<ManagedService[]>;
   stopServices(target: ServiceTarget, names: string[]): Promise<void>;
-  /** Creates a Paseo worktree workspace (paseo.json setup runs in the background). */
+  /** Creates a platform worktree workspace (its setup runs in the background). */
   createWorktree(request: WorktreeRequest): Promise<{ workspaceId: string; directory: string }>;
-  /** 1.14: the Paseo workspace of an existing directory (opened as one if it is not yet). */
+  /** 1.14: the platform workspace of an existing directory (opened as one if it is not yet). */
   openWorkspace?(directory: string): Promise<{ workspaceId: string }>;
-  /** Waits for the workspace's paseo.json setup; "none" when there is nothing to wait for or it cannot be read. */
+  /** Waits for the workspace's setup; "none" when there is nothing to wait for or it cannot be read. */
   waitForWorkspaceSetup(workspaceId: string, timeoutMs: number): Promise<{ status: "completed" | "failed" | "none" | "timeout"; error: string | null }>;
-  /** Subscription windows of the given providers; null when Paseo has no usage data. */
+  /** Subscription windows of the given providers; null when the platform has no usage data. */
   providerQuota(providers: string[]): Promise<ProviderQuota[] | null>;
   /** The agent's latest actions, oldest first; null when they cannot be read. */
   recentActivity(agentId: string, limit: number): Promise<ActivityItem[] | null>;
@@ -162,17 +162,17 @@ export interface AgentRuntime {
   runningTool(agentId: string): Promise<import("./scan-guard.js").RunningTool | null>;
   /** 1.14: the agent's latest tool calls, running or done (for the danger guard); null when they cannot be read. */
   toolCalls?(agentId: string): Promise<import("./danger-guard.js").ToolCall[] | null>;
-  /** Which Paseo tools step agents get (Settings → Agents); null when unknown. */
-  capabilities(): Promise<{ paseoTools: boolean; browser: boolean } | null>;
+  /** Which platform tools step agents get (Settings → Agents); null when unknown. */
+  capabilities(): Promise<{ platformTools: boolean; browser: boolean } | null>;
   /** 1.12: whether each agent provider is installed and logged in ("ready"); null when the daemon does not say. */
   providerStatus(): Promise<Array<{ provider: string; status: string }> | null>;
   /**
-   * Paseo schedule that sends `prompt` into an existing agent's conversation (the chat):
+   * A platform schedule that sends `prompt` into an existing agent's conversation (the chat):
    * once at `at`, or on `cron` (5 fields, local time zone). Returns the schedule ID, or
-   * null when this Paseo cannot schedule.
+   * null when this platform cannot schedule.
    */
   scheduleMessage(input: ScheduledMessage): Promise<string | null>;
-  /** Paseo schedule that starts a fresh agent on `cron` (e.g. to run a command weekly). */
+  /** A platform schedule that starts a fresh agent on `cron` (e.g. to run a command weekly). */
   scheduleNewAgent(input: ScheduledAgent): Promise<string | null>;
   cancelSchedule(id: string): Promise<void>;
   close(): Promise<void>;

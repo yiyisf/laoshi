@@ -88,7 +88,7 @@ laoshi/
 
 - `platform.adapter`：选择适配器（如 `"paseo"`）。
 - `platform.<适配器名>`：适配器私有配置。req-kit 的 `daemonUrl`、`daemonPasswordEnv` 迁移到 `platform.paseo` 下，旧字段继续读取并提示迁移。
-- `AgentProfile` 拆成通用字段（模型、模式、思考档位）和适配器私有字段（Paseo 的 `paseoProfile`、`featureValues`）。
+- `AgentProfile` 拆成通用字段（模型、模式、思考档位）和适配器私有字段（平台的 agent profile `platformProfile`，req-kit 1.x 叫 `paseoProfile`；`featureValues`）。
 - 代码库级可声明 laoshi 最低版本，由 `doctor` 检查。
 - req-kit 1.x 的团队层配置继续读取，`laoshi migrate` 提示合并到安装级。
 - 凭据只来自使用者自己的环境变量，不写入安装根。

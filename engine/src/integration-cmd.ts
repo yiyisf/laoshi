@@ -51,7 +51,7 @@ function quoteArg(a: string): string {
 function testIntegration(config: IntegrationConfig, project: PipelineConfig, target: { repo: string; featureDir: string; state: PipelineState | null } | null): string[] {
   const lines = [`== ${config.name}（命令 ${config.command}）`];
   const { file, prefix } = resolveCommand(config.command);
-  lines.push(commandAvailable(config.command) ? `✓ 找到命令：${[file, ...prefix].join(" ")}` : `✗ 找不到命令 ${config.command}：请确认它已安装并在 PATH 中（运行 Paseo daemon 的用户的 PATH）`);
+  lines.push(commandAvailable(config.command) ? `✓ 找到命令：${[file, ...prefix].join(" ")}` : `✗ 找不到命令 ${config.command}：请确认它已安装并在 PATH 中（运行步骤 agent 的那个用户的 PATH）`);
   const ctx = {
     repo: target?.repo ?? process.cwd(),
     featureDir: target?.featureDir ?? "docs/features/20261015-示例需求",

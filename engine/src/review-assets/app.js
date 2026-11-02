@@ -837,7 +837,7 @@
     changes.textContent = view.comments.length ? `提交修改意见（${view.comments.length} 条）` : "提交修改意见";
     const hasAny = view.comments.length > 0 || view.general.trim().length > 0;
     if (!info.canReply) {
-      note.textContent = "这个需求不是从 Paseo 对话开始的，这里的意见只会保存，请在卡片或终端中处理。";
+      note.textContent = "这个需求不是从对话开始的，这里的意见只会保存，请在卡片或终端中处理。";
       changes.disabled = true;
       approve.disabled = !info.waitingForApproval;
     } else if (info.waitingForApproval) {

@@ -1,4 +1,4 @@
-// Times for Paseo schedules: parsing what people type ("22:00", "明天 8:30", "+2h")
+// Times for platform schedules: parsing what people type ("22:00", "明天 8:30", "+2h")
 // and turning a moment into a one-shot cron expression in the local time zone.
 
 export function localTimeZone(): string {

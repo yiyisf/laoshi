@@ -1,7 +1,7 @@
 // Stopping dangerous commands (1.14): step agents usually run commands without asking (the
 // provider's "no confirmation" mode), so the rules "only local commits, never touch production"
 // were only words in the prompt. While a step runs, the pipeline looks at the commands the agent
-// has run or is running (its Paseo timeline, every few seconds to a minute); a command that
+// has run or is running (its platform timeline, every few seconds to a minute); a command that
 // pushes, publishes, changes a cluster, connects to a remote database or host, deletes outside
 // the repository, runs a downloaded script, or mentions a configured production address is
 // interrupted (if still running) and reported to the person. A plain check of the command

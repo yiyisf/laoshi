@@ -7,6 +7,8 @@ import { withBuiltins } from "./builtin/index.js";
 import type { AgentProfile, PipelineConfig } from "./config.js";
 import { describeProfileDefault, type PlatformAdapter, withCapabilities } from "./platform.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
+import { BUILTIN_SERVICE_WORDS, NEUTRAL_WORDS, type PlatformWords } from "./words.js";
+import { defaultConfigPath } from "./locations.js";
 
 // laoshi: each agent platform has an adapter under adapters/<id>/ (engine/src/platform.ts); the
 // config's platform.adapter picks one. This is the one core file that names the adapters.
@@ -70,6 +72,20 @@ export function scrubOriginEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.Pro
 export async function resolveProfiles(config: PipelineConfig, runtime: AgentRuntime): Promise<PipelineConfig> {
   const adapter = adapterFor(config);
   return adapter.resolveProfiles ? adapter.resolveProfiles(config, runtime) : config;
+}
+
+/**
+ * The words for messages and prompts (engine/src/words.ts) of a configuration's platform: neutral
+ * ones, laoshi's for the capabilities it provides itself, then the adapter's. Without a
+ * configuration, the platform the install-level configuration names.
+ */
+export function wordsFor(config?: unknown): PlatformWords {
+  const adapter = config === undefined ? adapterForFile(defaultConfigPath()) : (ADAPTERS[adapterIdOf(config)] ?? ADAPTERS[DEFAULT_ADAPTER]);
+  return {
+    ...NEUTRAL_WORDS,
+    ...(adapter.capabilities.services === "builtin" ? BUILTIN_SERVICE_WORDS : {}),
+    ...adapter.words,
+  };
 }
 
 /** One line for an agent's settings, in the terms of the config's platform. */

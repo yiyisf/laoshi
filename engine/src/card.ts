@@ -45,7 +45,7 @@ export interface SourceFile {
   fetchedAt: string;
   /** The repository the requirement started in (before any worktree of its own). */
   sourceRepo: string;
-  /** The Paseo agent that is the requirement's chat. */
+  /** The platform agent that is the requirement's chat. */
   sessionAgentId: string | null;
   /** The requester's text (above the req-kit sections) when last passed to the session. */
   originalHash: string | null;

@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { loadConfig } from "./config.js";
 import { defaultConfigPath, kitVersion } from "./locations.js";
 import { dispatchNotifiers, peopleOf, NOTIFIER_EVENT_TYPES, type NotifierEvent, type NotifierEventType } from "./notifiers.js";
+import { wordsFor } from "./runtime-loader.js";
 
 /** A realistic event of the given type, with the details the pipeline would send. */
 export function sampleEvent(type: NotifierEventType, repo: string): NotifierEvent {
@@ -35,8 +36,8 @@ export function sampleEvent(type: NotifierEventType, repo: string): NotifierEven
       details: { handoffPath: `${featureDir}/handoff.md`, mode: "gated", verifyCommand: `${resume} --phase verify`, verifyAt: null, handbacks: 0 },
     },
     alert: {
-      text: "接单器自检没有通过，暂停接新卡片：builder 用的 claude 不可用（needs_login）：在 Paseo 中登录它",
-      details: { source: "factory", machine: "dev-box", problems: ["builder 用的 claude 不可用（needs_login）：在 Paseo 中登录它"], recovered: false },
+      text: `接单器自检没有通过，暂停接新卡片：builder 用的 claude 不可用（needs_login）：${wordsFor().signIn}`,
+      details: { source: "factory", machine: "dev-box", problems: [`builder 用的 claude 不可用（needs_login）：${wordsFor().signIn}`], recovered: false },
     },
     approval: {
       text: `方案已通过审核，请需求方确认"做完后会看到什么"再开始写代码：${featureDir}/preview.md`,

@@ -2,8 +2,8 @@
 // features) that people set up once in Paseo's settings. req-kit roles and review
 // panel members can name one instead of spelling the settings out:
 //
-//   "builder": { "paseoProfile": "实现" }
-//   "reviewer": { "paseoProfile": "评审", "thinkingOptionId": "high" }   // own fields win
+//   "builder": { "platformProfile": "实现" }
+//   "reviewer": { "platformProfile": "评审", "thinkingOptionId": "high" }   // own fields win
 //
 // The names are resolved against the daemon when a run starts, so changing the
 // profile in Paseo changes the next run without touching req-kit's config.
@@ -33,19 +33,19 @@ export function findPaseoProfile(name: string, available: PaseoProfile[]): Paseo
 
 /**
  * Turns a role that names a Paseo profile into concrete agent settings. Settings
- * written next to `paseoProfile` override the profile's; feature values are merged.
- * Roles without `paseoProfile` are returned unchanged.
+ * written next to `platformProfile` override the profile's; feature values are merged.
+ * Roles without `platformProfile` are returned unchanged.
  */
 export function resolveAgentProfile(label: string, profile: AgentProfile, available: PaseoProfile[] | null): AgentProfile {
-  if (!profile.paseoProfile) return profile;
+  if (!profile.platformProfile) return profile;
   if (available === null) {
-    throw new ProfileResolutionError(`${label} 使用 Paseo profile「${profile.paseoProfile}」，但无法从 daemon 读取 profile 列表`);
+    throw new ProfileResolutionError(`${label} 使用 Paseo profile「${profile.platformProfile}」，但无法从 daemon 读取 profile 列表`);
   }
-  const found = findPaseoProfile(profile.paseoProfile, available);
+  const found = findPaseoProfile(profile.platformProfile, available);
   if (!found) {
     const names = available.map((p) => `「${p.name}」`).join("、") || "（还没有任何 profile）";
     throw new ProfileResolutionError(
-      `${label} 使用的 Paseo profile「${profile.paseoProfile}」不存在。现有的 profile：${names}。在 Paseo 的 设置 → Agents → Agent profiles 中查看或新建`,
+      `${label} 使用的 Paseo profile「${profile.platformProfile}」不存在。现有的 profile：${names}。在 Paseo 的 设置 → Agents → Agent profiles 中查看或新建`,
     );
   }
   if (!found.model) {
@@ -63,9 +63,9 @@ export function resolveAgentProfile(label: string, profile: AgentProfile, availa
 
 /** "Paseo profile「实现」→ claude/opus（模式 bypassPermissions）" */
 export function describeAgentProfile(profile: AgentProfile): string {
-  if (!profile.provider) return `Paseo profile「${profile.paseoProfile}」（运行时从 Paseo 读取设置）`;
+  if (!profile.provider) return `Paseo profile「${profile.platformProfile}」（运行时从 Paseo 读取设置）`;
   const settings = `${profile.provider}${profile.modeId ? `（模式 ${profile.modeId}）` : ""}`;
-  return profile.paseoProfile ? `Paseo profile「${profile.paseoProfile}」→ ${settings}` : settings;
+  return profile.platformProfile ? `Paseo profile「${profile.platformProfile}」→ ${settings}` : settings;
 }
 
 /** Reads the daemon's profiles from its config. Null when the daemon does not say. */
@@ -90,7 +90,7 @@ export function usesPaseoProfiles(config: PipelineConfig): boolean {
     ...config.designProposals.members,
     ...Object.values(config.phases.verify.agents),
   ].some((p) =>
-    Boolean(p.paseoProfile),
+    Boolean(p.platformProfile),
   );
 }
 

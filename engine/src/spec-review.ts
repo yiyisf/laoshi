@@ -8,7 +8,7 @@ import { parseLaunchArgs } from "./cli-args.js";
 import { loadConfig } from "./config.js";
 import { defaultConfigPath, KIT_ROOT, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
 import { specReviewFailedMessage, specReviewMessage } from "./messages.js";
-import { loadRuntimeFactory, resolveProfiles } from "./runtime-loader.js";
+import { loadRuntimeFactory, resolveProfiles, wordsFor } from "./runtime-loader.js";
 import { runSingleStep } from "./pipeline.js";
 import { normalizeFeatureDir, specProfile } from "./preflight.js";
 import { ensurePipelineDir, hashFile, type PipelineState, pipelineDir, STATE_VERSION } from "./state.js";
@@ -42,7 +42,7 @@ async function main(): Promise<number> {
       status: "running",
       attempt: 1,
       specHash: hashFile(specPath),
-      originAgentId: origin,
+      originSessionId: origin,
       pid: process.pid,
       startedAt: now,
       updatedAt: now,
@@ -63,7 +63,7 @@ async function main(): Promise<number> {
         runtime,
         state,
         statePath: path.join(pipelineDir(repo, featureDir), "spec-review-state.json"),
-        prompts: { promptsDir: PROMPTS_DIR, localPromptsDir: localPromptsDir(), principlesFile: PRINCIPLES_INDEX },
+        prompts: { promptsDir: PROMPTS_DIR, localPromptsDir: localPromptsDir(), principlesFile: PRINCIPLES_INDEX, words: wordsFor(config) },
         logPath: path.join(pipelineDir(repo, featureDir), "spec-review.log"),
         resumeCommand: "",
         log,

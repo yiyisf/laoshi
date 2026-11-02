@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "repo": "/work/e2e/kit-home/worktrees/repo-0d3b97d8d75d/feature-20261101-e2e",
+  "featureDir": "docs/features/20261101-e2e",
+  "status": "completed",
+  "attempt": 1,
+  "specHash": "2ab39bff4dcf9a3c805b8bf7f746191a993f1d39ac0d93cf8ce088f0a5d8c443",
+  "originAgentId": "session-18b3dbef-8b5e-49c9-9191-1d1d20298492",
+  "pid": 999999,
+  "startedAt": "2026-11-02T00:09:15.834Z",
+  "updatedAt": "2026-11-02T00:09:23.949Z",
+  "results": {
+    "design": {
+      "has_runnable_service": false,
+      "files": [
+        "src/"
+      ],
+      "ui_change": false
+    },
+    "design_review-r1": {
+      "verdict": "approved"
+    },
+    "implement": {
+      "status": "done"
+    },
+    "code_review-r1": {
+      "verdict": "pass"
+    },
+    "handoff": {
+      "status": "done"
+    },
+    "verify": {
+      "result": "pass"
+    },
+    "report": {
+      "outcome": "completed",
+      "summary": "端到端检查：流水线在 dsh 上跑完。"
+    }
+  },
+  "history": [
+    {
+      "key": "design",
+      "stepId": "design",
+      "round": null,
+      "attempt": 1,
+      "agentId": "7a3a77e8-05f4-4c5b-83ea-080b469a8dce",
+      "startedAt": "2026-11-02T00:09:15.925Z",
+      "endedAt": "2026-11-02T00:09:17.003Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "has_runnable_service": false,
+        "files": [
+          "src/"
+        ],
+        "ui_change": false
+      },
+      "error": null,
+      "phase": "develop",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "design_review-r1",
+      "stepId": "design_review",
+      "round": 1,
+      "attempt": 1,
+      "agentId": "77dddee2-88ba-412a-a93c-b3b5e2ef89cb",
+      "startedAt": "2026-11-02T00:09:17.004Z",
+      "endedAt": "2026-11-02T00:09:18.042Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "verdict": "approved"
+      },
+      "error": null,
+      "phase": "develop",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "implement",
+      "stepId": "implement",
+      "round": null,
+      "attempt": 1,
+      "agentId": "e5090087-6c53-4643-b11c-1d23a48288f2",
+      "startedAt": "2026-11-02T00:09:18.047Z",
+      "endedAt": "2026-11-02T00:09:19.120Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "status": "done"
+      },
+      "error": null,
+      "phase": "develop",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "code_review-r1",
+      "stepId": "code_review",
+      "round": 1,
+      "attempt": 1,
+      "agentId": "4b54ad10-13b0-4760-95d2-9b0795e8b94d",
+      "startedAt": "2026-11-02T00:09:19.130Z",
+      "endedAt": "2026-11-02T00:09:20.175Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "verdict": "pass"
+      },
+      "error": null,
+      "phase": "develop",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "handoff",
+      "stepId": "handoff",
+      "round": null,
+      "attempt": 1,
+      "agentId": "f4eeb3c5-0464-4f0f-ade6-ef10b01adaa2",
+      "startedAt": "2026-11-02T00:09:20.177Z",
+      "endedAt": "2026-11-02T00:09:21.217Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "status": "done"
+      },
+      "error": null,
+      "phase": "develop",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "verify",
+      "stepId": "verify",
+      "round": null,
+      "attempt": 1,
+      "agentId": "ac7e4307-3a50-474a-889e-7a0102529c86",
+      "startedAt": "2026-11-02T00:09:21.745Z",
+      "endedAt": "2026-11-02T00:09:22.792Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "result": "pass"
+      },
+      "error": null,
+      "phase": "verify",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    },
+    {
+      "key": "report",
+      "stepId": "report",
+      "round": null,
+      "attempt": 1,
+      "agentId": "9728d010-cf8a-43c0-a142-7e42ec7cc0a7",
+      "startedAt": "2026-11-02T00:09:22.904Z",
+      "endedAt": "2026-11-02T00:09:23.948Z",
+      "outcome": "completed",
+      "followUps": 0,
+      "result": {
+        "outcome": "completed",
+        "summary": "端到端检查：流水线在 dsh 上跑完。"
+      },
+      "error": null,
+      "phase": "verify",
+      "agent": "dsh/chat-model",
+      "usage": {
+        "inputTokens": 2000,
+        "cachedInputTokens": 0,
+        "outputTokens": 40
+      }
+    }
+  ],
+  "stopReason": null,
+  "outcome": "completed",
+  "profile": "quick",
+  "branch": "feature/20261101-e2e",
+  "milestones": [
+    "design-settled",
+    "code-reviewed"
+  ],
+  "incremental": null,
+  "worktree": {
+    "workspaceId": "dir:/work/e2e/kit-home/worktrees/repo-0d3b97d8d75d/feature-20261101-e2e",
+    "sourceRepo": "/work/e2e/repo"
+  },
+  "phases": {
+    "mode": "continuous",
+    "environment": "local",
+    "defects": "fix"
+  },
+  "phase": "verify",
+  "verifyAt": null,
+  "handbacks": 0,
+  "type": null,
+  "stopKind": null,
+  "pendingQuestions": null,
+  "codeBase": {
+    "attempt": 1,
+    "commit": "9eb07589addc08ec23bb385e1b9858992c090371"
+  },
+  "secretScans": [
+    {
+      "key": "implement",
+      "attempt": 1,
+      "at": "2026-11-02T00:09:19.119Z",
+      "findings": [],
+      "fixRounds": 0,
+      "passed": true
+    }
+  ]
+}

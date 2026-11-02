@@ -68,9 +68,9 @@ export async function doctorPlatform({ config, configPath, tools }: { config: Pi
     const daemonConfig = await client.config.get().then((r) => r.config as Record<string, unknown>).catch(() => null);
     const paseoProfiles = daemonConfig ? profilesFromDaemonConfig(daemonConfig) : null;
     if (paseoProfiles && paseoProfiles.length > 0) {
-      report("ok", `Paseo agent profiles：${paseoProfiles.map((p) => `「${p.name}」`).join("、")}（配置中可以用 "paseoProfile": "<名称>" 引用）`);
+      report("ok", `Paseo agent profiles：${paseoProfiles.map((p) => `「${p.name}」`).join("、")}（配置中可以用 "platformProfile": "<名称>" 引用）`);
     } else if (paseoProfiles) {
-      info("Paseo 中还没有 agent profile。可选：在 设置 → Agents → Agent profiles 中建好\"实现\"\"评审\"等 profile，配置中用 paseoProfile 引用，之后换模型只需改 Paseo");
+      info("Paseo 中还没有 agent profile。可选：在 设置 → Agents → Agent profiles 中建好\"实现\"\"评审\"等 profile，配置中用 platformProfile 引用，之后换模型只需改 Paseo");
     }
     if (daemonConfig) {
       const mcp = daemonConfig.mcp as { injectIntoAgents?: boolean } | undefined;
@@ -88,7 +88,7 @@ export async function doctorPlatform({ config, configPath, tools }: { config: Pi
         report("ok", `Paseo profile 已解析：builder ${describeAgentProfile(config.agents.builder)}；reviewer ${describeAgentProfile(config.agents.reviewer)}`);
       } catch (error) {
         if (!(error instanceof ProfileResolutionError)) throw error;
-        report("fail", error.message, "在 Paseo 中建好这个 profile，或修改配置中的 paseoProfile");
+        report("fail", error.message, "在 Paseo 中建好这个 profile，或修改配置中的 platformProfile");
         config = null;
       }
     }

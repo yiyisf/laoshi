@@ -57,7 +57,7 @@ export { samePath };
 
 function agentConfig(profile: AgentProfile) {
   if (!isResolved(profile)) {
-    throw new Error(`agent 配置没有 provider${profile.paseoProfile ? `（Paseo profile「${profile.paseoProfile}」没有解析）` : ""}`);
+    throw new Error(`agent 配置没有 provider${profile.platformProfile ? `（Paseo profile「${profile.platformProfile}」没有解析）` : ""}`);
   }
   return {
     provider: profile.provider,
@@ -387,8 +387,8 @@ export function createRuntimeWithClient(
       if (!client.config) return null;
       try {
         const daemonConfig = (await client.config.get()).config as { mcp?: { injectIntoAgents?: boolean }; browserTools?: { enabled?: boolean } };
-        const paseoTools = daemonConfig.mcp?.injectIntoAgents === true;
-        return { paseoTools, browser: paseoTools && daemonConfig.browserTools?.enabled === true };
+        const platformTools = daemonConfig.mcp?.injectIntoAgents === true;
+        return { platformTools, browser: platformTools && daemonConfig.browserTools?.enabled === true };
       } catch {
         return null;
       }

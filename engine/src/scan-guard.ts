@@ -7,7 +7,7 @@
 import os from "node:os";
 
 export interface RunningTool {
-  /** Paseo's tool kind: "shell", "search", … */
+  /** the platform's tool kind: "shell", "search", … */
   kind: string;
   /** The command (shell) or the pattern (search). */
   text: string;

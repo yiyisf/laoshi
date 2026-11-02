@@ -20,6 +20,13 @@ export const dshAdapter: PlatformAdapter = {
     toolCalls: "plugin",
   },
   originEnv: { id: "DSH_SESSION_ID" },
+  words: {
+    name: "dsh",
+    chat: "dsh 的对话",
+    schedule: "dsh 定时任务",
+    approvePermission: "在 dsh 的界面中打开这个对话的子 agent「{agent}」，查看并批准这个请求（或拒绝）",
+    signIn: "检查 dsh 中这个模型的配置",
+  },
   doctorTitle: "DeepSeek Harness（dsh）与 laoshi 插件",
   async doctorPlatform({ config, configPath, tools }) {
     const { dshEnv, pluginClient } = await import("./dsh-runtime.js");

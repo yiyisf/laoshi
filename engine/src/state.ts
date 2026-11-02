@@ -105,7 +105,7 @@ export interface StepRecord {
   reattached?: number;
   /** 1.12.1: the step's time limit was already given its one extra period (selfHeal); a later run waiting for the same agent gets none. */
   extendedTimeout?: boolean;
-  /** 1.13: the agent the step ran with: the Paseo profile name, or "provider/model". */
+  /** 1.13: the agent the step ran with: the platform agent profile's name, or "provider/model". */
   agent?: string;
 }
 
@@ -128,7 +128,11 @@ export interface PipelineState {
   /** Incremented every time the pipeline starts over from the design step. */
   attempt: number;
   specHash: string;
-  originAgentId: string | null;
+  /**
+   * The chat (session) the run reports to, null when started outside one. State v2 (laoshi M2d);
+   * v1 called it originAgentId, and the external contracts (schema 1) still do.
+   */
+  originSessionId: string | null;
   pid: number;
   startedAt: string;
   updatedAt: string;
@@ -164,12 +168,19 @@ export interface PipelineState {
    */
   incremental?: IncrementalInfo | null;
   /**
-   * Set when the requirement is developed in a worktree created for it (--worktree):
-   * the Paseo workspace and the checkout the chat works in. `repo` is the worktree.
+   * Set when the requirement is developed in a worktree created for it (--worktree): the
+   * platform's reference to that workspace (the adapter interprets it; v1: workspaceId) and the
+   * checkout the chat works in. `repo` is the worktree.
    */
-  worktree?: { workspaceId: string; sourceRepo: string } | null;
-  /** Paseo schedules this run created (reminders, automatic continuation, watchdog); cancelled by the next run. */
-  schedules?: Array<{ id: string; kind: "reminder" | "auto-resume" | "watchdog" | "verify-start" | "approval-continue"; at: string | null }>;
+  worktree?: { workspaceRef: string; sourceRepo: string } | null;
+  /** Wake-ups this run scheduled on the platform (reminders, automatic continuation, watchdog); cancelled by the next run. v1: schedules[].id. */
+  wakeups?: Wakeup[];
+  /** laoshi M2d: the adapter this run used (for troubleshooting); absent in files migrated from v1. */
+  adapter?: { id: string; version?: string | null } | null;
+  /** laoshi M2d: who orchestrates the steps: the engine (default) or the chat (mode B, docs/design/in-chat-orchestration.md). */
+  mode?: "engine" | "chat";
+  /** laoshi M2d, mode B only: the step waiting for the chat agent to run it. */
+  stepRequest?: { key: string; since: string } | null;
   /** Automatic continuations used in this attempt. */
   autoResumes?: { attempt: number; count: number } | null;
   /** Set while waiting for a free slot (maxConcurrentPipelines). */
@@ -212,6 +223,15 @@ export interface PipelineState {
   }> | null;
 }
 
+export type WakeupKind = "reminder" | "auto-resume" | "watchdog" | "verify-start" | "approval-continue";
+
+/** A wake-up scheduled on the platform: `ref` is the platform's schedule ID (v1: schedules[].id). */
+export interface Wakeup {
+  ref: string;
+  kind: WakeupKind;
+  at: string | null;
+}
+
 export interface JointRepo {
   /** Name in relatedRepos, e.g. "后端". */
   name: string;
@@ -221,7 +241,8 @@ export interface JointRepo {
   sourceRepo: string;
   /** The worktree the steps work in. */
   repo: string;
-  workspaceId: string;
+  /** The platform's reference to the worktree's workspace (v1: workspaceId). */
+  workspaceRef: string;
   branch: string;
   /** Hash of the spec last copied there. */
   specHash: string | null;
@@ -283,13 +304,38 @@ export function ensurePipelineDir(repo: string, featureDir: string): string {
  * Format version of state.json written by this engine. Bump it when the shape changes
  * and add a migration from the previous version to STATE_MIGRATIONS.
  */
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 
 /** Upgrades a state object from version `n` to `n + 1`. */
 export type StateMigration = (state: Record<string, unknown>) => Record<string, unknown>;
 
 /** Keyed by the version a migration upgrades from. */
-export const STATE_MIGRATIONS: Record<number, StateMigration> = {};
+export const STATE_MIGRATIONS: Record<number, StateMigration> = {
+  // laoshi M2d (docs/design/state-v2.md): names without one platform's meaning; values unchanged.
+  1: (old) => {
+    const s = structuredClone(old) as Record<string, unknown> & {
+      originAgentId?: unknown;
+      worktree?: Record<string, unknown> | null;
+      joint?: Array<Record<string, unknown>> | null;
+      schedules?: Array<Record<string, unknown>>;
+    };
+    s.originSessionId = s.originAgentId ?? null;
+    delete s.originAgentId;
+    if (s.worktree && typeof s.worktree === "object") {
+      s.worktree.workspaceRef = s.worktree.workspaceId;
+      delete s.worktree.workspaceId;
+    }
+    for (const j of Array.isArray(s.joint) ? s.joint : []) {
+      j.workspaceRef = j.workspaceId;
+      delete j.workspaceId;
+    }
+    if (Array.isArray(s.schedules)) {
+      s.wakeups = s.schedules.map(({ id, ...rest }) => ({ ref: id, ...rest }));
+      delete s.schedules;
+    }
+    return s;
+  },
+};
 
 export class StateVersionError extends Error {
   constructor(file: string, found: number, supported: number) {
@@ -336,7 +382,10 @@ export function readState(
   const text = fs.readFileSync(file, "utf8");
   const raw = JSON.parse(text) as Record<string, unknown>;
   const { state, from } = migrateState(raw, file, migrations, target);
-  if (from < target) {
+  // laoshi M2d: a run still going (started by the older version) keeps writing its own format, so
+  // its file is read migrated but left as it is; it is migrated the first time it is read after.
+  const live = raw.status === "running" && typeof raw.pid === "number" && raw.pid !== process.pid && isAlive(raw.pid);
+  if (from < target && !live) {
     const backup = `${file}.bak-v${from}`;
     if (!fs.existsSync(backup)) fs.writeFileSync(backup, text);
     const tmp = `${file}.${process.pid}.tmp`;

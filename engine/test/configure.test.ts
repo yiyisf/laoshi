@@ -75,7 +75,7 @@ test("配置向导：找不到免确认模式时请用户选择", async () => {
   assert.equal((config.agents as { builder: { modeId: string } }).builder.modeId, "auto");
 });
 
-test("配置向导：Paseo 中有 agent profile 时先推荐 profile（按名称和说明匹配角色），选中后写 paseoProfile", async () => {
+test("配置向导：Paseo 中有 agent profile 时先推荐 profile（按名称和说明匹配角色），选中后写 platformProfile", async () => {
   const withProfiles: Catalog = {
     ...catalog,
     profiles: async () => [
@@ -86,7 +86,7 @@ test("配置向导：Paseo 中有 agent profile 时先推荐 profile（按名称
   };
   const { choose, seen } = recorder();
   const { config, summary } = await runWizard({}, withProfiles, choose);
-  assert.deepEqual(config.agents, { builder: { paseoProfile: "实现" }, reviewer: { paseoProfile: "评审" }, fallback: { provider: "pi/anthropic/claude-x" } });
+  assert.deepEqual(config.agents, { builder: { platformProfile: "实现" }, reviewer: { platformProfile: "评审" }, fallback: { provider: "pi/anthropic/claude-x" } });
   assert.ok(!seen[0].options.some((o) => o.includes("草稿")), "没有模型的 profile 不列出");
   assert.match(seen[0].options.at(-1) ?? "", /不用 profile/);
   assert.match(summary.join("\n"), /builder：Paseo profile「实现」/);
@@ -114,8 +114,8 @@ test("自动选择（1.12）：不提问，两个不同厂商分别做 builder �
 
 test("插件设置页写回的 agent（1.12）：检查后写入，其余设置保留；不合格的拒绝", () => {
   const existing = { daemonUrl: "ws://x", agents: { builder: { provider: "a/b" }, reviewer: { provider: "c/d" }, fallback: { provider: "e/f" } } };
-  const next = applyAgents(existing, { builder: { provider: "claude/x", modeId: "bypassPermissions" }, reviewer: { paseoProfile: "评审" }, fallback: null });
-  assert.deepEqual(next, { daemonUrl: "ws://x", agents: { builder: { provider: "claude/x", modeId: "bypassPermissions" }, reviewer: { paseoProfile: "评审" } } });
+  const next = applyAgents(existing, { builder: { provider: "claude/x", modeId: "bypassPermissions" }, reviewer: { platformProfile: "评审" }, fallback: null });
+  assert.deepEqual(next, { daemonUrl: "ws://x", agents: { builder: { provider: "claude/x", modeId: "bypassPermissions" }, reviewer: { platformProfile: "评审" } } });
   assert.throws(() => applyAgents(existing, { builder: { provider: "claude/CHANGE-ME" }, reviewer: { provider: "c/d" } }), /都要选/);
   assert.throws(() => applyAgents(existing, { builder: { provider: "a/b" }, reviewer: { provider: "c/d" }, fallback: { provider: "x" } }), /备用模型/);
 });

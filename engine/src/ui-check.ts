@@ -305,7 +305,7 @@ const HELP = `用法：req ui-check <网址> [选项]
   --shots <目录>            把整页截图存到这个目录（给人看；不要再把截图读给模型）
   --browser <程序路径>      指定浏览器（默认找本机的 Edge，再找 Chrome；也可以设 REQ_KIT_BROWSER）
   --json                    输出 JSON
-  --script                  只输出页面检查脚本（在 Paseo 浏览器的 browser_evaluate 中用）
+  --script                  只输出页面检查脚本（在平台浏览器工具的 browser_evaluate 中用）
 
 退出码：0 没有发现问题，1 发现需要核对的地方，2 没能检查（打不开页面、没有浏览器等）。`;
 
