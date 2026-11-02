@@ -5,12 +5,13 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_CONFIG, type PipelineConfig } from "../../engine/src/config.js";
+import type { PipelineConfig } from "../../engine/src/config.js";
 import { findDependency, KIT_ROOT } from "../../engine/src/locations.js";
 import type { DoctorTools } from "../../engine/src/platform.js";
 import { satisfies } from "../../engine/src/semver.js";
 import { checkProfile, connect } from "./daemon-check.js";
 import { daemonVersion } from "./daemon-version.js";
+import { type DaemonSettings, daemonOf } from "./settings.js";
 import { type PaseoJson, paseoJsonIssues } from "./paseo-json.js";
 import { describeAgentProfile, ProfileResolutionError, profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
 
@@ -24,12 +25,11 @@ function readPaseoRange(): string | null {
 }
 
 /** Daemon address from the raw file, so the daemon can be checked even when the agents are not filled in yet. */
-function daemonSettings(configPath: string): PipelineConfig {
+function daemonSettings(configPath: string): DaemonSettings {
   try {
-    const raw = JSON.parse(fs.readFileSync(configPath, "utf8")) as Partial<PipelineConfig>;
-    return { ...DEFAULT_CONFIG, ...(raw.daemonUrl ? { daemonUrl: raw.daemonUrl } : {}), ...(raw.daemonPasswordEnv ? { daemonPasswordEnv: raw.daemonPasswordEnv } : {}) };
+    return daemonOf(JSON.parse(fs.readFileSync(configPath, "utf8")));
   } catch {
-    return DEFAULT_CONFIG;
+    return daemonOf(null);
   }
 }
 
@@ -42,7 +42,7 @@ export async function doctorPlatform({ config, configPath, tools }: { config: Pi
     if (satisfies(sdk, range)) report("ok", `Paseo SDK ${sdk}（本版本支持 ${range}）`);
     else report("warn", `Paseo SDK ${sdk} 不在本版本支持的范围 ${range} 内`, "确认 Paseo 与 req-kit 版本匹配，必要时升级 req-kit");
   }
-  const settings = config ?? daemonSettings(configPath);
+  const settings = config ? daemonOf(config) : daemonSettings(configPath);
   let client;
   try {
     client = await connect(settings);

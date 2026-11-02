@@ -2,15 +2,17 @@
 
 import type { AgentProfile, PipelineConfig } from "../../engine/src/config.js";
 import { profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
+import { type DaemonSettings, daemonOf } from "./settings.js";
 
 export type Report = (level: "ok" | "warn" | "fail", text: string, fix?: string) => void;
 
-export async function connect(config: PipelineConfig) {
+export async function connect(config: PipelineConfig | DaemonSettings) {
   const { createPaseoClient } = await import("@getpaseo/client");
-  const password = process.env[config.daemonPasswordEnv];
-  const client = createPaseoClient({ url: config.daemonUrl, ...(password ? { password } : {}) });
+  const daemon = daemonOf(config);
+  const password = process.env[daemon.daemonPasswordEnv];
+  const client = createPaseoClient({ url: daemon.daemonUrl, ...(password ? { password } : {}) });
   const { connectWithin } = await import("./paseo-runtime.js");
-  await connectWithin(client, 30_000, config.daemonUrl);
+  await connectWithin(client, 30_000, daemon.daemonUrl);
   return client;
 }
 

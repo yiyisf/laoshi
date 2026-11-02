@@ -19,10 +19,28 @@ export const LAUNCHER = path.join(KIT_ROOT, "bin", "start-pipeline.mjs");
 export const PROMPTS_DIR = path.join(ENGINE_DIR, "prompts");
 export const PRINCIPLES_INDEX = path.join(KIT_ROOT, "principles", "INDEX.md");
 
-/** Machine settings directory. REQ_KIT_HOME overrides it (tests, or several setups on one machine). */
+/**
+ * The install root (ADR 0007): install-level configuration, usage records, the requirement index,
+ * builtin worktrees and services. laoshi M2c: LAOSHI_HOME names it; REQ_KIT_HOME (req-kit's name)
+ * still works. Without either, ~/.laoshi; a machine that only has req-kit's ~/.req-kit keeps using
+ * it, so an existing setup carries on until it is migrated.
+ */
 export function kitHome(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env.REQ_KIT_HOME?.trim();
-  return override ? path.resolve(override) : path.join(os.homedir(), ".req-kit");
+  return homeOf(env).dir;
+}
+
+export type HomeSource = "LAOSHI_HOME" | "REQ_KIT_HOME" | "default" | "legacy";
+
+/** The install root and how it was chosen (for doctor). */
+export function homeOf(env: NodeJS.ProcessEnv = process.env, home: string = os.homedir()): { dir: string; source: HomeSource } {
+  const laoshi = env.LAOSHI_HOME?.trim();
+  if (laoshi) return { dir: path.resolve(laoshi), source: "LAOSHI_HOME" };
+  const legacyEnv = env.REQ_KIT_HOME?.trim();
+  if (legacyEnv) return { dir: path.resolve(legacyEnv), source: "REQ_KIT_HOME" };
+  const preferred = path.join(home, ".laoshi");
+  const legacy = path.join(home, ".req-kit");
+  if (!fs.existsSync(preferred) && fs.existsSync(path.join(legacy, "config.json"))) return { dir: legacy, source: "legacy" };
+  return { dir: preferred, source: "default" };
 }
 
 export function defaultConfigPath(env: NodeJS.ProcessEnv = process.env): string {

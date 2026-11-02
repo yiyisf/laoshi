@@ -8,7 +8,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { type CheckDef, type RelatedRepo, resolveRelatedRepo } from "./config.js";
+import { type CheckDef, projectConfigPath, type RelatedRepo, resolveRelatedRepo } from "./config.js";
 import type { AgentRuntime } from "./runtime.js";
 import { ensurePipelineDir, hashFile, type JointRepo, type PipelineState } from "./state.js";
 
@@ -156,7 +156,7 @@ export function syncJointDocs(entries: JointRepo[], mainRepo: string, featureDir
 
 /** The quality-gate checks a joint repository defines in its own project configuration. */
 export function loadProjectChecks(repo: string, log: (message: string) => void): CheckDef[] {
-  const file = path.join(repo, ".requirement-pipeline.json");
+  const file = projectConfigPath(repo);
   if (!fs.existsSync(file)) return [];
   try {
     const raw = JSON.parse(fs.readFileSync(file, "utf8")) as { checks?: unknown };

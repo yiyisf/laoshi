@@ -13,7 +13,7 @@ import {
   PHASE_MODE_LABELS,
   type PipelineConfig,
   PROFILE_LABELS,
-  PROJECT_CONFIG_FILE,
+  projectConfigPath,
 } from "./config.js";
 import { describeProfile } from "./runtime-loader.js";
 import { STEPS, type StepId } from "./steps.js";
@@ -257,7 +257,7 @@ export function configView(configPath: string, repo: string | null): ConfigView 
     if (team) layers.push({ layer: "team", path: teamFile, raw: team });
   }
   if (repo) {
-    const projectFile = path.join(repo, PROJECT_CONFIG_FILE);
+    const projectFile = projectConfigPath(repo);
     const project = readRaw(projectFile);
     if (project) layers.push({ layer: "project", path: projectFile, raw: project });
   }

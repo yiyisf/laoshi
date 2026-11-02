@@ -35,6 +35,7 @@ import { parsePeriod, summarizeRuns } from "./stats.js";
 import { readEvents, readRuns, runsFile } from "./records.js";
 import { totals } from "./usage.js";
 import { scrubOriginEnv } from "./runtime-loader.js";
+import { type Codebase, codebaseOf } from "./identity.js";
 
 export const API_SCHEMA = 1;
 
@@ -110,6 +111,8 @@ export interface ListItem {
   hasPrototype?: boolean;
   key: string;
   project: string;
+  /** laoshi M2c: the codebase the requirement belongs to (ADR 0007). */
+  codebase: Codebase;
   repo: string;
   sourceRepo: string | null;
   workspaceId: string | null;
@@ -198,6 +201,7 @@ function item(repo: string, branch: string | null, featureDir: string, extra: { 
   return {
     key: requirementKey(extra.sourceRepo ?? repo, featureDir),
     project: extra.project,
+    codebase: codebaseOf(extra.sourceRepo ?? repo),
     repo,
     sourceRepo: extra.sourceRepo,
     workspaceId: extra.workspaceId ?? state?.worktree?.workspaceId ?? null,
@@ -262,6 +266,7 @@ export function apiList(input: { repo: string; all: boolean }): ListItem[] {
       found ?? {
         key: e.key,
         project: e.project,
+        codebase: codebaseOf(e.sourceRepo ?? e.repo),
         repo: e.repo,
         sourceRepo: e.sourceRepo,
         workspaceId: e.workspaceId,

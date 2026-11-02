@@ -2,6 +2,7 @@
 // laoshi's dsh plugin; worktrees and services are laoshi's builtin ones (M2b); what neither offers
 // is degraded by the core (ADR 0008).
 
+import fs from "node:fs";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
 import { channelPaths, dshHome } from "./plugin/channel.mjs";
 
@@ -20,11 +21,20 @@ export const dshAdapter: PlatformAdapter = {
   },
   originEnv: { id: "DSH_SESSION_ID" },
   doctorTitle: "DeepSeek Harness（dsh）与 laoshi 插件",
-  async doctorPlatform({ tools }) {
-    const { pluginClient } = await import("./dsh-runtime.js");
-    const paths = channelPaths(dshHome());
+  async doctorPlatform({ config, configPath, tools }) {
+    const { dshEnv, pluginClient } = await import("./dsh-runtime.js");
+    let raw: unknown = config;
+    if (!raw) {
+      try {
+        raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      } catch {
+        // The config section reports it.
+      }
+    }
+    const env = dshEnv(raw);
+    const paths = channelPaths(dshHome(env));
     try {
-      const hello = await pluginClient(process.env, 10_000)<{ plugin: string; approvals: string }>("hello");
+      const hello = await pluginClient(env, 10_000)<{ plugin: string; approvals: string }>("hello");
       tools.report("ok", `已连接 laoshi 的 dsh 插件 ${hello.plugin}（${paths.socket}），审批策略：${hello.approvals}`);
     } catch (error) {
       tools.report(

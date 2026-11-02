@@ -5,6 +5,7 @@ import { profilesFromDaemonConfig } from "./paseo-profiles.js";
 import { cronAt, localTimeZone } from "../../engine/src/schedule-time.js";
 import { samePath } from "../../engine/src/paths.js";
 import type { AgentRuntime, ManagedService, ProviderQuota, RuntimeFactory, ServiceTarget, StepAgent, WaitOutcome } from "../../engine/src/runtime.js";
+import { daemonOf } from "./settings.js";
 
 // Checked against @getpaseo/client 0.11.2 (packages/client/src/index.ts) and the
 // daemon (packages/server/src/server/session.ts, agent/create-agent/intent.ts):
@@ -402,13 +403,14 @@ export function createRuntimeWithClient(
 export const createRuntime: RuntimeFactory = async ({ config, log }) => {
   // Loaded lazily so the runtime logic can be tested without the SDK installed.
   const { createPaseoClient } = await import("@getpaseo/client");
-  const password = process.env[config.daemonPasswordEnv];
+  const settings = daemonOf(config);
+  const password = process.env[settings.daemonPasswordEnv];
   const client = createPaseoClient({
-    url: config.daemonUrl,
+    url: settings.daemonUrl,
     ...(password ? { password } : {}),
     reconnect: { enabled: true },
   });
-  await connectWithin(client, CONNECT_TIMEOUT_MS, config.daemonUrl);
+  await connectWithin(client, CONNECT_TIMEOUT_MS, settings.daemonUrl);
   return createRuntimeWithClient(client, config, log, () => connectScripts(config));
 };
 
@@ -443,16 +445,17 @@ async function connectScripts(config: PipelineConfig): Promise<WorkspaceScripts 
     | { DaemonClient?: new (options: Record<string, unknown>) => InternalDaemonClient }
     | null;
   if (!internal?.DaemonClient) return null;
-  const password = process.env[config.daemonPasswordEnv];
+  const settings = daemonOf(config);
+  const password = process.env[settings.daemonPasswordEnv];
   const daemon = new internal.DaemonClient({
-    url: config.daemonUrl,
+    url: settings.daemonUrl,
     clientId: `req-kit-${process.pid}-${Date.now().toString(36)}`,
     clientType: "cli",
     ...(password ? { password } : {}),
     reconnect: { enabled: true },
   });
   if (typeof daemon.listWorkspaceScripts !== "function") return null;
-  await connectWithin(daemon as unknown as { connect(): Promise<unknown>; close(): Promise<unknown> }, CONNECT_TIMEOUT_MS, config.daemonUrl);
+  await connectWithin(daemon as unknown as { connect(): Promise<unknown>; close(): Promise<unknown> }, CONNECT_TIMEOUT_MS, settings.daemonUrl);
   const check = (payload: { error: string | null }) => {
     if (payload.error) throw new Error(payload.error);
   };

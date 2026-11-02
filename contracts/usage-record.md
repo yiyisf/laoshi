@@ -1,6 +1,6 @@
 # 本机的需求索引与使用记录
 
-1.9.0 起，引擎在本机配置目录（默认 `~/.req-kit`，可用 `REQ_KIT_HOME` 改变）下记两样东西。它们只在这台机器上，不提交进任何仓库，也不会自动发往任何地方。环境变量 `REQ_KIT_NO_RECORD=1` 时两样都不记（评估运行就是这样）。
+1.9.0 起，引擎在本机配置目录下记两样东西。laoshi M2c 起这个目录是安装根（ADR 0007）：`LAOSHI_HOME` 指定，其次 `REQ_KIT_HOME`；都没有时为 `~/.laoshi`，只有 req-kit 的 `~/.req-kit` 时沿用它。它们只在这台机器上，不提交进任何仓库，也不会自动发往任何地方。环境变量 `REQ_KIT_NO_RECORD=1` 时两样都不记（评估运行就是这样）。
 
 ## 需求索引 `index/<key>.json`
 
@@ -33,7 +33,8 @@
 | --- | --- |
 | `schema` / `kind` | `1` / `"run"` |
 | `machine` / `kitVersion` | 主机名、req-kit 版本 |
-| `requirement` | `{ key, project, name, title, type, profile }`；从卡片开始的需求（1.10 起）另有 `requester`（卡片的提出人）和 `source`（`{ system, id }`） |
+| `user` | laoshi M2c 起。这次运行是为谁：环境变量 `LAOSHI_USER`，其次安装级配置的 `user`，再次系统用户名。更早的记录没有 |
+| `requirement` | `{ key, project, name, title, type, profile }`；laoshi M2c 起另有 `codebase`（`{ root, remote }`，见 [cli-json.md](cli-json.md) 的同名字段）；从卡片开始的需求（1.10 起）另有 `requester`（卡片的提出人）和 `source`（`{ system, id }`） |
 | `steps[].cachedInputTokens` / `steps[].agent` | 1.13 起。输入中来自提示缓存的 tokens（agent 报告时）；这一步用的 agent（Paseo profile 名，或 "provider/model"）。更早的记录没有 |
 | `run` | `{ startedAt, endedAt, attempt, phase, phaseMode, status, outcome, stopReason, stopKind, recoveries }`；`status` 是运行结束时的状态，`outcome` 是完成时报告的结论；`stopKind`（1.12 起）是停下等人的原因代码（见 [state.md](state.md)），`recoveries`（1.12 起）是这次运行中自动处理的次数，按种类，如 `{ "retry": 2 }`。更早的记录没有这两项 |
 | `agents` | `{ builder, reviewer }`：当时配置的 agent（如 `claude/opus（bypassPermissions）`） |
@@ -44,7 +45,7 @@
 
 ### 运行之后的事（1.14 起）
 
-同一个文件里还有几种记录，都有 `schema`（1）、`kind`、`machine`、`kitVersion`、`at` 和 `requirement`（`{ key, project, name, title }`，`key` 与运行记录相同）。读运行记录的旧版本会跳过它们。
+同一个文件里还有几种记录，都有 `schema`（1）、`kind`、`machine`、`kitVersion`、`at` 和 `requirement`（`{ key, project, name, title }`，`key` 与运行记录相同）。laoshi M2c 起另有 `user`，`requirement` 中另有 `codebase`，含义同运行记录。读运行记录的旧版本会跳过它们。
 
 | `kind` | 何时写 | 字段 |
 | --- | --- | --- |

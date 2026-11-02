@@ -39,6 +39,8 @@ const logs = path.join(out, "logs");
 for (const d of [home, repo, logs]) fs.mkdirSync(d, { recursive: true });
 const FEATURE = "docs/features/20261101-e2e";
 const env = { ...process.env, DSH_HOME: home, LAOSHI_E2E_KEY: "e2e" };
+// The kit home is set per run below (REQ_KIT_HOME); LAOSHI_HOME would win over it.
+delete env.LAOSHI_HOME;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const checks = [];
 const check = (name, ok, detail = "") => {

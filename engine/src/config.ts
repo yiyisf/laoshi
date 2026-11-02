@@ -164,10 +164,13 @@ export interface MergeRequestSettings {
 
 export interface PipelineConfig {
   /**
-   * laoshi: the agent platform the pipeline runs on. `adapter` picks the runtime under
-   * adapters/<id>/ (runtime-loader.ts); "paseo" is the only one so far.
+   * laoshi: the agent platform the pipeline runs on. `adapter` picks the adapter under
+   * adapters/<id>/ (runtime-loader.ts); `<id>` (laoshi M2c) holds that adapter's own settings,
+   * e.g. { "adapter": "dsh", "dsh": { "home": "D:/dsh" } }. Install-level only.
    */
-  platform: { adapter: string };
+  platform: { adapter: string } & Record<string, unknown>;
+  /** laoshi M2c: who uses this install (ADR 0007); LAOSHI_USER wins, else the system user name. Install-level only. */
+  user: string | null;
   daemonUrl: string;
   /** Name of the environment variable holding the daemon password, if the daemon has one. */
   daemonPasswordEnv: string;
@@ -330,6 +333,7 @@ export interface PipelineConfig {
 
 export const DEFAULT_CONFIG: PipelineConfig = {
   platform: { adapter: "paseo" },
+  user: null,
   daemonUrl: "ws://127.0.0.1:6767/ws",
   daemonPasswordEnv: "PASEO_DAEMON_PASSWORD",
   agents: {
@@ -404,11 +408,20 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   reviewAxes: { enabled: true, profiles: ["standard"] },
 };
 
-/** Project file, at the repository root, that overrides the machine-wide configuration. */
-export const PROJECT_CONFIG_FILE = ".requirement-pipeline.json";
+/** Project file, at the repository root, that overrides the install-level configuration (laoshi M2c). */
+export const PROJECT_CONFIG_FILE = ".laoshi.json";
+/** req-kit's name for it: still read when the repository has no .laoshi.json. */
+export const LEGACY_PROJECT_CONFIG_FILE = ".requirement-pipeline.json";
 
-/** Settings that describe this machine, not a project; a project file may not change them. */
-export const MACHINE_ONLY_KEYS = ["daemonUrl", "daemonPasswordEnv", "teamConfig"] as const;
+/** The repository's project configuration file: .laoshi.json, else the legacy name when only that exists. */
+export function projectConfigPath(repo: string): string {
+  const current = path.join(repo, PROJECT_CONFIG_FILE);
+  const legacy = path.join(repo, LEGACY_PROJECT_CONFIG_FILE);
+  return !fs.existsSync(current) && fs.existsSync(legacy) ? legacy : current;
+}
+
+/** Settings that describe this install, not a project; a team or project file may not change them. */
+export const MACHINE_ONLY_KEYS = ["daemonUrl", "daemonPasswordEnv", "teamConfig", "platform", "user"] as const;
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -709,6 +722,12 @@ function validate(config: PipelineConfig): void {
     throw new ConfigError('requiredVersion 必须是版本范围字符串，例如 ">=1.2.0 <2"');
   }
   if (config.paseoServices !== "auto" && config.paseoServices !== "off") throw new ConfigError('paseoServices 只能是 "auto" 或 "off"');
+  if (config.user !== null && (typeof config.user !== "string" || !config.user.trim())) throw new ConfigError("user 必须是使用者的名字，或者不写");
+  if (isRecord(config.platform)) {
+    for (const [key, value] of Object.entries(config.platform)) {
+      if (key !== "adapter" && !isRecord(value)) throw new ConfigError(`platform.${key} 必须是对象：适配器 ${key} 自己的设置`);
+    }
+  }
   if (!isRecord(config.platform) || typeof config.platform.adapter !== "string" || !/^[a-z][a-z0-9-]*$/.test(config.platform.adapter)) {
     throw new ConfigError('platform.adapter 必须是适配器名称，例如 { "adapter": "paseo" }');
   }
@@ -740,6 +759,8 @@ export interface LoadedConfig {
   sources: string[];
   /** Settings a team or project file tried to set but may not, e.g. "项目配置中的 daemonUrl". */
   ignored: string[];
+  /** laoshi M2c: things to tell people about the files, e.g. a legacy project file left next to .laoshi.json. */
+  notes: string[];
 }
 
 /** Keys a project file may not set: they run code or reach outside the repository. */
@@ -799,14 +820,19 @@ export function loadConfig(configPath: string, repo?: string): LoadedConfig {
     sources.push(teamFile);
   }
 
+  const notes: string[] = [];
+  if (config.teamConfig) notes.push(`团队配置（teamConfig）是 req-kit 的做法：laoshi 只有安装级和代码库级两层（ADR 0007），团队共用安装目录时，把团队配置合并进安装级配置即可`);
   if (repo) {
-    const projectFile = path.join(repo, PROJECT_CONFIG_FILE);
+    const projectFile = projectConfigPath(repo);
     if (fs.existsSync(projectFile)) {
       config = merge(config, stripMachineKeys(readJson(projectFile, "项目配置文件"), "项目配置", ignored, NOT_IN_PROJECT_KEYS));
       sources.push(projectFile);
     }
+    if (projectFile.endsWith(PROJECT_CONFIG_FILE) && fs.existsSync(path.join(repo, LEGACY_PROJECT_CONFIG_FILE))) {
+      notes.push(`项目里同时有 ${PROJECT_CONFIG_FILE} 和旧的 ${LEGACY_PROJECT_CONFIG_FILE}：只读取 ${PROJECT_CONFIG_FILE}，旧文件中的设置没有生效`);
+    }
   }
   validate(config);
-  return { config, sources, ignored };
+  return { config, sources, ignored, notes };
 }
 

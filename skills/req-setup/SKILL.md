@@ -15,7 +15,7 @@ metadata:
 | `GLOSSARY.md` | 术语表（推荐）：业务词、含义、代码中的名字。访谈和方案设计会继续补充 | `/req` 访谈、流水线每个步骤 |
 | `.requirement-pipeline/verify.md` | 验证方法：安装依赖、启动服务、运行测试、准备测试数据，命令都实际跑过 | 实现、修复、服务启动、验证、复验步骤 |
 | `paseo.json` | Paseo 的工作区设置（推荐）：新建 worktree 时自动安装依赖、复制本地配置；把常驻服务定义为由 Paseo 管理的服务，每个 worktree 分到独立的端口 | Paseo；流水线在服务启动和验证前通过 Paseo 启动这些服务 |
-| `.requirement-pipeline.json` | 项目配置：**质量门的检查命令**（`checks`，推荐）、关联仓库（`relatedRepos`，有就写）；本项目用的 agent、默认档位、轮数、超时（需要时） | 流水线 |
+| `.laoshi.json` | 项目配置：**质量门的检查命令**（`checks`，推荐）、关联仓库（`relatedRepos`，有就写）；本项目用的 agent、默认档位、轮数、超时（需要时） | 流水线 |
 
 格式见 `{{REQ_KIT_ROOT}}/contracts/verify.md`。这个入口通常由开发同事或熟悉项目的测试同事运行。
 
@@ -94,7 +94,7 @@ metadata:
   - 团队确定只用一种系统、并且用户明确要求时，才可以用那种系统的 shell 写法；`/req-doctor` 会提示它在其他系统上不能用。
   - 已有 `paseo.json` 时只补充缺少的部分，不改别人写的内容。
   - 在 `verify.md` 的启动服务一节注明：服务已定义在 `paseo.json`，由流水线通过 Paseo 启动；同时保留手工启动的命令，供没有 Paseo 时使用。
-- `.requirement-pipeline.json`：
+- `.laoshi.json`（laoshi 的项目配置；req-kit 用的旧名 `.requirement-pipeline.json` 也能读，项目里已有旧名文件时就在旧文件里补充，不要两个都写：两个都在时只读 `.laoshi.json`）：
   - `checks`（推荐）：质量门的检查。流水线会在写代码和修复的步骤之后**自己运行**它们，只拦"改动之前通过、现在失败"的检查，并把输出发回给那一步的 agent 修复，不依赖 agent 自己说"测试通过了"。把第 4 步实际跑通、几分钟内能跑完的检查写进去：格式、lint、类型检查、单元测试、构建（端到端测试和需要启动服务的检查不要写，它们由功能验证负责）。命令同样写成各系统通用的形式。多模块的仓库按模块分开写，用 `cwd` 指定模块目录（这项检查只在该模块有改动时运行；需要更精确时用 `paths` 列出它关心的目录）：
 
     ```json
