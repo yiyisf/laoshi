@@ -14,6 +14,8 @@
 
 ## 使用
 
+> 内网（Windows，无 PowerShell）安装与验证见 [docs/intranet/install-verify.md](../../docs/intranet/install-verify.md)：`intranet/install.mjs` 一次完成配置、插件安装与挂载、skill 渲染；`intranet/make-sample.mjs` 生成验证用的样例项目；安装包由 `scripts/pack-intranet.mjs` 生成（带 Windows 依赖，内网不需要 npm 源）。
+
 1. 把插件装进 dsh 的 profile，并挂载：
 
    ```sh
