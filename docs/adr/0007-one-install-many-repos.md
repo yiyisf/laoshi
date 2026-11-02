@@ -1,6 +1,6 @@
 # 0007 一次安装，多库共用；库内只放专属配置
 
-- 状态：提议（待摸底实验 A、实验 5 确认平台上的可行性）
+- 状态：提议（待摸底实验 A、实验 5 确认平台上的可行性）；决定 1、4、5、6 的引擎部分已在 M2c 实现（见文末"实现"）
 - 日期：2026-10-28
 - 关联：[ADR 0003](0003-generate-once-then-lock.md)、[ADR 0004](0004-external-contracts-stay-stable.md)、[ADR 0006](0006-deterministic-engine-platform-capabilities.md)
 
@@ -53,3 +53,11 @@ laoshi 要服务多套代码库，**不能每个代码库安装一次**；代码
 - 解决计划待定项 4：锁定文件放安装根。
 - [architecture](../design/architecture.md) §5、§6，[init-bootstrap](../design/init-bootstrap.md) §6，[platform-discovery](../design/platform-discovery.md)，[plan](../extraction/plan.md) 随本 ADR 更新。
 - 后续：`contracts/usage-record.md`、`notifier-event.md`、`cli-json.md` 新增 `repo`、`user` 字段；`contracts/state.md` 增加发起人；[compat-migration](../design/compat-migration.md) 的路径对照改为以 `LAOSHI_HOME` 为准；`laoshi-setup` 按决定 3 改造。
+
+## 实现（M2c，2026-11-02）
+
+- 决定 1：安装根由 `LAOSHI_HOME` 指定（`engine/src/locations.ts`），`REQ_KIT_HOME` 继续有效；都没有时为 `~/.laoshi`，机器上只有 req-kit 的 `~/.req-kit` 时沿用它，直到迁移。`doctor` 显示安装根和它是怎么选出来的。
+- 决定 4：代码库级配置为 `.laoshi.json`，只有旧名 `.requirement-pipeline.json` 时读旧名，两者都在时只读新名并在 `doctor` 中提示。`platform`、`user` 只能写在安装级配置中。团队配置（`teamConfig`）继续读取，`doctor` 提示合并到安装级。
+- 各平台的设置放在 `platform.<id>`：Paseo 为 `platform.paseo.daemonUrl` / `daemonPasswordEnv`（顶层的旧写法继续有效），dsh 为 `platform.dsh.home`。
+- 决定 5、6：`engine/src/identity.ts`。代码库标识为 `{ root, remote }`：需求自己的 worktree 归属原仓库，远程地址去掉凭据。使用者依次取 `LAOSHI_USER`、安装级配置的 `user`、系统用户名。使用记录（`user`、`requirement.codebase`）、通知事件（`codebase`、`user`）、`req api list`（`codebase`）只加字段，仍为 `schema: 1`。字段名与本 ADR 原写的 `repo` 不同：通知事件已有 `repo`（需求所在目录），所以改叫 `codebase`。
+- 还没有做：使用者身份由适配器提供（两个适配器都还取不到平台上的使用者）；`.requirement-pipeline/` 目录改名为 `.laoshi/`（和 `/laoshi` 改名一起在 M2e 处理）；决定 7 的"升级前列出各代码库进行中的需求"（属于安装器，M7）。

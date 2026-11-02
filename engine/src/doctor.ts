@@ -9,9 +9,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, resolveRelatedRepo } from "./config.js";
+import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, projectConfigPath, resolveRelatedRepo } from "./config.js";
 import { gitInfo } from "./git.js";
-import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
+import { codebaseOf, userOf } from "./identity.js";
+import { defaultConfigPath, homeOf, KIT_ROOT, kitVersion } from "./locations.js";
 import { PROJECT_DIR } from "./prompts.js";
 import { readProjectServices, SERVICES_FILE } from "./builtin/project-services.js";
 import { CAPABILITIES, type CapabilityName, type DoctorTools, type PlatformAdapter, SOURCE_LABELS, sourceOf } from "./platform.js";
@@ -98,6 +99,7 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
   try {
     const loaded = loadConfig(configPath, repo ?? undefined);
     report("ok", `配置：${loaded.sources.join(" → ")}`);
+    for (const note of loaded.notes) report("warn", note);
     if (loaded.ignored.length > 0) {
       report("warn", `${loaded.ignored.join("、")} 只能在本机配置中设置，已被忽略`, "从团队或项目配置中删除这些字段");
     }
@@ -118,7 +120,7 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
       if (checks.length > 0) {
         report("ok", `质量门：${checks.length} 项检查（${checks.map((c) => c.name).join("、")}），流水线在写代码和修复的步骤之后自己运行`);
         for (const c of checks) {
-          if (c.cwd && !fs.existsSync(path.join(repo, c.cwd))) report("warn", `检查「${c.name}」的目录 ${c.cwd} 不存在`, `修改 ${PROJECT_CONFIG_FILE} 中的 checks`);
+          if (c.cwd && !fs.existsSync(path.join(repo, c.cwd))) report("warn", `检查「${c.name}」的目录 ${c.cwd} 不存在`, `修改 ${path.basename(projectConfigPath(repo))} 中的 checks`);
         }
       } else {
         report(
@@ -252,8 +254,8 @@ function project(repo: string, adapter: PlatformAdapter): void {
   } else {
     report("ok", `当前分支：${git.branch}`);
   }
-  const projectConfig = path.join(repo, PROJECT_CONFIG_FILE);
-  if (fs.existsSync(projectConfig)) report("ok", `项目配置：${PROJECT_CONFIG_FILE}`);
+  const projectConfig = projectConfigPath(repo);
+  if (fs.existsSync(projectConfig)) report("ok", `项目配置：${path.basename(projectConfig)}${path.basename(projectConfig) === PROJECT_CONFIG_FILE ? "" : `（旧名，可以改名为 ${PROJECT_CONFIG_FILE}）`}`);
   const notes = path.join(repo, PROJECT_DIR, "project-notes.md");
   if (fs.existsSync(notes)) report("ok", `项目说明：${PROJECT_DIR}/project-notes.md`);
   else report("warn", "没有项目说明（包管理工具、不能改的目录、提交格式等），步骤 agent 需要自己摸索", "在项目根目录的对话中运行 /req-setup");
@@ -316,6 +318,19 @@ function project(repo: string, adapter: PlatformAdapter): void {
   if (found === 0) report("ok", "没有运行过流水线的需求");
 }
 
+/** laoshi M2c: the install root, who this is for, and the codebase (ADR 0007). */
+function identity(repo: string | null): void {
+  section("安装根与身份");
+  const home = homeOf();
+  const how = { LAOSHI_HOME: "环境变量 LAOSHI_HOME", REQ_KIT_HOME: "环境变量 REQ_KIT_HOME（req-kit 的旧名，可以改用 LAOSHI_HOME）", default: "默认位置", legacy: "req-kit 的旧目录（还没有 ~/.laoshi）" }[home.source];
+  report("ok", `安装根：${home.dir}（${how}）`);
+  report("ok", `使用者：${userOf()}${process.env.LAOSHI_USER?.trim() ? "（环境变量 LAOSHI_USER）" : ""}`);
+  if (repo) {
+    const c = codebaseOf(repo);
+    report("ok", `代码库：${c.root}${c.remote ? `（${c.remote}）` : "（没有 origin 远程地址）"}`);
+  }
+}
+
 /** .laoshi/services.json, for laoshi's builtin services and worktree setup (M2b). */
 function builtinServicesFile(repo: string, isRepo: boolean): void {
   let defs;
@@ -366,6 +381,7 @@ async function main(): Promise<number> {
   const repo = values["no-project"] ? null : path.resolve(values.repo ?? originFromEnv(process.env, adapter)?.cwd ?? process.cwd());
 
   console.log(`req-kit ${kitVersion()} 体检（安装目录 ${KIT_ROOT}）`);
+  identity(repo);
   installation(values.offline ?? false);
   const config = configuration(configPath, repo);
   section(adapter.doctorTitle);

@@ -91,6 +91,12 @@ Node 22.22，Linux。
 | `engine/src/doctor.ts` | 平台用内置能力时检查 `.laoshi/services.json` | M2b |
 | `engine/src/runtime.ts` | 新增可选的 `agentDirectory` | M2b |
 | `skills/req-setup/templates/paseo/with-port.mjs`、`copy-local-files.mjs` | 也读取 `LAOSHI_PORT`、`LAOSHI_SOURCE_CHECKOUT_PATH` | M2b |
+| `engine/src/locations.ts` | `kitHome` 先看 `LAOSHI_HOME`，默认 `~/.laoshi`（只有旧目录时沿用 `~/.req-kit`） | M2c |
+| `engine/src/config.ts` | 项目配置文件为 `.laoshi.json`（旧名继续读，`projectConfigPath`）；`platform.<id>`、`user`；`platform`、`user` 只能在安装级配置中；`LoadedConfig.notes` | M2c |
+| `engine/src/card.ts`、`joint.ts`、`config-view.ts`、`doctor.ts` | 项目配置文件改用 `projectConfigPath`；体检新增"安装根与身份"一节 | M2c |
+| `engine/src/records.ts`、`notifiers.ts`、`api.ts` | 使用记录、通知事件、`req api list` 加上代码库和使用者（`identity.ts`） | M2c |
+| `adapters/paseo/*` | daemon 地址改由 `settings.ts` 的 `daemonOf` 读取（`platform.paseo` 优先） | M2c |
+| `skills/`、`contracts/verify.md` | 项目配置写作 `.laoshi.json` | M2c |
 
 ## 移植登记
 

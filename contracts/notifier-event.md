@@ -55,6 +55,8 @@ export default async function notify(event, options) { /* 发送 */ }
 
 `text` 是一两句可以直接发出的话；需要自己排版时用 `details`。
 
+laoshi M2c 起（ADR 0007）另有两个字段：`codebase`（需求所属的代码库 `{ root, remote }`，见 [cli-json.md](cli-json.md)；本机的 `alert` 没有对应仓库时为 null）和 `user`（为谁运行，取法见 [usage-record.md](usage-record.md)）。只加字段，`schema` 仍为 1。
+
 **发给谁**（1.12 起，`people`）：
 
 ```json

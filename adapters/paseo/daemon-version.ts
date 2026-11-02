@@ -5,8 +5,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { DEFAULT_CONFIG } from "../../engine/src/config.js";
 import { defaultConfigPath } from "../../engine/src/locations.js";
+import { daemonOf } from "./settings.js";
 
 interface ServerInfoClient {
   connect(): Promise<void>;
@@ -43,15 +43,13 @@ export async function daemonVersion(daemonUrl: string, password: string | undefi
 async function main(): Promise<number> {
   const { values } = parseArgs({ args: process.argv.slice(2), options: { config: { type: "string" } } });
   const file = values.config ? path.resolve(values.config) : defaultConfigPath();
-  let url = DEFAULT_CONFIG.daemonUrl;
-  let passwordEnv = DEFAULT_CONFIG.daemonPasswordEnv;
+  let raw: unknown = null;
   try {
-    const raw = JSON.parse(fs.readFileSync(file, "utf8")) as { daemonUrl?: string; daemonPasswordEnv?: string };
-    url = raw.daemonUrl ?? url;
-    passwordEnv = raw.daemonPasswordEnv ?? passwordEnv;
+    raw = JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
     // No machine config yet: the default address.
   }
+  const { daemonUrl: url, daemonPasswordEnv: passwordEnv } = daemonOf(raw);
   const version = await daemonVersion(url, process.env[passwordEnv]).catch(() => null);
   if (!version) return 1;
   console.log(version);

@@ -39,7 +39,7 @@ export const USAGE = `用法：
   --verify-env    测试验证的环境：local（本地启动服务）或 deployed（已部署的测试环境，需要 test-env.md）
   --defects       测试验证发现缺陷时：fix（当场修复并复验）、handback（退回研发阶段修复）、report（只记录）
   --approve       方案确认点：需求方看过 preview.md 并确认，继续开发（等同于 --resume 加上确认）
-  --config        配置文件，默认为 ~/.req-kit/config.json（可用环境变量 REQ_KIT_HOME 改变目录）`;
+  --config        配置文件，默认为安装根下的 config.json（安装根：LAOSHI_HOME，其次 REQ_KIT_HOME，默认 ~/.laoshi）`;
 
 export function parseLaunchArgs(argv: string[]): LaunchArgs {
   const { values } = parseArgs({

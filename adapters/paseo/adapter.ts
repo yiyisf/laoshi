@@ -4,6 +4,7 @@
 import type { Catalog } from "../../engine/src/configure.js";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
 import { connect } from "./daemon-check.js";
+import { daemonOf } from "./settings.js";
 import { doctorProject } from "./doctor.js";
 import { describeAgentProfile, profilesFromDaemonConfig, resolveConfigProfiles, usesPaseoProfiles } from "./paseo-profiles.js";
 
@@ -53,17 +54,14 @@ export const paseoAdapter: PlatformAdapter = {
   doctorPlatform: async (input) => (await import("./doctor.js")).doctorPlatform(input),
   doctorProject,
   async agentCatalog(settings, progress) {
-    const daemon = {
-      daemonUrl: typeof settings.daemonUrl === "string" ? settings.daemonUrl : "ws://127.0.0.1:6767/ws",
-      daemonPasswordEnv: typeof settings.daemonPasswordEnv === "string" ? settings.daemonPasswordEnv : "PASEO_DAEMON_PASSWORD",
-    };
+    const daemon = daemonOf(settings);
     progress(`配置向导：连接 Paseo daemon ${daemon.daemonUrl} ……`);
     let client;
     try {
       // A daemon that is not running must not hold up the installer: give up after 20 seconds.
       let timer: NodeJS.Timeout | undefined;
       client = await Promise.race([
-        connect(daemon as never),
+        connect(daemon),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error("20 秒内没有连上")), 20_000);
         }),

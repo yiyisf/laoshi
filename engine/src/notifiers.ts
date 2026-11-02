@@ -5,6 +5,7 @@
 // A notifier never affects the pipeline: errors and timeouts are logged and ignored.
 
 import { pathToFileURL } from "node:url";
+import { codebaseOf, userOf } from "./identity.js";
 
 export const NOTIFIER_EVENT_TYPES = ["milestone", "blocked", "permission", "failed", "completed", "digest", "phase_done", "approval", "alert"] as const;
 export type NotifierEventType = (typeof NOTIFIER_EVENT_TYPES)[number];
@@ -30,6 +31,9 @@ export interface NotifierEvent {
   profile: string;
   /** Chat agent the run reports to, if any. */
   originAgentId: string | null;
+  /** laoshi M2c: the codebase the requirement belongs to, and who it is for (ADR 0007). Set by dispatchNotifiers. */
+  codebase?: import("./identity.js").Codebase | null;
+  user?: string;
   /** One or two plain sentences, ready to post as is. */
   text: string;
   /** Type-specific fields; see contracts/notifier-event.md. */
@@ -85,6 +89,9 @@ export async function dispatchNotifiers(
   log: (message: string) => void,
 ): Promise<void> {
   const wanted = notifiers.filter((n) => !n.events || n.events.includes(event.type));
+  if (wanted.length === 0) return;
+  // laoshi M2c: every event says which codebase and person it is for (machine alerts have no repo).
+  event = { ...event, codebase: event.codebase ?? (event.repo ? codebaseOf(event.repo) : null), user: event.user ?? userOf() };
   await Promise.all(
     wanted.map(async (n) => {
       let timer: NodeJS.Timeout | undefined;

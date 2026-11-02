@@ -16,6 +16,7 @@
 
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import { projectConfigPath } from "./config.js";
 import { asData } from "./messages.js";
 import { replaceFile } from "./state.js";
 import path from "node:path";
@@ -489,7 +490,7 @@ export function setRegisteredRepos(repos: string[], env: NodeJS.ProcessEnv = pro
 /** The repository's cardSource, read from its project file (not merged with other layers). */
 export function readRoute(repo: string): CardRoute | null {
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(repo, ".requirement-pipeline.json"), "utf8")) as { cardSource?: Record<string, unknown> };
+    const raw = JSON.parse(fs.readFileSync(projectConfigPath(repo), "utf8")) as { cardSource?: Record<string, unknown> };
     const c = raw.cardSource;
     if (!c || typeof c.system !== "string") return null;
     const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "") : []);

@@ -44,6 +44,7 @@
 | --- | --- |
 | `key` | 需求在本机的标识（对话所在目录 + 功能目录） |
 | `project` | 项目名：对话所在目录的目录名 |
+| `codebase` | laoshi M2c 起。需求所属的代码库：`{ root, remote }`，`root` 是主检出目录（需求自己的 worktree 归属它的原仓库），`remote` 是 origin 的地址（去掉凭据），没有时为 null（ADR 0007） |
 | `repo` | 需求所在的目录（有自己的工作区时是那个工作区） |
 | `sourceRepo` / `workspaceId` | 有自己的工作区时：对话所在的目录、Paseo 工作区 ID；否则 null |
 | `featureDir` / `name` / `title` | 功能目录、目录名、需求标题 |

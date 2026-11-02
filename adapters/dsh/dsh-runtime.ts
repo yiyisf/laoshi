@@ -199,8 +199,17 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
   };
 }
 
-export const createRuntime: RuntimeFactory = async ({ log }) => {
-  const call = pluginClient();
+/**
+ * The environment for reaching the plugin: platform.dsh.home in the install-level config (laoshi M2c)
+ * names dsh's home directory when it is not DSH_HOME's (or ~/.dsh).
+ */
+export function dshEnv(config: unknown, env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const home = (config as { platform?: { dsh?: { home?: unknown } } } | null)?.platform?.dsh?.home;
+  return typeof home === "string" && home.trim() ? { ...env, DSH_HOME: home.trim() } : env;
+}
+
+export const createRuntime: RuntimeFactory = async ({ config, log }) => {
+  const call = pluginClient(dshEnv(config));
   await call("hello");
   return createRuntimeWithClient(call, log);
 };

@@ -54,7 +54,7 @@ metadata:
 每个根因，按下面的顺序选择**最靠前、能解决它**的落点。越靠前越可靠，因为它不依赖模型记得遵守：
 
 1. **项目的自动检查**：测试、lint 规则、类型约束、CI 检查。例如加一条 lint 规则禁止直接拼接 SQL。
-2. **项目配置** `.requirement-pipeline.json`：轮数、超时、档位、agent 选择、评审小组。
+2. **项目配置** `.laoshi.json`：轮数、超时、档位、agent 选择、评审小组。
 3. **项目说明** `.requirement-pipeline/project-notes.md`、验证方法 `.requirement-pipeline/verify.md`、按步骤说明 `.requirement-pipeline/steps/<步骤>.md`：本项目的约定、命令和坑。
 4. **本机提示词覆盖** `~/.req-kit/prompts.local/`：只有前三层都不适用、并且问题确实出在通用的步骤说明上时才用。它会让这台机器跟随不到新版本对同一提示词的改进，要写明原因。
 5. **req-kit 本身的问题**：例如某个手册的流程有缺陷、引擎行为不合理。不在本地改 req-kit 的文件，而是写一份问题报告草稿（现象、复现方式、相关文件、建议），交给用户提给 req-kit 的维护者。

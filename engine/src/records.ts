@@ -18,6 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { kitHome, kitVersion } from "./locations.js";
 import type { PipelineState } from "./state.js";
+import { type Codebase, codebaseOf, userOf } from "./identity.js";
 
 export const RECORD_SCHEMA = 1;
 
@@ -170,9 +171,13 @@ export interface RunRecord {
   kind: "run";
   machine: string;
   kitVersion: string;
+  /** laoshi M2c: who the run was for (ADR 0007). Absent in older records. */
+  user?: string;
   requirement: {
     key: string;
     project: string;
+    /** laoshi M2c: the codebase it belongs to (ADR 0007). Absent in older records. */
+    codebase?: Codebase;
     name: string;
     title: string;
     type: string | null;
@@ -257,9 +262,11 @@ export function runRecord(input: {
     kind: "run",
     machine: input.machine ?? os.hostname(),
     kitVersion: kitVersion(),
+    user: userOf(),
     requirement: {
       key: requirementKey(source, state.featureDir),
       project: path.basename(real(source)),
+      codebase: codebaseOf(source),
       name: path.basename(state.featureDir),
       title: input.title,
       type: state.type ?? null,
@@ -336,7 +343,9 @@ export interface EventRecord {
   machine: string;
   kitVersion: string;
   at: string;
-  requirement: { key: string; project: string; name: string; title: string };
+  /** laoshi M2c: who did it (ADR 0007). Absent in older records. */
+  user?: string;
+  requirement: { key: string; project: string; name: string; title: string; codebase?: Codebase };
   /** A person's code review in the plugin. */
   review?: { verdict: "approved" | "changes_requested"; reviewer: string; items: number; head: string | null };
   /** The requester's acceptance on the checklist page. */
@@ -360,13 +369,13 @@ export function requirementRef(repo: string, featureDir: string, env: NodeJS.Pro
   } catch {
     /* no spec: the directory name */
   }
-  return { key: entry?.key ?? requirementKey(source, fd), project: entry?.project ?? path.basename(real(source)), name: path.basename(fd), title };
+  return { key: entry?.key ?? requirementKey(source, fd), project: entry?.project ?? path.basename(real(source)), name: path.basename(fd), title, codebase: codebaseOf(source) };
 }
 
 /** Appends an event to the usage records. Never throws. */
 export function appendEvent(input: Omit<EventRecord, "schema" | "machine" | "kitVersion" | "at"> & { at?: string }, env: NodeJS.ProcessEnv = process.env): void {
   if (recordingOff(env)) return;
-  const record: EventRecord = { schema: 1, machine: os.hostname(), kitVersion: kitVersion(), at: input.at ?? new Date().toISOString(), ...input } as EventRecord;
+  const record: EventRecord = { schema: 1, machine: os.hostname(), kitVersion: kitVersion(), user: userOf(env), at: input.at ?? new Date().toISOString(), ...input } as EventRecord;
   try {
     fs.mkdirSync(usageDir(env), { recursive: true });
     fs.appendFileSync(runsFile(env), `${JSON.stringify(record)}\n`);
