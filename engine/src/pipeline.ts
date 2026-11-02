@@ -244,7 +244,7 @@ function save(ctx: PipelineContext): void {
 }
 
 async function notifyOrigin(ctx: PipelineContext, text: string): Promise<void> {
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   ctx.log(`通知：\n${text}`);
   if (!origin) {
     ctx.log("没有发起对话的 agent ID，通知只写入日志。");
@@ -284,7 +284,7 @@ function jointTargets(ctx: PipelineContext): StepTarget[] {
     slug: j.slug,
     repo: j.repo,
     featureDir: ctx.featureDir,
-    workspaceId: j.workspaceId,
+    workspaceId: j.workspaceRef,
     branch: j.branch,
     joint: j,
   }));
@@ -468,7 +468,7 @@ async function notifyExternal(ctx: PipelineContext, type: NotifierEventType, tex
       repo: ctx.repo,
       branch: ctx.state.branch,
       profile: ctx.state.profile,
-      originAgentId: ctx.state.originAgentId,
+      originAgentId: ctx.state.originSessionId,
       text,
       details,
       people: (() => {
@@ -961,10 +961,10 @@ async function runStepOnce(
         "pipeline-step": key,
         ...(target ? { "joint-repo": target.slug } : {}),
       },
-      parentAgentId: ctx.config.attachToOriginChat ? ctx.state.originAgentId : null,
+      parentAgentId: ctx.config.attachToOriginChat ? ctx.state.originSessionId : null,
       // Always passed: the run's config has Paseo profile names resolved; the runtime's may not.
       profile: stepProfile,
-      workspaceId: target ? target.workspaceId : (ctx.state.worktree?.workspaceId ?? null),
+      workspaceId: target ? target.workspaceId : (ctx.state.worktree?.workspaceRef ?? null),
     });
     record.agentId = agent.id;
     ctx.state.history.push(record);
@@ -1163,8 +1163,8 @@ function serviceState(ctx: PipelineContext): NonNullable<PipelineContext["servic
 
 /** The workspace whose paseo.json services the steps use: the requirement's own worktree, or the chat's. */
 function serviceTarget(ctx: PipelineContext): ServiceTarget | null {
-  if (ctx.state.worktree) return { workspaceId: ctx.state.worktree.workspaceId };
-  const origin = ctx.state.originAgentId;
+  if (ctx.state.worktree) return { workspaceId: ctx.state.worktree.workspaceRef };
+  const origin = ctx.state.originSessionId;
   return origin && ctx.config.attachToOriginChat ? { agentId: origin } : null;
 }
 
@@ -1265,7 +1265,7 @@ async function stopManagedServices(ctx: PipelineContext): Promise<void> {
 /** A Paseo schedule that reminds the chat about unanswered questions; returns the hours, or null. */
 async function scheduleReminder(ctx: PipelineContext, what: string[] | "phase" | "approval"): Promise<number | null> {
   const hours = ctx.config.waitingReminderHours;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (hours <= 0 || !origin) return null;
   const at = new Date(Date.now() + hours * 3600_000);
   const shown = shownFeatureDir(ctx);
@@ -1282,7 +1282,7 @@ async function scheduleReminder(ctx: PipelineContext, what: string[] | "phase" |
             : waitingReminderMessage({ featureDir: shown, hours, questions: what, resumeCommand: ctx.resumeCommand }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "reminder", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "reminder", at: at.toISOString() }];
     save(ctx);
     ctx.log(`已预约 ${hours} 小时后的提醒（Paseo 定时任务 ${id}）`);
     return hours;
@@ -1298,7 +1298,7 @@ function shortTime(at: Date): string {
 
 /** --verify-at: a Paseo schedule that has the chat start the verify phase; returns the time as text, or null. */
 async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null> {
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (!ctx.state.verifyAt || !origin) return null;
   const at = new Date(ctx.state.verifyAt);
   try {
@@ -1314,7 +1314,7 @@ async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null>
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "verify-start", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "verify-start", at: at.toISOString() }];
     save(ctx);
     ctx.log(`已预约在 ${shortTime(at)} 开始测试验证（Paseo 定时任务 ${id}）`);
     return shortTime(at);
@@ -1327,7 +1327,7 @@ async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null>
 /** designApproval.autoContinueHours: a Paseo schedule that has the chat approve the design if nobody did; returns the time, or null. */
 async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | null> {
   const hours = ctx.config.designApproval.autoContinueHours;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (hours <= 0 || !origin) return null;
   const at = new Date(Date.now() + hours * 3600_000);
   try {
@@ -1343,7 +1343,7 @@ async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | 
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "approval-continue", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "approval-continue", at: at.toISOString() }];
     save(ctx);
     ctx.log(`已预约 ${hours} 小时后仍未确认时按方案继续（Paseo 定时任务 ${id}）`);
     return shortTime(at);
@@ -1376,7 +1376,7 @@ async function quotaResetTime(ctx: PipelineContext, reason: string): Promise<Dat
 
 async function scheduleAutoResume(ctx: PipelineContext, reason: string): Promise<string | null> {
   const minutes = ctx.config.autoResumeMinutes;
-  const origin = ctx.state.originAgentId;
+  const origin = ctx.state.originSessionId;
   if (minutes <= 0 || !origin) return null;
   const used = ctx.state.autoResumes?.attempt === ctx.state.attempt ? ctx.state.autoResumes.count : 0;
   if (used >= ctx.config.autoResumeMax) {
@@ -1398,7 +1398,7 @@ async function scheduleAutoResume(ctx: PipelineContext, reason: string): Promise
       }),
     });
     if (!id) return null;
-    ctx.state.schedules = [...(ctx.state.schedules ?? []), { id, kind: "auto-resume", at: at.toISOString() }];
+    ctx.state.wakeups = [...(ctx.state.wakeups ?? []), { ref: id, kind: "auto-resume", at: at.toISOString() }];
     ctx.state.autoResumes = { attempt: ctx.state.attempt, count: used + 1 };
     save(ctx);
     const when = at.toLocaleString("zh-CN", { hour12: false });

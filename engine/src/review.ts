@@ -393,7 +393,7 @@ export function createReviewServer(opts: ReviewServerOptions): http.Server {
         status: state?.status ?? null,
         waitingForApproval: state?.status === "waiting_for_approval",
         waitingForReply: state?.status === "waiting_for_approval" || state?.status === "waiting_for_business",
-        canReply: Boolean(state?.originAgentId),
+        canReply: Boolean(state?.originSessionId),
         readOnly: !full,
         files: fs.existsSync(prototypeDir) ? prototypeFiles(prototypeDir) : [],
         criteria: specCriteria(spec),

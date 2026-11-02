@@ -65,7 +65,7 @@ async function main(): Promise<number> {
   const runtime = await createRuntime({ config, log });
 
   // A resume without --origin-agent keeps reporting to the chat that started the run.
-  const originAgentId = args.originAgentId ?? (mode.kind === "fresh" ? null : mode.previous.originAgentId);
+  const originAgentId = args.originAgentId ?? (mode.kind === "fresh" ? null : mode.previous.originSessionId);
 
   const previousState = mode.kind === "fresh" ? null : mode.previous;
   const reuse = mode.kind === "resume-reuse";
@@ -133,7 +133,9 @@ async function main(): Promise<number> {
       status: "running",
       attempt: 1,
       specHash,
-      originAgentId,
+      originSessionId: originAgentId,
+      // laoshi M2d: which adapter ran it, for troubleshooting.
+      adapter: { id: config.platform.adapter },
       pid: process.pid,
       startedAt: now,
       updatedAt: now,
@@ -145,7 +147,7 @@ async function main(): Promise<number> {
       branch: checked.branch,
       milestones: [],
       incremental: null,
-      worktree: args.sourceRepo && args.workspaceId ? { workspaceId: args.workspaceId, sourceRepo: args.sourceRepo } : null,
+      worktree: args.sourceRepo && args.workspaceId ? { workspaceRef: args.workspaceId, sourceRepo: args.sourceRepo } : null,
       phases,
       phase: "develop",
       verifyAt: verifyAt?.toISOString() ?? null,
@@ -165,7 +167,9 @@ async function main(): Promise<number> {
       attempt: startOver ? mode.previous.attempt + 1 : mode.previous.attempt,
       specHash,
       // A later launch from a different chat moves notifications to that chat.
-      originAgentId,
+      originSessionId: originAgentId,
+      // laoshi M2d: which adapter ran it, for troubleshooting.
+      adapter: { id: config.platform.adapter },
       pid: process.pid,
       results: startOver ? {} : mode.previous.results,
       stopReason: null,
@@ -221,11 +225,11 @@ async function main(): Promise<number> {
     log(`继续流水线：${featureDir}（第 ${state.attempt} 次尝试，${PROFILE_LABELS[profile]}档）—— ${why}`);
   }
   writeState(stateFile, state);
-  if (state.worktree) log(`在为这个需求新建的工作区中开发：${repo}（Paseo 工作区 ${state.worktree.workspaceId}，对话所在目录 ${state.worktree.sourceRepo}）`);
+  if (state.worktree) log(`在为这个需求新建的工作区中开发：${repo}（Paseo 工作区 ${state.worktree.workspaceRef}，对话所在目录 ${state.worktree.sourceRepo}）`);
 
   if (state.worktree && mode.kind === "fresh") {
     // The worktree's setup (installing dependencies, copying .env) runs in the background.
-    const setup = await runtime.waitForWorkspaceSetup(state.worktree.workspaceId, 30 * 60_000).catch(() => ({ status: "none" as const, error: null }));
+    const setup = await runtime.waitForWorkspaceSetup(state.worktree.workspaceRef, 30 * 60_000).catch(() => ({ status: "none" as const, error: null }));
     if (setup.status === "completed") log("新工作区的环境准备已完成");
     else if (setup.status === "failed" || setup.status === "timeout") {
       const why = setup.status === "timeout" ? "30 分钟内没有完成" : `失败：${setup.error ?? "原因未知"}`;
@@ -247,10 +251,10 @@ async function main(): Promise<number> {
   };
 
   // Reminders and automatic continuations from the previous run are no longer needed.
-  if (state.schedules?.length) {
-    for (const s of state.schedules) await runtime.cancelSchedule(s.id).catch((error: Error) => log(`取消定时任务 ${s.id} 失败：${error.message}`));
-    log(`已取消上次运行留下的 Paseo 定时任务：${state.schedules.map((s) => s.kind).join("、")}`);
-    state.schedules = [];
+  if (state.wakeups?.length) {
+    for (const s of state.wakeups) await runtime.cancelSchedule(s.ref).catch((error: Error) => log(`取消定时任务 ${s.ref} 失败：${error.message}`));
+    log(`已取消上次运行留下的 Paseo 定时任务：${state.wakeups.map((s) => s.kind).join("、")}`);
+    state.wakeups = [];
     writeState(stateFile, state);
   }
 
@@ -335,7 +339,7 @@ async function main(): Promise<number> {
         return null;
       });
     if (watchdog) {
-      state.schedules = [...(state.schedules ?? []), { id: watchdog, kind: "watchdog", at: null }];
+      state.wakeups = [...(state.wakeups ?? []), { ref: watchdog, kind: "watchdog", at: null }];
       writeState(stateFile, state);
       log(`已预约定时检查（每 ${config.watchdogMinutes} 分钟，Paseo 定时任务 ${watchdog}）`);
     }
@@ -366,7 +370,7 @@ async function main(): Promise<number> {
     // The run ended by itself: the watchdog has nothing left to watch.
     if (watchdog) {
       await runtime.cancelSchedule(watchdog).catch(() => undefined);
-      state.schedules = (state.schedules ?? []).filter((s) => s.id !== watchdog);
+      state.wakeups = (state.wakeups ?? []).filter((s) => s.ref !== watchdog);
       writeState(stateFile, state);
     }
     await runtime.close().catch(() => undefined);

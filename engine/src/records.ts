@@ -77,7 +77,7 @@ export function registerRequirement(state: Pick<PipelineState, "repo" | "feature
       repo: real(state.repo),
       featureDir: state.featureDir.split(path.sep).join("/"),
       sourceRepo: source ? real(source) : null,
-      workspaceId: state.worktree?.workspaceId ?? null,
+      workspaceId: state.worktree?.workspaceRef ?? null,
       project: path.basename(real(source ?? state.repo)),
       registeredAt: existing?.registeredAt ?? new Date().toISOString(),
       ...(chatAgentId ?? existing?.chatAgentId ? { chatAgentId: chatAgentId ?? existing?.chatAgentId ?? null } : {}),

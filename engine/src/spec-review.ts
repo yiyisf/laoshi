@@ -42,7 +42,7 @@ async function main(): Promise<number> {
       status: "running",
       attempt: 1,
       specHash: hashFile(specPath),
-      originAgentId: origin,
+      originSessionId: origin,
       pid: process.pid,
       startedAt: now,
       updatedAt: now,

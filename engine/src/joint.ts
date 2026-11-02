@@ -101,7 +101,7 @@ export async function ensureJointRepos(input: {
       baseRef,
       branchName: branch,
       title: `${input.title}（${name}）`,
-      callerAgentId: state.originAgentId,
+      callerAgentId: state.originSessionId,
     });
     const repo = fs.realpathSync(created.directory);
     ensurePipelineDir(repo, input.featureDir);
@@ -110,7 +110,7 @@ export async function ensureJointRepos(input: {
       slug: slugFor(sourceRepo, state.joint.map((j) => j.slug)),
       sourceRepo,
       repo,
-      workspaceId: created.workspaceId,
+      workspaceRef: created.workspaceId,
       branch,
       specHash: null,
     };

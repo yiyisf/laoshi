@@ -97,6 +97,7 @@ Node 22.22，Linux。
 | `engine/src/records.ts`、`notifiers.ts`、`api.ts` | 使用记录、通知事件、`req api list` 加上代码库和使用者（`identity.ts`） | M2c |
 | `adapters/paseo/*` | daemon 地址改由 `settings.ts` 的 `daemonOf` 读取（`platform.paseo` 优先） | M2c |
 | `skills/`、`contracts/verify.md` | 项目配置写作 `.laoshi.json` | M2c |
+| `engine/src/state.ts` 及读取状态的各处（`main`、`pipeline`、`control`、`joint`、`api`、`reply`、`review`、`try`、`spec-review`、`records`、`worktree`、`features`） | 状态第 2 版：`originSessionId`、`workspaceRef`、`wakeups[].ref`；`adapter`；运行中的旧版文件只在内存中迁移。**移植 req-kit 补丁时**，补丁里的 `state.originAgentId`、`worktree.workspaceId`、`joint[].workspaceId`、`state.schedules` / `.id` 要改成新名；`req api`、通知、使用记录的输出字段名不变 | M2d |
 
 ## 移植登记
 

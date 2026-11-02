@@ -1,6 +1,6 @@
 # 状态文件 v2
 
-- 状态：提议
+- 状态：**已实现**（laoshi M2d，2026-11-02；格式说明见 [contracts/state.md](../../contracts/state.md)）。与本文的差别：迁移在读到时就写回（沿用 req-kit 的机制），只有还在运行的流水线才只在内存中迁移；模式 B 的 `mode`、`stepRequest` 只定义了字段，还没有用到
 - 现状：req-kit 的 `state.json` 是 `version: 1`（`engine/src/state.ts` 中 `STATE_VERSION = 1`，`STATE_MIGRATIONS` 目前为空）。格式规则见 [contracts/state.md](../../contracts/state.md)：只加可选字段不升版；改变字段含义或增加必需字段要升版并写迁移。
 
 ## 1. 为什么要升版

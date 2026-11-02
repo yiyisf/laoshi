@@ -66,7 +66,7 @@ export async function tryRequirement(input: { repo: string; featureDir: string; 
   if (state && state.status === "running" && isAlive(state.pid)) {
     return { ok: false, message: "流水线还在运行，它会自己启动和停止服务。等开发结束后再试用。", services: [], howTo };
   }
-  const target: ServiceTarget | null = state?.worktree?.workspaceId ? { workspaceId: state.worktree.workspaceId } : state?.originAgentId ? { agentId: state.originAgentId } : null;
+  const target: ServiceTarget | null = state?.worktree?.workspaceRef ? { workspaceId: state.worktree.workspaceRef } : state?.originSessionId ? { agentId: state.originSessionId } : null;
   const names = target ? await input.runtime.listServices(target).catch(() => null) : null;
   if (!target || !names || names.length === 0) {
     return {

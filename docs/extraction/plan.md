@@ -39,7 +39,7 @@ npm 包名：**`laoshi`（已确认可用）**。
   - **M2a 适配器接口**（已完成，2026-11-01）：`PlatformAdapter`（[platform.ts](../../engine/src/platform.ts)）；profile 解析、体检、配置向导、版本检查、会话识别放到接口后面；未声明的能力统一降级；体检列出能力来源。核心中只有 `runtime-loader.ts` 引用适配器（有测试）。
   - **M2b 内置能力**（已完成，2026-11-01）：worktree（`git worktree`，后台准备命令）、服务管理（`.laoshi/services.json`，端口、健康检查、跨进程停止，Windows 不用 PowerShell），dsh 适配器改用这两项；本机调度已设计未实现（[builtin-capabilities](../design/builtin-capabilities.md)）。
   - **M2c 配置与身份**（已完成，2026-11-02）：安装根 `LAOSHI_HOME`；安装级 → 代码库级两层（`.laoshi.json`，旧名继续读）；`platform.<id>`；代码库与使用者标识写进使用记录、通知事件和 `req api list`（[ADR 0007 实现](../adr/0007-one-install-many-repos.md#实现m2c2026-11-02)）。
-  - M2d 状态 v2 与迁移（ADR 0004）。
+  - **M2d 状态 v2 与迁移**（已完成，2026-11-02）：`STATE_VERSION` 2，去掉平台含义的字段改名，`.bak-v1`，运行中的流水线不改写，对外契约仍为 `schema: 1`（[contracts/state.md](../../contracts/state.md)）。
   - M2e 词汇：核心中的平台名、`/laoshi` 命名，CI 检查。
 
 > **顺序说明（ADR 0006）**：摸高平台就是内部平台，M4 优先于原计划，与 M3 并行；M5 的"生成"排在两个手写适配器之后。

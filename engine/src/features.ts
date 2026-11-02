@@ -290,14 +290,16 @@ export function findWorktreeRun(sourceRepo: string, feature: string): WorktreeRu
       if (!(dir === name || dir.toLowerCase().includes(name.toLowerCase()))) continue;
       try {
         const state = JSON.parse(fs.readFileSync(path.join(root, dir, ".pipeline", "state.json"), "utf8")) as {
-          worktree?: { workspaceId?: string; sourceRepo?: string } | null;
+          // workspaceRef: state v2 (laoshi M2d); workspaceId: v1, which this reads without migrating.
+          worktree?: { workspaceRef?: string; workspaceId?: string; sourceRepo?: string } | null;
           status?: string;
           phase?: string;
         };
         // The chat it was started from; or, for testing, any chat of the same repository (ADR 0022).
         const forTesting = state.status === "phase_done" || state.phase === "verify";
-        if (state.worktree?.workspaceId && state.worktree.sourceRepo && (isSameDir(state.worktree.sourceRepo, sourceRepo) || forTesting)) {
-          matches.push({ repo: fs.realpathSync(wt.path), featureDir: `${prefix}/${dir}`, workspaceId: state.worktree.workspaceId });
+        const ref = state.worktree?.workspaceRef ?? state.worktree?.workspaceId;
+        if (ref && state.worktree?.sourceRepo && (isSameDir(state.worktree.sourceRepo, sourceRepo) || forTesting)) {
+          matches.push({ repo: fs.realpathSync(wt.path), featureDir: `${prefix}/${dir}`, workspaceId: ref });
         }
       } catch {
         // No run there.

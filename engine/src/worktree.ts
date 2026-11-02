@@ -189,7 +189,7 @@ export async function moveToOwnWorktree(input: {
   writeRecord({ schema: 1, sourceRepo: fs.realpathSync(sourceRepo), featureDir, repo, workspaceId, branch, baseRef: record?.baseRef ?? baseRef, createdAt: record?.createdAt ?? new Date().toISOString(), originAgentId: input.originAgentId }, env);
 
   // The plugin lists it where it now lives, still under the chat's project.
-  registerRequirement({ repo, featureDir, worktree: { workspaceId, sourceRepo: fs.realpathSync(sourceRepo) } }, env, input.originAgentId);
+  registerRequirement({ repo, featureDir, worktree: { workspaceRef: workspaceId, sourceRepo: fs.realpathSync(sourceRepo) } }, env, input.originAgentId);
 
   // The spec and interview notes were written in the chat's checkout; move them over.
   const from = path.join(sourceRepo, featureDir);
