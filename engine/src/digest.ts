@@ -42,7 +42,7 @@ export function digestText(project: string, features: FeatureSummary[], now = ne
     }
   }
   if (lessons.length > 0) {
-    lines.push("", "反复出现的问题（建议变成项目的规则，可以运行 /req-retro）：");
+    lines.push("", "反复出现的问题（建议变成项目的规则，可以运行 /laoshi-retro）：");
     for (const l of lessons.slice(0, 5)) {
       lines.push(`- ${l.category}：${l.features.length} 个需求（${l.features.join("、")}）${l.rules.length > 0 ? `；建议：${l.rules[0]}` : ""}`);
     }

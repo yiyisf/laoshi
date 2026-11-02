@@ -13,7 +13,7 @@
 
 ## 1. 找到需求并查看状态
 
-按 `{{REQ_KIT_ROOT}}/skills/req/playbooks/status.md` 第 1 步找到功能目录，执行"查看进度"命令，知道现在在哪一步。
+按 `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/status.md` 第 1 步找到功能目录，执行"查看进度"命令，知道现在在哪一步。
 
 需求在另一个工作区（`--list` 的输出中"位置"不是当前工作区）时，告诉需求方到那个工作区的对话中修改，不要在这里改。
 

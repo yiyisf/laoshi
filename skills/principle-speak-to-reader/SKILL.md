@@ -1,6 +1,6 @@
 ---
 name: principle-speak-to-reader
-description: req-kit 工作原则：按读者说话。对需求方讲需求和结果，不讲代码实现。在使用 /req 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: req-kit 工作原则：按读者说话。对需求方讲需求和结果，不讲代码实现。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 按读者说话

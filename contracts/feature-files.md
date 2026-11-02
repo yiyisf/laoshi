@@ -1,4 +1,4 @@
-# 功能目录中由人和 /req 维护的文件
+# 功能目录中由人和 /laoshi 维护的文件
 
 除 spec.md（见 [spec.md](spec.md)）外，功能目录 `docs/features/<日期>-<名称>/` 中还有以下约定格式的文件。
 
@@ -21,7 +21,7 @@ time	step	ref	decision	alternatives	reason	kind	needs_human
 
 ## changes.md
 
-需求变更记录，由 `/req` 的"修改需求"手册追加，每次修改一节，新的在后：
+需求变更记录，由 `/laoshi` 的"修改需求"手册追加，每次修改一节，新的在后：
 
 ```markdown
 ## 第 2 版（2026-10-14）
@@ -40,7 +40,7 @@ spec.md 头部的"版本"与最新一节一致。
 
 ## test-env.md（测试环境说明）
 
-1.7.0 起。在已部署的测试环境中做测试验证（`--verify-env deployed` 或配置 `phases.verify.environment`）时必须有，由 `/req` 的"开始测试验证"手册和用户一起写。流水线只使用其中列出的环境、账号和数据：
+1.7.0 起。在已部署的测试环境中做测试验证（`--verify-env deployed` 或配置 `phases.verify.environment`）时必须有，由 `/laoshi` 的"开始测试验证"手册和用户一起写。流水线只使用其中列出的环境、账号和数据：
 
 ```markdown
 # 测试环境：<需求名称>
@@ -69,7 +69,7 @@ spec.md 头部的"版本"与最新一节一致。
 
 ## card.json（外部系统的卡片字段）
 
-1.9.0 起。团队配置了外部系统对接（`integrations`）、且其中写了 `cardFields` 时，由 `/req` 在需求说明确认时和需求方一起确认后写入，与 `spec.md` 一起提交：
+1.9.0 起。团队配置了外部系统对接（`integrations`）、且其中写了 `cardFields` 时，由 `/laoshi` 在需求说明确认时和需求方一起确认后写入，与 `spec.md` 一起提交：
 
 ```json
 { "title": "<卡片标题，可省略，默认用需求说明的标题>", "body": "<卡片描述，可省略，默认用 spec.md 全文>", "fields": { "<字段>": "<值>" } }
@@ -122,7 +122,7 @@ category	finding	source	rule	layer
 
 ## acceptance.md
 
-验收记录，由 `/req` 的"验收"手册写。验收标准本身只在 spec.md 中维护，这里只记录结果：
+验收记录，由 `/laoshi` 的"验收"手册写。验收标准本身只在 spec.md 中维护，这里只记录结果：
 
 ```markdown
 # 验收记录：<需求名称>

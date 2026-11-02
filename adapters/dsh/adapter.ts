@@ -26,6 +26,7 @@ export const dshAdapter: PlatformAdapter = {
     schedule: "dsh 定时任务",
     approvePermission: "在 dsh 的界面中打开这个对话的子 agent「{agent}」，查看并批准这个请求（或拒绝）",
     signIn: "检查 dsh 中这个模型的配置",
+    connectFix: "确认 dsh 正在运行，并已用 `dsh plugin add` 安装、在 `cordis.patch.yml` 中挂载 laoshi 的 dsh 插件。",
   },
   doctorTitle: "DeepSeek Harness（dsh）与 laoshi 插件",
   async doctorPlatform({ config, configPath, tools }) {

@@ -1,6 +1,6 @@
 ---
 name: principle-this-requirement-only
-description: req-kit 工作原则：只做这个需求。不顺手重构、不升级无关依赖、不改无关文件。在使用 /req 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: req-kit 工作原则：只做这个需求。不顺手重构、不升级无关依赖、不改无关文件。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 只做这个需求

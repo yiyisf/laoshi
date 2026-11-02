@@ -36,6 +36,10 @@ export interface PlatformWords {
   browser: string | null;
   /** Who can watch the step's browser, a sentence; null when nobody can. */
   browserWatch: string | null;
+  /** How the platform tells laoshi which chat it runs in, a clause, e.g. "<平台> 提供的 `X_ID`". Set by wordsFor from the adapter. */
+  origin: string;
+  /** What to check when the platform cannot be reached, a sentence. */
+  connectFix: string;
   /** The view where people follow requirements, e.g. "<平台> 的 req-kit 插件"; null when none. */
   requirementView: string | null;
 }
@@ -57,6 +61,8 @@ export const NEUTRAL_WORDS: PlatformWords = {
   requirementPage: null,
   browser: null,
   browserWatch: null,
+  origin: "平台提供的环境变量",
+  connectFix: "确认平台正在运行。",
   requirementView: null,
 };
 

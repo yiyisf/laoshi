@@ -73,7 +73,7 @@ export async function tryRequirement(input: { repo: string; featureDir: string; 
     return {
       ok: false,
       message:
-        `这个项目没有用 ${wordsFor(input.config).managedServices.replace(/的服务$/, "的服务脚本")}（${wordsFor(input.config).servicesFile}），不能一键启动。可以在这个需求的对话里说"帮我把它跑起来"，或按下面的方法启动；以后请开发同事运行 /req-setup 写好 ${wordsFor(input.config).servicesFile}，就能一键试用。`,
+        `这个项目没有用 ${wordsFor(input.config).managedServices.replace(/的服务$/, "的服务脚本")}（${wordsFor(input.config).servicesFile}），不能一键启动。可以在这个需求的对话里说"帮我把它跑起来"，或按下面的方法启动；以后请开发同事运行 /laoshi-setup 写好 ${wordsFor(input.config).servicesFile}，就能一键试用。`,
       services: [],
       howTo,
     };

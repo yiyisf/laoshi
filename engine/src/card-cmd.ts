@@ -114,7 +114,7 @@ export async function withRuntime<T>(config: PipelineConfig, use: (runtime: Agen
 export function sessionStartPrompt(input: { system: string; id: string; title: string; featureDir: string }): string {
   const publish = `${REQ} card publish "${input.system}:${input.id}"`;
   return [
-    `/req 无人值守：这是从${input.system}卡片 ${input.id}「${input.title}」自动开始的需求。`,
+    `/laoshi 无人值守：这是从${input.system}卡片 ${input.id}「${input.title}」自动开始的需求。`,
     "",
     "【需求开发流水线】这个对话由 req-kit 接单时创建，没有人在这里实时回复。需求方通过卡片描述末尾的两个区块和你交流：你写的内容出现在“AI 区”，需求方在“需求方回复”区回答和确认。",
     "",
@@ -432,7 +432,7 @@ function route(argv: string[], opts: CardCmdOptions): number {
     const repo = gitTop(path.resolve(cwd, values.add));
     const r = readRoute(repo);
     setRegisteredRepos([...registeredRepos(opts.env), repo], opts.env);
-    out(r ? `已登记 ${repo}：${r.system} 空间 ${r.projectId ?? "（未写）"}，子系统 ${r.subsystems.join("、") || "（未写）"}` : `已登记 ${repo}，但它的项目配置还没有 cardSource（运行 /req-setup 写上）`);
+    out(r ? `已登记 ${repo}：${r.system} 空间 ${r.projectId ?? "（未写）"}，子系统 ${r.subsystems.join("、") || "（未写）"}` : `已登记 ${repo}，但它的项目配置还没有 cardSource（运行 /laoshi-setup 写上）`);
     return 0;
   }
   if (values.remove) {
@@ -444,7 +444,7 @@ function route(argv: string[], opts: CardCmdOptions): number {
   if (systems.length === 0) out("没有配置可以读取卡片的外部系统（本机或团队配置的 integrations 中没有写 query）。");
   const { routes, missing } = cardRoutes(opts.env);
   if (routes.length === 0 && missing.length === 0) {
-    out("本机还没有登记接收卡片的仓库：在仓库中运行 /req-setup（或 req card route --add <仓库目录>）。");
+    out("本机还没有登记接收卡片的仓库：在仓库中运行 /laoshi-setup（或 req card route --add <仓库目录>）。");
     return 0;
   }
   for (const r of routes) out(`${r.system}  空间 ${r.projectId ?? "-"}  子系统 ${r.subsystems.join("、") || "-"}  标题关键字 ${r.titleKeywords.join("、") || "-"}  ${r.repo}`);

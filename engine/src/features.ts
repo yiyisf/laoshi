@@ -2,7 +2,7 @@
 //
 // Each requirement normally lives on its own worktree and branch, so a committed
 // index file would conflict on every merge. The overview is generated instead:
-// `start-pipeline --list` prints it, and /req uses it for status and takeover.
+// `start-pipeline --list` prints it, and /laoshi uses it for status and takeover.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";

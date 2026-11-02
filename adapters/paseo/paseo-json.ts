@@ -4,7 +4,7 @@
 //   worktree.setup: bash (macOS, Linux) / powershell -ExecutionPolicy Bypass (Windows)
 //   scripts:        the terminal's shell, $SHELL or /bin/sh (macOS, Linux) / cmd.exe (Windows)
 // paseo.json is committed and shared, so commands should work in all of them: plain program
-// invocations, with environment variables read by the program (see /req-setup's helpers).
+// invocations, with environment variables read by the program (see /laoshi-setup's helpers).
 
 export type PaseoJson = { worktree?: { setup?: unknown }; scripts?: Record<string, { type?: string; command?: string; port?: number }> };
 
@@ -38,7 +38,7 @@ export interface PaseoJsonIssue {
 }
 
 const FIX =
-  "改成各系统都一样的写法：准备命令用 node scripts/paseo/copy-local-files.mjs .env，服务用 node scripts/paseo/with-port.mjs npm run dev -- --port {PORT}（/req-setup 会写入这两个脚本）";
+  "改成各系统都一样的写法：准备命令用 node scripts/paseo/copy-local-files.mjs .env，服务用 node scripts/paseo/with-port.mjs npm run dev -- --port {PORT}（/laoshi-setup 会写入这两个脚本）";
 
 /** Problems of the project's paseo.json for the system Paseo runs on (process.platform by default). */
 export function paseoJsonIssues(raw: PaseoJson, platform: NodeJS.Platform = process.platform): PaseoJsonIssue[] {

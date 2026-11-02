@@ -55,6 +55,12 @@ export interface PlatformAdapter {
   describeProfile?(profile: AgentProfile): string;
   /** laoshi M2e: the platform's words in messages and prompts (engine/src/words.ts); the rest are neutral. */
   words?: Partial<PlatformWords>;
+  /**
+   * laoshi M2e: the file with this platform's sections of the /laoshi-setup skill ("<!-- fragment: name -->"
+   * blocks, e.g. how to write its workspace configuration). Without it, laoshi's builtin sections
+   * when the platform uses laoshi's builtin services.
+   */
+  skillSetup?: string;
   /** Heading of the platform section in `doctor`. */
   doctorTitle: string;
   /** The platform section of `doctor` (connection, versions, profiles), when not --offline. */

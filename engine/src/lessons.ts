@@ -1,5 +1,5 @@
 // Recurring review findings: the report step writes lessons.tsv (problems a project-level
-// rule would prevent); the overview and /req-retro look for a category that keeps coming
+// rule would prevent); the overview and /laoshi-retro look for a category that keeps coming
 // back across requirements, the cue to turn it into a lint rule, a type, a test or a note.
 
 import fs from "node:fs";

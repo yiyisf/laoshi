@@ -31,7 +31,7 @@ export interface LaunchArgs {
   stop: boolean;
   /** --list: print every requirement in this repository's worktrees. */
   list: boolean;
-  /** --card-fields: what /req confirms with the spec for the external systems (card.json). */
+  /** --card-fields: what /laoshi confirms with the spec for the external systems (card.json). */
   cardFields?: boolean;
   /** 1.14 --track: register a requirement being aligned, before the pipeline runs (shown in the plugin). */
   track?: boolean;

@@ -20,6 +20,10 @@ laoshi 的核心来自 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)�
 | `engine/src/daemon-version.ts` | `adapters/paseo/daemon-version.ts` |
 | `engine/test/paseo-json.test.ts` | `adapters/paseo/test/paseo-json.test.ts` |
 | `engine/test/paseo-runtime.test.ts` | `adapters/paseo/test/paseo-runtime.test.ts` |
+| `skills/req/`、`skills/req-setup/`、`skills/req-doctor/`、`skills/req-retro/` | `skills/laoshi/`、`skills/laoshi-setup/`、`skills/laoshi-doctor/`、`skills/laoshi-retro/`（M2e） |
+| `skills/req-setup/templates/paseo/` | `adapters/paseo/skill/templates/`（M2e） |
+| `skills/req-setup/SKILL.md` 中 `paseo.json` 的各段 | `adapters/paseo/skill/setup.md` 的片段（M2e） |
+| `engine/prompts/paseo-services.md` | `engine/prompts/managed-services.md`（M2e） |
 | `engine/src/smoke-test.ts` | `adapters/paseo/smoke-test.ts`（M2a） |
 | `engine/src/doctor.ts` 中的 `daemon()`、`paseoJson()`、SDK 版本检查 | `adapters/paseo/doctor.ts`（M2a） |
 | `engine/src/configure.ts` 中的 `daemonCatalog` 与连接 daemon | `adapters/paseo/adapter.ts` 的 `agentCatalog`（M2a） |

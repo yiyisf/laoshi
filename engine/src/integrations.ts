@@ -4,7 +4,7 @@
 // An integration is a local command line tool (e.g. an ALM's CLI) described in the machine or
 // team configuration: how to create a card, how to change its state, and which state each
 // pipeline event maps to. The engine fills the arguments from the requirement and the card
-// fields the requester confirmed with the spec (card.json, written by /req), runs the tool
+// fields the requester confirmed with the spec (card.json, written by /laoshi), runs the tool
 // without a shell, reads the card's id and link from its output and keeps them in the state
 // file. A call that fails is kept in order and sent again before the next one, or with
 // `req sync`. An integration never stops the pipeline.
@@ -94,7 +94,7 @@ export interface ExternalRecord {
   pending: Array<{ action: "create" | "status"; event: IntegrationEvent; status: string | null; at: string; attempts: number; error: string }>;
 }
 
-/** The card fields /req writes with the spec: card.json in the feature directory. */
+/** The card fields /laoshi writes with the spec: card.json in the feature directory. */
 export interface CardFile {
   title?: string;
   body?: string;
@@ -460,7 +460,7 @@ export function describeExternal(external: PipelineState["external"]): string[] 
   return lines;
 }
 
-/** For `--card-fields`: what /req should ask for and write to card.json, or null without integrations. */
+/** For `--card-fields`: what /laoshi should ask for and write to card.json, or null without integrations. */
 export function cardFieldsText(integrations: IntegrationConfig[]): string | null {
   const withFields = integrations.filter((i) => i.cardFields && Object.keys(i.cardFields).length > 0);
   if (withFields.length === 0) return null;

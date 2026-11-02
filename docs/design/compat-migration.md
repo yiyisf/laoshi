@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | npm 包 | `paseo-req-kit` | `laoshi`（已确认可用） | `paseo-req-kit` 2.0 成为薄分发包 |
 | 命令 | `req`、`req-kit`、`paseo-req-kit`、`start-pipeline` | `laoshi` | 旧名全部保留为别名 |
-| 入口 skill | `/req`、`/req-setup`、`/req-doctor`、`/req-retro` | `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro` | **已决定**（[ADR 0005](../adr/0005-skill-names.md)）：`paseo-req-kit` 2.0 额外安装转发到 laoshi 的 `/req*` 薄 skill |
+| 入口 skill | `/req`、`/req-setup`、`/req-doctor`、`/req-retro` | `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro`（M2e 已改名） | **已决定**（[ADR 0005](../adr/0005-skill-names.md)）：`paseo-req-kit` 2.0 额外安装转发到 laoshi 的 `/req*` 薄 skill |
 | 机器配置目录 | `~/.req-kit/` | `~/.laoshi/` | 旧目录作回退读取；`REQ_KIT_HOME` 仍然有效，新增 `LAOSHI_HOME` |
 | 项目配置 | `.requirement-pipeline.json`、`.requirement-pipeline/`（含 `project-notes.md`、`verify.md`） | `.laoshi.json`、`.laoshi/` | 两者都读，新项目写新名；`laoshi migrate` 提供重命名但不强制（避免逼团队仓库提交改名） |
 | 功能目录 | `docs/features/<日期>-<名称>/` | 不变 | — |

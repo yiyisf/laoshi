@@ -81,9 +81,11 @@ export async function resolveProfiles(config: PipelineConfig, runtime: AgentRunt
  */
 export function wordsFor(config?: unknown): PlatformWords {
   const adapter = config === undefined ? adapterForFile(defaultConfigPath()) : (ADAPTERS[adapterIdOf(config)] ?? ADAPTERS[DEFAULT_ADAPTER]);
+  const env = [adapter.originEnv.id, ...(adapter.originEnv.cwd ? [adapter.originEnv.cwd] : [])];
   return {
     ...NEUTRAL_WORDS,
     ...(adapter.capabilities.services === "builtin" ? BUILTIN_SERVICE_WORDS : {}),
+    origin: `${adapter.words?.name ?? adapter.displayName} 提供的 ${env.map((e) => `\`${e}\``).join("、")}`,
     ...adapter.words,
   };
 }

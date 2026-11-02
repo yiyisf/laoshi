@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 // Where things live.
 //
 //   <kit root>/                 one installed version of req-kit, e.g. ~/tools/req-kit/versions/1.0.0
-//     bin/start-pipeline.mjs    launcher the /req skill runs
+//     bin/start-pipeline.mjs    launcher the /laoshi skill runs
 //     engine/prompts/           step prompts shipped with this version
 //     principles/INDEX.md       principles shared by the chat skills and the step prompts
 //   <kit home>/                 machine settings that survive upgrades, default ~/.req-kit

@@ -458,7 +458,7 @@ export function planAppendix(repo: string, featureDir: string): string | null {
 
 // ---------------------------------------------------------------------------
 // Which repository a card belongs to (1.10): each repository says in its project file
-// (cardSource, written by /req-setup) which system, space and subsystems it takes; the
+// (cardSource, written by /laoshi-setup) which system, space and subsystems it takes; the
 // machine keeps a list of repositories that take cards (~/.req-kit/card-repos.json).
 
 export interface CardRoute {
@@ -528,7 +528,7 @@ export function routeCard(card: Pick<CardData, "id" | "title" | "subsystem">, sy
   const bySubsystem = card.subsystem ? ofSystem.filter((r) => r.subsystems.some((s) => same(s, card.subsystem!))) : [];
   if (bySubsystem.length === 0) {
     throw new Error(
-      `卡片 ${card.id} 的子系统「${card.subsystem ?? "（没有）"}」没有对应的仓库。本机登记的仓库：${ofSystem.map((r) => `${r.repo}（${r.subsystems.join("、") || "未写子系统"}）`).join("；")}。请在对应仓库运行 /req-setup 写上这个子系统，或用 --repo 指定。`,
+      `卡片 ${card.id} 的子系统「${card.subsystem ?? "（没有）"}」没有对应的仓库。本机登记的仓库：${ofSystem.map((r) => `${r.repo}（${r.subsystems.join("、") || "未写子系统"}）`).join("；")}。请在对应仓库运行 /laoshi-setup 写上这个子系统，或用 --repo 指定。`,
     );
   }
   if (bySubsystem.length === 1) return bySubsystem[0].repo;
