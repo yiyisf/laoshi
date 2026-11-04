@@ -116,7 +116,8 @@ fs.writeFileSync(
   JSON.stringify({
     ...base,
     platform: { adapter: "dsh" },
-    agents: { builder: { provider: "dsh/chat-model" }, reviewer: { provider: "dsh/chat-model" } },
+    // builder: the chat's model; reviewer: a model of its own (M4b, per-role models), the same scripted one here.
+    agents: { builder: { provider: "dsh/chat-model" }, reviewer: { provider: "e2e/step-1" } },
     waitChunkSeconds: 2,
     watchdogMinutes: 0,
     selfHeal: false,
@@ -152,6 +153,16 @@ try {
   const chatRun = spawnSync(process.execPath, [tsx, helper, repo], { env, encoding: "utf8", timeout: 120_000 });
   const chat = chatRun.stdout.trim().split("\n").at(-1);
   check("建立发起流水线的对话", chatRun.status === 0 && /^session-/.test(chat ?? ""), chatRun.status === 0 ? chat : chatRun.stderr.slice(-300));
+
+  // The dsh section of doctor against this host: the plugin, its models, each role's model.
+  const doctor = spawnSync(process.execPath, [tsx, path.join(root, "engine", "src", "doctor.ts"), "--no-project", "--config", configPath], { env, encoding: "utf8", timeout: 120_000 });
+  const doctorOut = `${doctor.stdout}${doctor.stderr}`;
+  fs.writeFileSync(path.join(logs, "doctor.log"), doctorOut);
+  check(
+    "体检：连上插件，列出 dsh 的模型，逐个角色检查模型",
+    /已连接 laoshi 的 dsh 插件/.test(doctorOut) && /dsh 中可用的模型：[^\n]*e2e\/step-1/.test(doctorOut) && /✓ builder：用对话的模型/.test(doctorOut) && /✓ reviewer：e2e\/step-1/.test(doctorOut),
+    "见 logs/doctor.log",
+  );
 
   const started = Date.now();
   const kitHome = path.join(out, "kit-home");
@@ -210,6 +221,12 @@ try {
   const pluginLog = fs.readFileSync(channelPaths(home).log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const spawned = pluginLog.filter((l) => l.spawn);
   check("步骤 agent 都挂在对话下", spawned.length >= keys.length && spawned.every((l) => l.parent === chat), `${spawned.length} 个子 agent：${spawned.map((l) => l.label).join("、")}`);
+  const reviewSteps = spawned.filter((l) => /方案审核|代码评审|功能验证/.test(l.label));
+  check(
+    "按角色选模型：reviewer 的步骤用自己的模型，builder 的步骤用对话的模型",
+    reviewSteps.length > 0 && reviewSteps.every((l) => l.model?.provider === "e2e" && l.model?.model === "step-1") && spawned.filter((l) => /方案设计|代码实现/.test(l.label)).every((l) => !l.model),
+    `${reviewSteps.length} 个 reviewer 步骤：${[...new Set(reviewSteps.map((l) => (l.model ? `${l.model.provider}/${l.model.model}` : "对话的模型")))].join("、")}`,
+  );
   if (WORKTREE) check("步骤 agent 在需求的工作区中工作", spawned.length > 0 && spawned.every((l) => l.cwd === workRepo), [...new Set(spawned.map((l) => l.cwd))].join("、"));
   // The final note is queued into the chat as the engine exits: give the chat time to read it.
   const notes = () => fs.readFileSync(path.join(logs, "step-model.log"), "utf8").split("\n").filter((l) => l.includes('"chat"') && l.includes("流水线"));

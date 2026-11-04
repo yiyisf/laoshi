@@ -12,7 +12,7 @@ import path from "node:path";
 import { channelPaths, dshHome } from "./channel.mjs";
 
 export const name = "laoshi-dsh";
-export const inject = ["agents", "subagents", "schedule", "approval", "sessionController"];
+export const inject = ["agents", "subagents", "schedule", "approval", "sessionController", "llm"];
 
 const VERSION = "0.1.0-dev";
 const SHELL_TOOLS = new Set(["bash", "pwsh"]);
@@ -118,13 +118,15 @@ export function apply(ctx, config = {}) {
     },
 
     /** A step agent as a child of the chat, labelled, working in cwd; its result goes to the engine only. */
-    spawn: async ({ parent, label, prompt: text, cwd }) => {
+    spawn: async ({ parent, label, prompt: text, cwd, model }) => {
       const parentAgent = await liveAgent(parent);
       const provider = config.subagentProvider ?? "spawn";
+      // The step's own model (the role's provider/model in laoshi's config); without it, the chat's.
+      const agentOptions = model?.provider && model?.model ? { provider: model.provider, model: model.model, ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}) } : null;
       const activation = await ctx.subagents.startActivation({
         provider,
         label,
-        request: { prompt: [{ type: "text", text }], parent: parentAgent, cwd },
+        request: { prompt: [{ type: "text", text }], parent: parentAgent, cwd, ...(agentOptions ? { agentOptions } : {}) },
         signal: new AbortController().signal,
         delivery: "caller",
       });
@@ -137,8 +139,18 @@ export function apply(ctx, config = {}) {
         (result) => (entry.settled = { ok: true, stopReason: result?.stopReason ?? null }),
         (error) => (entry.settled = { ok: false, error: String(error?.message ?? error) }),
       );
-      log({ spawn: childId, parent, label, provider, cwd });
+      log({ spawn: childId, parent, label, provider, cwd, model: agentOptions });
       return { childId };
+    },
+
+    /** The models step agents can use: every provider route with an adapter, and its models. */
+    models: async () => {
+      const providers = [];
+      for (const p of ctx.llm.listProviders()) {
+        const models = await ctx.llm.listModels(p.id).catch(() => []);
+        providers.push({ provider: p.id, name: p.name, models: models.map((m) => ({ id: m.id, name: m.name })) });
+      }
+      return { providers };
     },
 
     /** Is the session working, waiting for an approval, how much has it used. */

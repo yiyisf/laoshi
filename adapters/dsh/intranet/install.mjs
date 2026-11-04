@@ -82,7 +82,7 @@ if (fs.existsSync(configPath)) {
 } else {
   const config = {
     platform: { adapter: "dsh", dsh: { home: slash(dshHome) } },
-    // dsh runs every step with the chat's model; these only satisfy the configuration's format.
+    // Every step on the chat's model; a role can get a model of its own ("<dsh provider>/<model>", see doctor).
     agents: { builder: { provider: "dsh/chat-model" }, reviewer: { provider: "dsh/chat-model" } },
   };
   if (!dry) {

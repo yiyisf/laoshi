@@ -3,7 +3,9 @@
 // is degraded by the core (ADR 0008).
 
 import fs from "node:fs";
+import type { AgentProfile } from "../../engine/src/config.js";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
+import type { DshModels } from "./dsh-runtime.js";
 import { channelPaths, dshHome } from "./plugin/channel.mjs";
 
 export const dshAdapter: PlatformAdapter = {
@@ -18,6 +20,7 @@ export const dshAdapter: PlatformAdapter = {
     activity: "plugin",
     runningTool: "plugin",
     toolCalls: "plugin",
+    providerStatus: "plugin",
   },
   originEnv: { id: "DSH_SESSION_ID" },
   words: {
@@ -30,7 +33,7 @@ export const dshAdapter: PlatformAdapter = {
   },
   doctorTitle: "DeepSeek Harness（dsh）与 laoshi 插件",
   async doctorPlatform({ config, configPath, tools }) {
-    const { dshEnv, pluginClient } = await import("./dsh-runtime.js");
+    const { CHAT_MODEL, dshEnv, pluginClient, stepModel } = await import("./dsh-runtime.js");
     let raw: unknown = config;
     if (!raw) {
       try {
@@ -42,8 +45,25 @@ export const dshAdapter: PlatformAdapter = {
     const env = dshEnv(raw);
     const paths = channelPaths(dshHome(env));
     try {
-      const hello = await pluginClient(env, 10_000)<{ plugin: string; approvals: string }>("hello");
+      const call = pluginClient(env, 10_000);
+      const hello = await call<{ plugin: string; approvals: string }>("hello");
       tools.report("ok", `已连接 laoshi 的 dsh 插件 ${hello.plugin}（${paths.socket}），审批策略：${hello.approvals}`);
+      const listed = await call<DshModels>("models").catch(() => null);
+      if (!listed) {
+        tools.report("warn", "插件没有列出 dsh 的模型（插件版本较旧？）", "重新运行安装脚本，更新 laoshi 的 dsh 插件后重启 dsh");
+        return;
+      }
+      const names = listed.providers.flatMap((p) => p.models.map((m) => `${p.provider}/${m.id}`));
+      tools.info(`dsh 中可用的模型：${names.length ? names.join("、") : "（无）"}。agent 的 provider 写成"<提供方>/<模型>"即可让这个角色用它；写 ${CHAT_MODEL} 时用对话的模型`);
+      const agents = (config as { agents?: Record<string, AgentProfile | null | undefined> } | null)?.agents ?? {};
+      for (const role of ["builder", "reviewer", "fallback"]) {
+        const profile = agents[role];
+        if (!profile) continue;
+        const model = stepModel(profile);
+        if (!model) tools.report("ok", `${role}：用对话的模型`);
+        else if (names.includes(`${model.provider}/${model.model}`)) tools.report("ok", `${role}：${model.provider}/${model.model}${model.reasoningEffort ? `（推理强度 ${model.reasoningEffort}）` : ""}`);
+        else tools.report("fail", `${role} 用的模型 ${model.provider}/${model.model} 在 dsh 中不存在`, `改成上面列出的模型之一，或写 ${CHAT_MODEL} 用对话的模型`);
+      }
     } catch (error) {
       tools.report(
         "fail",
