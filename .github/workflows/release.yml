@@ -1,0 +1,179 @@
+# Publishes laoshi to npm and creates the GitHub Release for a version tag (no "v" prefix,
+# e.g. 0.1.0 or 0.2.0-beta.1). Modeled on paseo-req-kit's release workflow.
+#
+# Tags come from either side:
+# - pushed by a person (git push origin 0.1.0), or
+# - made here: when main gets a package.json whose version has no tag yet, that commit is
+#   tagged in the same run, only after its tests pass (a failed run leaves no tag, so the same
+#   version is released once the fix is in). Development versions (x.y.z-dev) are never released.
+#
+# Setup once (docs/guide/维护者指南.md, "npm 发布的一次性设置"): the first publish needs an
+# NPM_TOKEN secret (npm trusted publishing needs the package to exist); after that, add this
+# repository and this workflow file as a trusted publisher of the package and remove the token.
+name: release
+
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+*"]
+    branches: [main]
+  # Re-run the release of an existing tag: Actions → release → Run workflow → tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to release, e.g. 0.1.0"
+        required: true
+
+permissions:
+  contents: write   # the tag, and the GitHub Release with the .tgz and the offline package
+  id-token: write   # npm trusted publishing (OIDC) and provenance
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Which version to release; on a push to main, package.json's version when it has no tag yet.
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.decide.outputs.tag }}
+      create: ${{ steps.decide.outputs.create }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: decide
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            case "$VERSION" in
+              *-dev*)
+                echo "::notice::$VERSION is a development version; nothing to release."
+                echo "tag=" >> "$GITHUB_OUTPUT" ;;
+              *)
+                if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null; then
+                  echo "::notice::$VERSION is already tagged; nothing to release."
+                  echo "tag=" >> "$GITHUB_OUTPUT"
+                else
+                  echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "create=true" >> "$GITHUB_OUTPUT"
+                fi ;;
+            esac
+          fi
+
+  # The intranet runs laoshi on Windows: its tests and the package check pass there too before
+  # anything is tagged or published.
+  windows:
+    needs: tag
+    if: ${{ needs.tag.outputs.tag != '' }}
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.create == 'true' && github.sha || format('refs/tags/{0}', needs.tag.outputs.tag) }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        shell: bash
+      - run: npm test
+        shell: bash
+      - run: node scripts/check-package.mjs
+        shell: bash
+
+  release:
+    needs: [tag, windows]
+    if: ${{ needs.tag.outputs.tag != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.create == 'true' && github.sha || format('refs/tags/{0}', needs.tag.outputs.tag) }}
+          fetch-depth: 0   # the docs' "last updated" times come from git history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs a recent npm.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - name: Tag and package.json agree
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test "$VERSION" = "$TAG" || { echo "package.json is $VERSION, tag is $TAG"; exit 1; }
+      - name: CHANGELOG has this version
+        run: grep -qE "^## $TAG( |$)" CHANGELOG.md || { echo "::error::CHANGELOG.md has no '## $TAG' section"; exit 1; }
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run eval:self-check
+      # The docs site goes into the package, so `laoshi docs` works without the internet
+      # (e.g. inside a company network that only has an npm mirror).
+      - name: Build the docs into the package
+        run: |
+          cd site
+          npm ci --no-audit --no-fund
+          BASE_URL=/ npm run build
+          cd ..
+          rm -rf site-dist
+          cp -R site/.vitepress/dist site-dist
+          test -f site-dist/index.html
+          du -sh site-dist
+      - name: Package
+        run: |
+          npm pack
+          ls -l laoshi-*.tgz
+      - name: Check the package as users install it
+        run: node scripts/check-package.mjs --tgz "laoshi-$TAG.tgz" --require-docs
+      # For machines without any npm registry (docs/intranet/install-verify.md).
+      - name: Offline package for Windows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/pack-intranet.mjs --out "$RUNNER_TEMP/offline"
+          cp "$RUNNER_TEMP"/offline/*.zip .
+      - name: Tag the tested commit
+        if: ${{ needs.tag.outputs.create == 'true' }}
+        run: |
+          git tag -a "$TAG" -m "laoshi $TAG"
+          git push origin "refs/tags/$TAG"
+          echo "::notice::Tagged $GITHUB_SHA as $TAG."
+      # A version already on npm (a re-run) is skipped, so the Release can still be made.
+      - name: Publish
+        id: publish
+        continue-on-error: true   # the Release with the .tgz is still made; the job fails at the end
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "laoshi@$TAG" version >/dev/null 2>&1; then
+            echo "::notice::laoshi@$TAG is already on npm; skipping publish."
+            exit 0
+          fi
+          case "$TAG" in
+            *-*) npm publish "laoshi-$TAG.tgz" --tag beta ;;
+            *)   npm publish "laoshi-$TAG.tgz" ;;
+          esac
+      - name: Release notes from CHANGELOG.md
+        run: |
+          node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const m=new RegExp('^## '+process.env.TAG.replace(/\./g,'\\\\.')+'( .*)?$','m').exec(s);const rest=m?s.slice(m.index+m[0].length):'';const j=rest.search(/^## /m);require('fs').writeFileSync(process.env.RUNNER_TEMP+'/notes.md',(j<0?rest:rest.slice(0,j)).trim()+'\n')"
+          cat "$RUNNER_TEMP/notes.md"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            laoshi-*.tgz
+            laoshi-*-win32-x64.zip
+          prerelease: ${{ contains(env.TAG, '-') }}
+          body_path: ${{ runner.temp }}/notes.md
+      - name: Publish to npm failed
+        if: ${{ steps.publish.outcome == 'failure' }}
+        run: |
+          echo "::error::npm publish failed. The GitHub Release and its .tgz were created; install with npm i -g <the .tgz URL>. See docs/guide/维护者指南.md (npm 发布的一次性设置)."
+          exit 1

@@ -1,10 +1,21 @@
 {
   "name": "laoshi",
   "version": "0.1.0-dev",
-  "private": true,
-  "description": "laoshi: a platform-neutral requirement-development workflow, extracted from paseo-req-kit. M1: req-kit 1.15.0's core with the Paseo adapter; not published yet.",
+  "description": "laoshi：给测试、产品、项目经理用的需求开发体系。在 agent 平台（Paseo、DeepSeek Harness）的对话中对齐需求，由一组 AI agent 在后台完成设计、实现、评审和验证。",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://yiyisf.github.io/laoshi/",
+  "bugs": {
+    "url": "https://github.com/yiyisf/laoshi/issues"
+  },
+  "keywords": [
+    "requirements",
+    "ai-agent",
+    "pipeline",
+    "paseo",
+    "deepseek",
+    "dsh"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yiyisf/laoshi.git"
@@ -36,5 +47,34 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
+  },
+  "files": [
+    "bin/",
+    "engine/src/",
+    "engine/prompts/",
+    "engine/skill-fragments/",
+    "adapters/*/*.ts",
+    "adapters/*/*.mjs",
+    "adapters/*/skill/**",
+    "adapters/dsh/plugin/",
+    "adapters/dsh/intranet/",
+    "skills/",
+    "principles/",
+    "contracts/",
+    "notifiers/",
+    "docs/guide/",
+    "docs/adr/",
+    "docs/design/",
+    "docs/intranet/",
+    "site-dist/",
+    "config.example.json",
+    "CHANGELOG.md",
+    "SCOPE.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

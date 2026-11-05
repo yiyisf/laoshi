@@ -56,7 +56,8 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
       else execFileSync("dsh", cli, { env: childEnv, stdio: "pipe" });
       added = true;
     } catch (error) {
-      report("info", `dsh plugin add 没有成功（${String(error.stderr ?? error.message).trim().split("\n").at(-1)}），改为直接复制到 profile`);
+      const reason = String(error.stderr || error.message || "").trim().split("\n").at(-1) || `退出码 ${error.status ?? "未知"}`;
+      report("info", `dsh plugin add 没有成功（${reason}），改为直接复制到 profile`);
     }
     if (!added) {
       fs.rmSync(installed, { recursive: true, force: true });
