@@ -49,7 +49,7 @@ export function resolveAgentProfile(label: string, profile: AgentProfile, availa
     );
   }
   if (!found.model) {
-    throw new ProfileResolutionError(`Paseo profile「${found.name}」没有选择模型，req-kit 需要明确的模型。请在 Paseo 设置中为它选择模型`);
+    throw new ProfileResolutionError(`Paseo profile「${found.name}」没有选择模型，laoshi 需要明确的模型。请在 Paseo 设置中为它选择模型`);
   }
   const resolved: AgentProfile = { ...profile, provider: profile.provider ?? `${found.provider}/${found.model}` };
   const modeId = profile.modeId ?? found.modeId;

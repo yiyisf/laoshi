@@ -236,7 +236,7 @@ export function summarize(results: EvalResult[]): string {
   const pipeline = results.filter((r) => r.mode === "pipeline");
   const pct = (n: number, d: number) => (d === 0 ? "-" : `${Math.round((n / d) * 100)}%`);
   const lines = [
-    `# req-kit 评估结果（${kitVersion()}，${new Date().toLocaleString("zh-CN", { hour12: false })}）`,
+    `# laoshi 评估结果（${kitVersion()}，${new Date().toLocaleString("zh-CN", { hour12: false })}）`,
     "",
     "| 用例 | 方式 | 流水线状态 | 报告结论 | 隐藏验收 | 如实 | 越界改动 | 用时（分钟） | 审核/评审/修复轮次 | 结果文件追问 | 人工介入 |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",

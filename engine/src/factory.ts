@@ -487,15 +487,15 @@ function service(configPath: string, opts: CardCmdOptions): number {
   const command = `"${process.execPath}" "${req}" factory run --config "${configPath}"`;
   if (process.platform === "win32") {
     out("在 Windows 上作为计划任务运行（登录后自动启动），在管理员 PowerShell 中执行：");
-    out(`  schtasks /Create /TN "req-kit 接单器" /SC ONLOGON /RL LIMITED /TR '${command.replace(/'/g, "''")}'`);
-    out("立即启动：schtasks /Run /TN \"req-kit 接单器\"；停止：schtasks /End /TN \"req-kit 接单器\"");
+    out(`  schtasks /Create /TN "laoshi 接单器" /SC ONLOGON /RL LIMITED /TR '${command.replace(/'/g, "''")}'`);
+    out("立即启动：schtasks /Run /TN \"laoshi 接单器\"；停止：schtasks /End /TN \"laoshi 接单器\"");
   } else {
-    out("在 Linux 上作为 systemd 用户服务运行，把下面的内容保存为 ~/.config/systemd/user/req-kit-factory.service：");
+    out("在 Linux 上作为 systemd 用户服务运行，把下面的内容保存为 ~/.config/systemd/user/laoshi-factory.service：");
     out("");
-    out("[Unit]\nDescription=req-kit 接单器\nAfter=network-online.target\n\n[Service]");
+    out("[Unit]\nDescription=laoshi 接单器\nAfter=network-online.target\n\n[Service]");
     out(`ExecStart=${command}\nRestart=on-failure\nRestartSec=60\n\n[Install]\nWantedBy=default.target`);
     out("");
-    out("然后执行：systemctl --user daemon-reload && systemctl --user enable --now req-kit-factory");
+    out("然后执行：systemctl --user daemon-reload && systemctl --user enable --now laoshi-factory");
     out("（希望不登录也运行：loginctl enable-linger $USER）。macOS 可以用 launchd 或直接 req factory start。");
   }
   out(`${wordsFor().name} 需要同时在运行：接单器通过它创建需求会话。`);

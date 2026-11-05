@@ -49,10 +49,10 @@ async function main(): Promise<number> {
   const loaded = loadConfig(configPath, repo);
   const { sources, ignored } = loaded;
   let config = loaded.config;
-  log(`req-kit ${kitVersion()}；配置：${sources.join(" → ")}`);
+  log(`laoshi ${kitVersion()}；配置：${sources.join(" → ")}`);
   if (ignored.length > 0) log(`${ignored.join("、")} 只能在本机配置中设置，已忽略`);
   if (config.requiredVersion && !satisfies(kitVersion(), config.requiredVersion)) {
-    log(`提醒：团队或项目要求 req-kit ${config.requiredVersion}，当前为 ${kitVersion()}。流水线照常运行，请找时间升级（见 /laoshi-doctor）。`);
+    log(`提醒：团队或项目要求 laoshi ${config.requiredVersion}，当前为 ${kitVersion()}。流水线照常运行，请找时间升级（见 /laoshi-doctor）。`);
   }
 
   ensurePipelineDir(repo, featureDir);
@@ -331,7 +331,7 @@ async function main(): Promise<number> {
         agentId: originAgentId,
         cron: cronEvery(config.watchdogMinutes),
         expiresAt: new Date(Date.now() + 3 * 24 * 3600_000),
-        name: `req-kit 定时检查：${path.basename(featureDir)}`,
+        name: `laoshi 定时检查：${path.basename(featureDir)}`,
         prompt: watchdogPrompt({ featureDir, statusCommand: commands.status, resumeCommand: commands.resume }),
       })
       .catch((error: Error) => {

@@ -1,6 +1,6 @@
 ---
 name: requirement-interview
-description: req-kit 方法：通过一次一问、带选项和推荐的访谈，把一个需求谈到"换一个人来做也会做出同一个东西"的程度，并边谈边记录到 alignment.md 和 GLOSSARY.md。由 /laoshi 的手册调用；单独使用时也适用于任何需求澄清。
+description: laoshi 方法：通过一次一问、带选项和推荐的访谈，把一个需求谈到"换一个人来做也会做出同一个东西"的程度，并边谈边记录到 alignment.md 和 GLOSSARY.md。由 /laoshi 的手册调用；单独使用时也适用于任何需求澄清。
 ---
 
 # 需求访谈

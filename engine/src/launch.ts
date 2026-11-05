@@ -321,7 +321,7 @@ if (args.at) {
       runtime.scheduleMessage({
         agentId: origin,
         at,
-        name: `req-kit 预约${args.phase ? "测试验证" : "开发"}：${path.basename(checked.featureDir)}`,
+        name: `laoshi 预约${args.phase ? "测试验证" : "开发"}：${path.basename(checked.featureDir)}`,
         prompt: scheduledStartPrompt({ featureDir: checked.featureDir, command }),
       }),
     );

@@ -1,6 +1,6 @@
 ---
 name: principle-report-honestly
-description: req-kit 工作原则：如实报告。未验证、未完成、有分歧、被驳回的意见都写出来。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: laoshi 工作原则：如实报告。未验证、未完成、有分歧、被驳回的意见都写出来。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 如实报告

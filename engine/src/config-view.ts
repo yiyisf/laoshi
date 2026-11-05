@@ -205,10 +205,10 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
     title: "连接与运行",
     description: "这台机器怎么连平台，以及步骤 agent 怎么创建。",
     keys: {
-      daemonUrl: { label: "平台 daemon 地址", description: "本机平台 daemon 的地址（req-kit 的写法；新写法见 platform.<适配器>）。" },
+      daemonUrl: { label: "平台 daemon 地址", description: "本机平台 daemon 的地址（旧写法；新写法见 platform.<适配器>）。" },
       daemonPasswordEnv: { label: "daemon 密码的环境变量", description: "daemon 设置了密码时，从这个环境变量读取（这里只显示变量名）。" },
       teamConfig: { label: "团队配置", description: "团队共用的配置文件。", display: (v) => (v ? String(v) : "未使用") },
-      requiredVersion: { label: "版本要求", description: "团队或项目要求的 req-kit 版本范围。", display: (v) => (v ? String(v) : "无") },
+      requiredVersion: { label: "版本要求", description: "团队或项目要求的 laoshi 版本范围。", display: (v) => (v ? String(v) : "无") },
       attachToOriginChat: { label: "步骤挂在发起的对话下", description: "步骤 agent 作为子 agent 显示在发起的对话中。", display: onOff },
       archiveStepAgents: { label: "完成后归档步骤", description: "步骤完成后把它的 agent 归档。", display: onOff },
       waitChunkSeconds: { label: "等待分段", description: "等待 agent 时每段的长度。", display: (v) => `${v} 秒` },

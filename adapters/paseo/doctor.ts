@@ -40,7 +40,7 @@ export async function doctorPlatform({ config, configPath, tools }: { config: Pi
   if (fs.existsSync(pkg) && range) {
     const sdk = (JSON.parse(fs.readFileSync(pkg, "utf8")) as { version: string }).version;
     if (satisfies(sdk, range)) report("ok", `Paseo SDK ${sdk}（本版本支持 ${range}）`);
-    else report("warn", `Paseo SDK ${sdk} 不在本版本支持的范围 ${range} 内`, "确认 Paseo 与 req-kit 版本匹配，必要时升级 req-kit");
+    else report("warn", `Paseo SDK ${sdk} 不在本版本支持的范围 ${range} 内`, "确认 Paseo 与 laoshi 版本匹配，必要时升级 laoshi");
   }
   const settings = config ? daemonOf(config) : daemonSettings(configPath);
   let client;
@@ -60,7 +60,7 @@ export async function doctorPlatform({ config, configPath, tools }: { config: Pi
     const version = await daemonVersion(settings.daemonUrl, process.env[settings.daemonPasswordEnv]).catch(() => null);
     if (version && range) {
       if (satisfies(version, range)) report("ok", `Paseo ${version}（本版本支持 ${range}）`);
-      else report("warn", `Paseo ${version} 不在本版本 req-kit 支持的范围 ${range} 内`, "运行 req upgrade，它会选能支持这个 Paseo 版本的 req-kit");
+      else report("warn", `Paseo ${version} 不在本版本 laoshi 支持的范围 ${range} 内`, "升级到支持这个 Paseo 版本的 laoshi（laoshi upgrade）");
     }
     const snapshot = await client.providers.waitForReady({ timeoutMs: 30_000 });
     const providers = snapshot.entries.map((e) => `${e.provider}（${e.status}）`).join("、");

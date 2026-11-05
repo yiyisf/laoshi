@@ -52,7 +52,7 @@ test("状态文件：比当前版本新（回滚之后）时拒绝，并说明�
   const file = tempFile({ version: STATE_VERSION + 1 });
   assert.throws(() => readState(file), (error: unknown) => {
     assert.ok(error instanceof StateVersionError);
-    assert.match(error.message, /请升级 req-kit/);
+    assert.match(error.message, /请升级 laoshi/);
     assert.match(error.message, /state\.json\.bak-v/);
     return true;
   });

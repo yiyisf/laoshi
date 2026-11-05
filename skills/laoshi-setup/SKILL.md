@@ -1,11 +1,11 @@
 ---
 name: laoshi-setup
-description: req-kit 项目接入。在项目根目录为 req-kit 生成或更新项目说明、验证方法（实际运行其中的命令）、工作区设置和项目配置，确认后提交。新项目第一次使用 /laoshi 之前、项目的构建或测试方式变了、或用户输入 /laoshi-setup 时使用。
+description: laoshi 项目接入。在项目根目录为 laoshi 生成或更新项目说明、验证方法（实际运行其中的命令）、工作区设置和项目配置，确认后提交。新项目第一次使用 /laoshi 之前、项目的构建或测试方式变了、或用户输入 /laoshi-setup 时使用。
 metadata:
   opencode/slash: "true"
 ---
 
-# req-kit 项目接入（{{REQ_KIT_VERSION}}）
+# laoshi 项目接入（{{REQ_KIT_VERSION}}）
 
 为当前项目生成以下文件，让流水线的每个步骤不必每次重新摸索这个项目：
 
@@ -77,7 +77,7 @@ metadata:
 - `project-notes.md`：一条一行，只写对做需求有影响的约定。例如"包管理用 pnpm，不要用 npm""数据库变更必须写成 migrations/ 下的迁移脚本""不要改动 legacy/ 目录""提交信息用 Conventional Commits 格式"。再加一节**范例文件**：各类代码（接口、页面、数据访问、测试、迁移脚本等）在项目里写得最好的一个文件，例如"接口：`src/api/orders.ts`；单元测试：`test/api/orders.test.ts`"。方案设计会让每个任务照着范例写，代码更像项目原有的样子。只列你读过、确认写得规范的文件。
 - `GLOSSARY.md`（仓库根目录）：项目还没有术语表时，从代码、文档和界面文字中整理主要的业务词，每条写含义和代码中的名字（类名、字段、接口路径或表名），格式见 `{{REQ_KIT_ROOT}}/skills/requirement-interview/SKILL.md` 的"术语"一节。已有的只补充"代码中的名字"等缺失的部分，不改别人写的含义。拿不准含义的不要写，留给访谈时问。
 {{fragment.workspaceWrite}}
-- `.laoshi.json`（laoshi 的项目配置；req-kit 用的旧名 `.requirement-pipeline.json` 也能读，项目里已有旧名文件时就在旧文件里补充，不要两个都写：两个都在时只读 `.laoshi.json`）：
+- `.laoshi.json`（laoshi 的项目配置；旧名 `.requirement-pipeline.json` 也能读，项目里已有旧名文件时就在旧文件里补充，不要两个都写：两个都在时只读 `.laoshi.json`）：
   - `checks`（推荐）：质量门的检查。流水线会在写代码和修复的步骤之后**自己运行**它们，只拦"改动之前通过、现在失败"的检查，并把输出发回给那一步的 agent 修复，不依赖 agent 自己说"测试通过了"。把第 4 步实际跑通、几分钟内能跑完的检查写进去：格式、lint、类型检查、单元测试、构建（端到端测试和需要启动服务的检查不要写，它们由功能验证负责）。命令同样写成各系统通用的形式。多模块的仓库按模块分开写，用 `cwd` 指定模块目录（这项检查只在该模块有改动时运行；需要更精确时用 `paths` 列出它关心的目录）：
 
     ```json
@@ -98,7 +98,7 @@ metadata:
 
 ## 6. 确认后提交
 
-用户确认后，只提交这几个文件（以及 `GLOSSARY.md`、复制进项目的辅助脚本和 `.gitignore` 的改动），提交信息例如 `chore(req-kit): 项目接入说明与验证方法`。不 push。
+用户确认后，只提交这几个文件（以及 `GLOSSARY.md`、复制进项目的辅助脚本和 `.gitignore` 的改动），提交信息例如 `chore(laoshi): 项目接入说明与验证方法`。不 push。
 
 {{fragment.workspaceCommit}}
 

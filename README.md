@@ -4,7 +4,20 @@
 
 laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit）中抽取出来的、与 agent 平台无关的需求开发体系：用对话对齐需求，由一组分工明确的 agent 完成方案设计、实现、评审和验证，每一步都有产出文件和验收门，流程由程序保证，而不是由 AI 或人即兴发挥。
 
-> **状态：M1 完成，还不能单独使用。** 核心已从 req-kit 1.15.0 导入，Paseo 实现已移到 `adapters/paseo/`，测试和评估自检与 req-kit 一致（见[移植记录](docs/porting-log.md)）。安装、升级和插件界面在 M7 之前仍由 paseo-req-kit 提供。req-kit 1.x 继续在原库维护，直到 laoshi 达到对等。
+> **状态：准备发布 0.1.0。** 支持 Paseo 和 DeepSeek Harness（dsh）。核心从 req-kit 1.15.0 抽取，平台相关的部分都在 `adapters/` 下（见[移植记录](docs/porting-log.md)、[实施计划](docs/extraction/plan.md)）。Paseo 的需求插件界面暂时仍由 paseo-req-kit 提供。
+
+## 安装
+
+与 paseo-req-kit 一样从 npm 分发，一步安装：
+
+```bash
+npx -y laoshi@latest install --platform dsh          # 或 --platform paseo
+# 公司内网只有 npm 镜像时：
+npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh
+laoshi doctor --no-project
+```
+
+它先用 npm 全局安装 laoshi（全局目录不可写时装到 `~/.laoshi/npm`），再运行装好的那份的 `laoshi install`：写入安装级配置（安装根默认 `~/.laoshi`，可用 `LAOSHI_HOME` 指定），把 skill 按平台渲染后装进平台读取 skill 的目录，并完成平台需要的设置（dsh：安装并挂载 laoshi 的 dsh 插件）。升级：`laoshi upgrade`（回到旧版本：`laoshi upgrade <版本>`）。卸载：`laoshi install --uninstall`。连 npm 镜像也没有时，用离线安装包（见 [docs/intranet/install-verify.md](docs/intranet/install-verify.md)）。
 
 ## 设计思路
 
@@ -19,7 +32,7 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 | `engine/` | 流水线引擎：`src/` 程序、`prompts/` 步骤提示词、`test/` 场景测试（`fake-runtime.ts` 模拟平台） |
 | `adapters/` | 平台适配器，配置 `platform.adapter` 选择使用哪个。`paseo/`：Paseo 运行时、profile、`paseo.json`、daemon 检查；`dsh/`：DeepSeek Harness 运行时与 laoshi 的 dsh 插件（M4b 原型） |
 | `skills/`、`principles/` | 入口 skill、方法 skill、原则 |
-| `bin/` | `req`（`laoshi`）、`start-pipeline` 命令 |
+| `bin/` | `laoshi`（别名 `req`）、`start-pipeline` 命令；`install.mjs` 安装器（平台各自的部分在 `adapters/<id>/install.mjs`） |
 | `evals/` | 端到端评估：样例仓库、隐藏验收测试 |
 | `design/`、`notifiers/` | 设计系统（审查网页用）、外部通知模板 |
 | `contracts/` | 文件格式与平台能力契约（req-kit 1.15.0，尚待中性化） |

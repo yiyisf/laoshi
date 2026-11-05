@@ -576,7 +576,7 @@ function makeMergeRequest(ctx: PipelineContext, repo: string, branch: string, so
     branch,
     target: mr.target || defaultBranch(repo, ctx.config.push.remote),
     title: `[${source.id}] ${specTitle(ctx)}`,
-    description: [`> 由 req-kit 在研发完成后创建的草稿，合并前请人工评审。`, "", cardLine, "", note.slice(0, 20_000)].join("\n"),
+    description: [`> 由 laoshi 在研发完成后创建的草稿，合并前请人工评审。`, "", cardLine, "", note.slice(0, 20_000)].join("\n"),
     card: source.id,
     cardUrl: source.url ?? "",
   };
@@ -1280,7 +1280,7 @@ async function scheduleReminder(ctx: PipelineContext, what: string[] | "phase" |
     const id = await ctx.runtime.scheduleMessage({
       agentId: origin,
       at,
-      name: `req-kit 提醒：${featureName(ctx.featureDir)} ${what === "phase" ? "待测试验证" : what === "approval" ? "等待确认方案" : "等待回答"}`,
+      name: `laoshi 提醒：${featureName(ctx.featureDir)} ${what === "phase" ? "待测试验证" : what === "approval" ? "等待确认方案" : "等待回答"}`,
       prompt:
         what === "phase"
           ? phaseWaitingReminderMessage({ featureDir: shown, hours, handoffPath: `${shown}/handoff.md`, verifyCommand: verifyCommandOf(ctx) })
@@ -1312,7 +1312,7 @@ async function scheduleVerifyStart(ctx: PipelineContext): Promise<string | null>
     const id = await ctx.runtime.scheduleMessage({
       agentId: origin,
       at,
-      name: `req-kit 测试验证：${featureName(ctx.featureDir)}`,
+      name: `laoshi 测试验证：${featureName(ctx.featureDir)}`,
       prompt: verifyStartPrompt({
         featureDir: shownFeatureDir(ctx),
         statusCommand: ctx.statusCommand ?? ctx.resumeCommand.replace(/ --resume$/, " --status"),
@@ -1341,7 +1341,7 @@ async function scheduleApprovalContinue(ctx: PipelineContext): Promise<string | 
     const id = await ctx.runtime.scheduleMessage({
       agentId: origin,
       at,
-      name: `req-kit 方案确认超时：${featureName(ctx.featureDir)}`,
+      name: `laoshi 方案确认超时：${featureName(ctx.featureDir)}`,
       prompt: approvalContinuePrompt({
         featureDir: shownFeatureDir(ctx),
         hours,
@@ -1396,7 +1396,7 @@ async function scheduleAutoResume(ctx: PipelineContext, reason: string): Promise
     const id = await ctx.runtime.scheduleMessage({
       agentId: origin,
       at,
-      name: `req-kit 自动继续：${featureName(ctx.featureDir)}`,
+      name: `laoshi 自动继续：${featureName(ctx.featureDir)}`,
       prompt: autoResumePrompt({
         featureDir: shownFeatureDir(ctx),
         reason: reason.slice(0, 300),

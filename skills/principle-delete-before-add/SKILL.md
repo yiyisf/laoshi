@@ -1,6 +1,6 @@
 ---
 name: principle-delete-before-add
-description: req-kit 工作原则：先删再加。能复用已有代码或删掉多余部分解决的，不新增。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: laoshi 工作原则：先删再加。能复用已有代码或删掉多余部分解决的，不新增。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 先删再加

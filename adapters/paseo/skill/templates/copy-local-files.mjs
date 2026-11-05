@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Written into the project by req-kit's /laoshi-setup. Copies local files that are not committed
+// Written into the project by laoshi's /laoshi-setup. Copies local files that are not committed
 // (for example .env) from the checkout a new Paseo worktree was created from, the same way on
 // macOS, Linux and Windows. Files that do not exist there, or already exist here, are skipped.
 //

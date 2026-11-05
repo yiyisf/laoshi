@@ -1,6 +1,6 @@
 ---
 name: principle-fix-root-cause
-description: req-kit 工作原则：修根因。找到问题真正的原因再改，不削弱检查来让它通过。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: laoshi 工作原则：修根因。找到问题真正的原因再改，不削弱检查来让它通过。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 修根因
