@@ -9,15 +9,15 @@
 ::: code-group
 
 ```sh [DeepSeek Harness]
-npx -y laoshi@latest install --platform dsh
+npx -y @yiyi_zhang/laoshi@latest install --platform dsh
 ```
 
 ```sh [Paseo]
-npx -y laoshi@latest install --platform paseo
+npx -y @yiyi_zhang/laoshi@latest install --platform paseo
 ```
 
 ```sh [公司内网（npm 镜像）]
-npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh
+npx -y --registry=https://npm.example.internal/ @yiyi_zhang/laoshi@latest install --platform dsh
 ```
 
 :::

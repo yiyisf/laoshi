@@ -2,9 +2,9 @@
 // The one-step install from npm, as paseo-req-kit does it: a machine that can reach an npm registry
 // (the public one or a company mirror) needs nothing else.
 //
-//   npx -y laoshi@latest install --platform dsh
-//   npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh
-//   laoshi upgrade [--registry <url>]                    (the same with laoshi@latest)
+//   npx -y @yiyi_zhang/laoshi@latest install --platform dsh
+//   npx -y --registry=https://npm.example.internal/ @yiyi_zhang/laoshi@latest install --platform dsh
+//   laoshi upgrade [--registry <url>]                    (the same with @yiyi_zhang/laoshi@latest)
 //
 // Steps: check Node.js, npm and git; use (and save) the npm registry; npm install -g this version
 // (into <install root>/npm when the global directory is not writable); then run the installed
@@ -90,11 +90,11 @@ const writable = (dir) => {
   }
 };
 
-const HELP = `用法：npx -y [--registry=<npm 源>] laoshi@latest install --platform <平台> [安装选项]
+const HELP = `用法：npx -y [--registry=<npm 源>] @yiyi_zhang/laoshi@latest install --platform <平台> [安装选项]
 
   --registry <地址>     这次安装用的 npm 源（公司内网的镜像），默认保存为本机的 npm 源
   --no-save-registry    只这次用，不保存
-  --spec <包>           安装哪个版本，默认是正在运行的这个（如 laoshi@0.1.0）
+  --spec <包>           安装哪个版本，默认是正在运行的这个（如 @yiyi_zhang/laoshi@0.1.1）
 其余选项交给 laoshi install（--platform、--home、--target、--force、平台的选项，见 laoshi install --help）。`;
 
 export async function main(argv) {
@@ -126,7 +126,7 @@ export async function main(argv) {
     else ok(`这次安装使用 ${wanted}（本机的 npm 源仍是 ${saved}）`);
   } else ok(`npm 源：${saved}`);
   ENV = childEnv(registry);
-  if (sameRegistry(registry, DEFAULT_REGISTRY)) say("  公司内网请改用镜像：npx -y --registry=<镜像地址> laoshi@latest install");
+  if (sameRegistry(registry, DEFAULT_REGISTRY)) say("  公司内网请改用镜像：npx -y --registry=<镜像地址> @yiyi_zhang/laoshi@latest install");
 
   step(`安装 ${spec}`);
   const found = npm(["view", spec, "version"], { timeout: 120_000 });

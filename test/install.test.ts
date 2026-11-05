@@ -9,7 +9,7 @@ import { test } from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const INSTALL = path.join(ROOT, "bin", "install.mjs");
-const VERSION: string = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+const { name: NAME, version: VERSION } = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { name: string; version: string };
 
 function machine() {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-install-")));
@@ -106,14 +106,15 @@ else if (cmd === "prefix") console.log(process.env.FAKE_NPM_PREFIX);
 else if (cmd === "root") console.log(root());
 else if (cmd === "install") {
   const kit = process.env.FAKE_KIT;
-  const dest = path.join(root(), "laoshi");
+  const dest = path.join(root(), ...process.env.FAKE_NAME.split("/"));
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.rmSync(dest, { recursive: true, force: true });
   fs.cpSync(kit, dest, { recursive: true, filter: (src) => !/[\\\\/](\\.git|node_modules|evals[\\\\/]results)$/.test(src) });
   fs.symlinkSync(path.join(kit, "node_modules"), path.join(dest, "node_modules"), "junction");
 } else process.exit(1);
 `;
 
-test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，用装好的那份完成安装，npm 源按 --registry", () => {
+test("一步安装（npx -y @yiyi_zhang/laoshi@latest install）：从 npm 装好 laoshi，用装好的那份完成安装，npm 源按 --registry", () => {
   const { base, home } = machine();
   const npmScript = path.join(base, "fake-npm.mjs");
   fs.writeFileSync(npmScript, FAKE_NPM);
@@ -124,7 +125,7 @@ test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，�
   fs.mkdirSync(path.join(dshHome, "profiles", "web"), { recursive: true });
   const fakeDsh = path.join(base, "fake-dsh.mjs");
   fs.writeFileSync(fakeDsh, "process.exit(1);\n");
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_NPM: npmScript, FAKE_NPM_LOG: log, FAKE_NPM_PREFIX: prefix, FAKE_KIT: ROOT, FAKE_VERSION: VERSION };
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_NPM: npmScript, FAKE_NPM_LOG: log, FAKE_NPM_PREFIX: prefix, FAKE_KIT: ROOT, FAKE_VERSION: VERSION, FAKE_NAME: NAME };
   delete env.LAOSHI_HOME;
   const r = spawnSync(
     process.execPath,
@@ -135,10 +136,10 @@ test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，�
   assert.equal(r.status, 0, out);
   const calls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const installCall = calls.find((c) => c.args[0] === "install");
-  assert.deepEqual(installCall.args, ["install", "-g", `laoshi@${VERSION}`]);
+  assert.deepEqual(installCall.args, ["install", "-g", `${NAME}@${VERSION}`]);
   assert.equal(installCall.registry, "https://npm.example.internal/");
   assert.equal(calls.some((c) => c.args[0] === "config" && c.args[1] === "set"), false, "--no-save-registry 时不改本机的 npm 源");
-  const copy = path.join(prefix, process.platform === "win32" ? "node_modules" : path.join("lib", "node_modules"), "laoshi");
+  const copy = path.join(prefix, process.platform === "win32" ? "node_modules" : path.join("lib", "node_modules"), ...NAME.split("/"));
   const record = JSON.parse(fs.readFileSync(path.join(home, ".laoshi", "install.json"), "utf8"));
   assert.equal(fs.realpathSync(record.root), fs.realpathSync(copy), "安装记录指向 npm 装好的那份，而不是 npx 的临时目录");
   const skill = fs.readFileSync(path.join(dshHome, "skills", "laoshi", "SKILL.md"), "utf8");

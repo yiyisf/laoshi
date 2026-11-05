@@ -14,19 +14,19 @@ const installs = ref([
   {
     id: "dsh",
     label: "DeepSeek Harness",
-    command: "npx -y laoshi@latest install --platform dsh",
+    command: "npx -y @yiyi_zhang/laoshi@latest install --platform dsh",
     note: "只需要 Node.js 22.19+。公司内网只有 npm 镜像时加 --registry=<镜像地址>（会保存为本机的 npm 源）。Windows 上用 cmd 或 Git Bash。",
   },
   {
     id: "paseo",
     label: "Paseo",
-    command: "npx -y laoshi@latest install --platform paseo",
+    command: "npx -y @yiyi_zhang/laoshi@latest install --platform paseo",
     note: "装在运行 Paseo daemon 的机器上；skill 装进 ~/.agents/skills 和 ~/.claude/skills。",
   },
   {
     id: "mirror",
     label: "公司内网",
-    command: "npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh",
+    command: "npx -y --registry=https://npm.example.internal/ @yiyi_zhang/laoshi@latest install --platform dsh",
     note: "把地址换成公司的 npm 镜像。连镜像也没有时用离线安装包，见\"内网安装与验证\"。",
   },
 ]);

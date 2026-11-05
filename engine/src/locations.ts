@@ -51,6 +51,16 @@ export function localPromptsDir(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(kitHome(env), "prompts.local");
 }
 
+/** The npm package name laoshi is published under (package.json). */
+export function kitPackageName(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "package.json"), "utf8")) as { name?: string };
+    return pkg.name ?? "laoshi";
+  } catch {
+    return "laoshi";
+  }
+}
+
 export function kitVersion(): string {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(KIT_ROOT, "package.json"), "utf8")) as { version?: string };

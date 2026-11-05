@@ -2,6 +2,16 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
+## 0.1.1 - 2026-11-05
+
+在 npm 上的包名改为 **`@yiyi_zhang/laoshi`**：`laoshi` 这个名字在 npm 上不能使用，0.1.0 只发布到了 GitHub Release，没有发布到 npm。其余内容与 0.1.0 相同。
+
+### 升级须知
+
+- 安装命令：`npx -y @yiyi_zhang/laoshi@latest install --platform dsh|paseo`（内网加 `--registry=<镜像地址>`）。装好后的命令仍是 `laoshi`（别名 `req`），skill 仍是 `/laoshi` 等。
+- 公司的 npm 镜像需要能同步 `@yiyi_zhang` 作用域下的包。
+- 用 GitHub Release 上 0.1.0 的 `.tgz` 或离线包装过的机器，运行一次上面的安装命令即可换成 npm 上的版本。
+
 ## 0.1.0 - 2026-11-05
 
 第一个正式版：paseo-req-kit 的需求开发体系，抽成不绑定平台的工具包，支持 Paseo 和 DeepSeek Harness。
@@ -11,7 +21,7 @@ laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题
 - **新的名字和命令**：对话中的入口是 `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro`；终端命令是 `laoshi`（`req` 是它的别名）。
 - **支持 DeepSeek Harness（dsh）**：步骤 agent 作为子会话挂在发起的对话下，进展和结果发回对话；各角色可以各用一个 dsh 中的模型（`<提供方>/<模型>`，`dsh/chat-model` 用对话的模型）；`laoshi doctor` 列出可用的模型并逐个角色检查。
 - **内置工作区和服务**：平台不提供时，laoshi 用 `git worktree` 为需求新建工作区，并按 `.laoshi/services.json` 启动、检查、停止项目的服务（每个工作区独立端口）。
-- **一步安装**：`npx -y laoshi@latest install --platform dsh|paseo`；公司内网加 `--registry=<镜像地址>`；`laoshi upgrade` 升级或回退；`laoshi install --check`、`--uninstall`。Windows 上只用 cmd 和 Git Bash。
+- **一步安装**：`npx -y @yiyi_zhang/laoshi@latest install --platform dsh|paseo`；公司内网加 `--registry=<镜像地址>`；`laoshi upgrade` 升级或回退；`laoshi install --check`、`--uninstall`。Windows 上只用 cmd 和 Git Bash。
 - **离线安装包**：完全没有 npm 源的机器，用 GitHub Release 上带 Windows 依赖的离线安装包，步骤见"内网安装与验证"。
 - **文档站点**：https://yiyisf.github.io/laoshi/ ；`laoshi docs` 在本机打开和装的版本一致的文档（不需要外网）。
 - **体检**：`laoshi doctor` 的"安装"一节检查 skill 是否已是这个版本的，并从 npm 源查询有没有新版本。

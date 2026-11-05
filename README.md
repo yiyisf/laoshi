@@ -11,9 +11,9 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 与 paseo-req-kit 一样从 npm 分发，一步安装：
 
 ```bash
-npx -y laoshi@latest install --platform dsh          # 或 --platform paseo
+npx -y @yiyi_zhang/laoshi@latest install --platform dsh          # 或 --platform paseo
 # 公司内网只有 npm 镜像时：
-npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh
+npx -y --registry=https://npm.example.internal/ @yiyi_zhang/laoshi@latest install --platform dsh
 laoshi doctor --no-project
 ```
 

@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const NAME = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).name;
 const WINDOWS = process.platform === "win32";
 const { values: args } = parseArgs({ options: { tgz: { type: "string" }, "require-docs": { type: "boolean", default: false }, keep: { type: "boolean", default: false } } });
 
@@ -57,7 +58,7 @@ try {
   // 2. Installed as `npm install -g` does it.
   const installed = npm(["install", "-g", "--prefix", prefix, "--no-audit", "--no-fund", tgz], { env });
   if (installed.code !== 0) throw new Error(`npm install 失败：${installed.out}`);
-  const copy = path.join(prefix, WINDOWS ? "node_modules" : path.join("lib", "node_modules"), "laoshi");
+  const copy = path.join(prefix, WINDOWS ? "node_modules" : path.join("lib", "node_modules"), ...NAME.split("/"));
   const bin = path.join(prefix, WINDOWS ? "laoshi.cmd" : path.join("bin", "laoshi"));
   if (!fs.existsSync(path.join(copy, "package.json"))) throw new Error(`安装后没有 ${copy}`);
   ok(`npm 安装到 ${copy}`);

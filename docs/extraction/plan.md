@@ -86,9 +86,9 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| R1 | 与 paseo-req-kit 一样从 npm 分发：一步安装 `npx -y [--registry=<镜像>] laoshi@latest install`（先 npm 全局安装，再运行装好的那份）、`laoshi upgrade [版本]`。`laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 进行中 |
+| R1 | 与 paseo-req-kit 一样从 npm 分发：一步安装 `npx -y [--registry=<镜像>] @yiyi_zhang/laoshi@latest install`（先 npm 全局安装，再运行装好的那份）、`laoshi upgrade [版本]`。`laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 进行中 |
 | R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 已完成：`site/`（GitHub Pages，`/laoshi/`），指南改写，`CHANGELOG.md`、ADR 索引；内网用 `laoshi docs`（R3 把站点构建进 npm 包） |
-| R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 发布流程已完成：`files`、`release.yml`（`-dev` 版本不发布）、`scripts/check-package.mjs`（CI 和发布时按使用者的方式安装检查）、站点构建进包、Release 附离线安装包；已用本地 npm 源（verdaccio）验证 `npx -y --registry=… laoshi@latest install`、保存 npm 源、`laoshi upgrade` 升级和回退。版本改为 0.1.0 发布（合并即发布） |
+| R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 发布流程已完成：`files`、`release.yml`（`-dev` 版本不发布）、`scripts/check-package.mjs`（CI 和发布时按使用者的方式安装检查）、站点构建进包、Release 附离线安装包；已用本地 npm 源（verdaccio）验证 `npx -y --registry=… @yiyi_zhang/laoshi@latest install`、保存 npm 源、`laoshi upgrade` 升级和回退。版本改为 0.1.0 发布（合并即发布） |
 | 0.1.0 之后 | `laoshi migrate`、paseo-req-kit 2.0 薄分发包、Paseo 插件界面迁入；以 1.0 达到对等为目标（M7） | — |
 
 ## 风险登记
