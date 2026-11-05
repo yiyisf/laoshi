@@ -87,7 +87,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | R1 | 与 paseo-req-kit 一样从 npm 分发：一步安装 `npx -y [--registry=<镜像>] laoshi@latest install`（先 npm 全局安装，再运行装好的那份）、`laoshi upgrade [版本]`。`laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 进行中 |
-| R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 待做 |
+| R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 已完成：`site/`（GitHub Pages，`/laoshi/`），指南改写，`CHANGELOG.md`、ADR 索引；内网用 `laoshi docs`（R3 把站点构建进 npm 包） |
 | R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 待做 |
 | 0.1.0 之后 | `laoshi migrate`、paseo-req-kit 2.0 薄分发包、Paseo 插件界面迁入；以 1.0 达到对等为目标（M7） | — |
 
@@ -114,5 +114,5 @@ npm 包名：**`laoshi`（已确认可用）**。
 2. ~~laoshi 版本号~~：已决定，正式版从 `0.1.0` 起（2026-11-05）。
 3. **模式 B 的命令集**与"谁调用 `record`"。（[in-chat-orchestration §7](../design/in-chat-orchestration.md)）
 4. ~~锁定文件~~：已决定放安装根，不进代码库（[ADR 0007](../adr/0007-one-install-many-repos.md)）。
-5. ~~文档站~~：已决定，参照 paseo-req-kit 的站点（2026-11-05）；内网同步方式随 R2 确定。
+5. ~~文档站~~：已决定，参照 paseo-req-kit 的站点（2026-11-05）；内网通过 `laoshi docs` 离线查看（R2 决定）。
 6. 探针对内部平台的用量与副作用是否可接受。

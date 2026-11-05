@@ -26,7 +26,7 @@ const HELP = `laoshi ${version}（${kitRoot}）
                                启动流水线（通常由 /laoshi 在对话中启动，这里用于终端中手工启动）
   laoshi digest [--notify]     项目的需求总览；--notify 同时发到外部通知（如企业 IM）
   laoshi digest --schedule "0 9 * * 1"
-                               让平台按时间表发送需求总览（例子为每周一 9:00）；取消：req digest --cancel <ID>
+                               让平台按时间表发送需求总览（例子为每周一 9:00）；取消：laoshi digest --cancel <ID>
   laoshi sync <需求>           把需求同步到对接的外部系统（补发失败的调用、补建卡片、更新状态）
   laoshi review <需求>         在浏览器打开原型审查页：点选要改的地方、直接改文字，提交意见或确认方案
   laoshi code-review <需求>    代码审查页：看这次的改动和 AI 评审意见，在代码行上写意见，退回修改或评审通过
@@ -49,8 +49,8 @@ const HELP = `laoshi ${version}（${kitRoot}）
                                本机的使用统计：需求数、交付周期、返工、等待、各步骤用时、用量
   laoshi stats --report [--out 目录]
                                生成汇报用的汇总（.md）和每个需求一行的表格（.csv）
-  laoshi stats --export [文件]    导出本机的运行记录；汇总多台机器：req stats --merge <文件…> --report
-  laoshi outcome               查找已合并进主干的需求和合并后发现的问题，记入使用记录（req stats 也会自动查）
+  laoshi stats --export [文件]    导出本机的运行记录；汇总多台机器：laoshi stats --merge <文件…> --report
+  laoshi outcome               查找已合并进主干的需求和合并后发现的问题，记入使用记录（laoshi stats 也会自动查）
   laoshi outcome <需求> --merged | --issue "<问题>"
                                手动记一笔：已合并，或合并后发现的问题
   laoshi index [--rebuild [目录…]] [--prune]

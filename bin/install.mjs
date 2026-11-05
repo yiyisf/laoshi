@@ -37,9 +37,23 @@ const { values: args } = parseArgs({
     check: { type: "boolean", default: false },
     uninstall: { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
+    help: { type: "boolean", short: "h", default: false },
     ...platformOptions,
   },
 });
+if (args.help) {
+  console.log(`用法：laoshi install --platform <${platforms.join("|")}> [选项]
+
+  --platform <平台>     装到哪个 agent 平台（第一次安装时要写；之后沿用安装记录）
+  --home <目录>         安装根，默认 LAOSHI_HOME 或 ~/.laoshi
+  --target <目录>       另外把 skill 装到这个目录（可以写多次）
+  --force               覆盖同名的、不是 laoshi 装的 skill
+  --check               只检查安装，不改动
+  --dry-run             演练：显示要做的事，不写文件
+  --uninstall           卸载 skill 和平台的设置（安装根保留）
+dsh 的选项：--dsh-home <DSH_HOME> --profile <名称> --dsh-bin <dsh 的 bin.js> --approvals ask|allow`);
+  process.exit(0);
+}
 const dry = args["dry-run"] || args.check;
 const home = path.resolve(args.home ?? process.env.LAOSHI_HOME ?? path.join(os.homedir(), ".laoshi"));
 const configPath = path.join(home, "config.json");
