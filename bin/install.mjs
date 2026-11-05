@@ -86,6 +86,15 @@ function ownership(dir) {
   return "foreign";
 }
 
+/** Every file of the rendered skill is in the installed one with the same content. */
+function sameFiles(src, dest) {
+  try {
+    return listFiles(src).every((f) => fs.readFileSync(path.join(src, f)).equals(fs.readFileSync(path.join(dest, f))));
+  } catch {
+    return false;
+  }
+}
+
 function listFiles(dir, base = dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listFiles(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name))]));
 }
@@ -184,7 +193,7 @@ for (const target of targets) {
       continue;
     }
     if (dry) {
-      changed += 1;
+      if (!sameFiles(path.join(out, name), dir)) changed += 1;
       continue;
     }
     fs.rmSync(dir, { recursive: true, force: true });
@@ -196,7 +205,8 @@ for (const target of targets) {
   // Skills an earlier laoshi installed that this one no longer has.
   const stale = fs.existsSync(target.dir) ? fs.readdirSync(target.dir).filter((n) => !skills.includes(n) && ownership(path.join(target.dir, n)) === "ours") : [];
   if (!dry) for (const n of stale) fs.rmSync(path.join(target.dir, n), { recursive: true, force: true });
-  report(blocked.length ? "warn" : "ok", `${target.label}：${dry ? "将安装" : "已安装"} ${changed} 个 skill${stale.length ? `，删除旧版本留下的 ${stale.join("、")}` : ""}${blocked.length ? `；没有覆盖 ${blocked.join("、")}` : ""}`, blocked.length ? "确认可以覆盖时加 --force" : undefined);
+  const done = dry ? (changed ? `将安装或更新 ${changed} 个 skill` : `${skills.length - blocked.length} 个 skill 已是这个版本的`) : `已安装 ${changed} 个 skill`;
+  report(blocked.length || (args.check && changed) ? "warn" : "ok", `${target.label}：${done}${stale.length ? `，删除旧版本留下的 ${stale.join("、")}` : ""}${blocked.length ? `；没有覆盖 ${blocked.join("、")}` : ""}`, blocked.length ? "确认可以覆盖时加 --force" : undefined);
 }
 fs.rmSync(rendered, { recursive: true, force: true });
 

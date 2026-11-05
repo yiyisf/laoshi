@@ -36,19 +36,22 @@ function section(title: string): void {
   console.log(`\n## ${title}\n`);
 }
 
-/** Newer published version, as an informational line; never counted as a problem. */
+/** Newer published version (npm view, from the configured npm registry), as an informational line; never counted as a problem. */
 function newVersion(): void {
-  const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "install.mjs"), "--latest", "--quiet"], {
+  const windows = process.platform === "win32";
+  const result = spawnSync(windows ? "npm.cmd" : "npm", ["view", "laoshi@latest", "version"], {
     encoding: "utf8",
     windowsHide: true,
+    shell: windows,
     timeout: 20_000,
   });
-  const latest = result.status === 0 ? result.stdout.trim().split("\n")[0] : "";
+  const latest = result.status === 0 ? (result.stdout ?? "").trim().split("\n")[0] : "";
   const current = kitVersion();
   if (!latest) {
-    console.log(`· 无法检查是否有新版本（${(result.stderr ?? "").trim().split("\n").at(-1) || "网络不通或超时"}），不影响使用`);
+    const reason = (result.stderr ?? "").split("\n").find((l) => /\bE\d{3}\b|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|404/.test(l))?.replace(/^npm (error|ERR!)\s*/, "").trim();
+    console.log(`· 无法检查是否有新版本（${reason || "网络不通、超时或 npm 源上还没有 laoshi"}），不影响使用`);
   } else if (latest !== current && newer(latest, current)) {
-    console.log(`↑ 有新版本 ${latest}（当前 ${current}）。升级：req upgrade（或在安装目录运行 node install.mjs --upgrade）`);
+    console.log(`↑ 有新版本 ${latest}（当前 ${current}）。升级：laoshi upgrade`);
   } else {
     report("ok", `已是最新版本 ${current}`);
   }
@@ -72,21 +75,22 @@ function newer(a: string, b: string): boolean {
 
 function installation(offline: boolean): void {
   section("安装");
-  // laoshi M1: the installer stays in paseo-req-kit until M7; without it there is no installation to check.
-  if (!fs.existsSync(path.join(KIT_ROOT, "install.mjs"))) {
-    console.log("· 安装检查：laoshi install --check");
-    return;
-  }
-  const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "install.mjs"), "--check", "--quiet"], {
+  const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "install.mjs"), "--check"], {
     encoding: "utf8",
     windowsHide: true,
   });
   const out = `${result.stdout ?? ""}${result.stderr ?? ""}`.trimEnd();
+  // Only the findings (and their fixes): the check's own headings and next steps belong to `laoshi install`.
+  let keep = false;
   for (const line of out.split("\n")) {
+    if (/^[✓⚠✗·] /.test(line)) keep = true;
+    else if (!/^\s+修复：/.test(line)) keep = false;
+    if (!keep) continue;
     if (line.startsWith("✗")) counts.fail += 1;
     else if (line.startsWith("⚠")) counts.warn += 1;
-    if (line.trim()) console.log(line);
+    console.log(line);
   }
+  if (result.status !== 0 && !/^[✗]/m.test(out)) report("fail", `安装检查没有完成（laoshi install --check 退出码 ${result.status}）`, "运行 laoshi install --check 查看");
   if (!offline) newVersion();
 }
 

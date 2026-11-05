@@ -1,6 +1,5 @@
 # Typecheck, tests and the eval self-check on every push to main and on pull requests.
-# Ported from paseo-req-kit's ci.yml (1.15.0) without the distribution checks (npm pack, install
-# scripts, Paseo plugin), which stay in paseo-req-kit until M7.
+# Ported from paseo-req-kit's ci.yml (1.15.0); the package check is scripts/check-package.mjs.
 name: ci
 
 on:
@@ -51,6 +50,9 @@ jobs:
           grep -E "^not ok" test.log | head -9 | sed 's/^/::error title=Linux::/' || true
       - run: npm run typecheck
       - run: npm run eval:self-check
+      # The package as users install it (npm pack → npm install -g → laoshi install …).
+      - name: Package
+        run: node scripts/check-package.mjs
 
   # The intranet runs on Windows: the same tests must pass there.
   windows:
@@ -76,6 +78,10 @@ jobs:
           details=$(grep -E -A16 "^not ok" test.log | grep -vE "^\s+(at |---|\.\.\.|duration_ms|type:|location:|failureType:|stack:|code:|operator:)|^--$" | head -160 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::error title=Windows details::$details"
           grep -E "^not ok" test.log | head -9 | sed 's/^/::error title=Windows::/' || true
+      - name: Package
+        if: always()
+        shell: bash
+        run: node scripts/check-package.mjs
       - name: Commands start on Windows
         if: always()
         shell: bash

@@ -27,6 +27,9 @@ console.log(`打包 ${name} ……`);
 fs.mkdirSync(dir);
 // The committed tree only: no local results, no node_modules of this machine.
 execFileSync("sh", ["-c", `git archive --format=tar HEAD | tar -x -C "${dir}"`], { cwd: root, stdio: "inherit" });
+// The docs site, when built (the release builds it into site-dist/): `laoshi docs` without the internet.
+if (fs.existsSync(path.join(root, "site-dist", "index.html"))) fs.cpSync(path.join(root, "site-dist"), path.join(dir, "site-dist"), { recursive: true });
+else console.warn("注意：没有 site-dist/（先构建文档站点），安装包里不带文档站点。");
 run("npm", ["ci", "--omit=dev", `--os=${values.platform}`, `--cpu=${values.arch}`, "--ignore-scripts", "--no-audit", "--no-fund"], dir);
 const esbuild = path.join(dir, "node_modules", "@esbuild", `${values.platform}-${values.arch}`);
 if (!fs.existsSync(esbuild)) throw new Error(`依赖里没有 ${values.platform}-${values.arch} 的 esbuild：tsx 在目标机器上无法运行`);
