@@ -227,7 +227,7 @@ test("使用统计：交付周期、返工、等待确认、各步骤用时；�
     ],
   );
   const md = describeStats(s);
-  assert.match(md, /# req-kit 使用情况：2026 年 10 月/);
+  assert.match(md, /# laoshi 使用情况：2026 年 10 月/);
   assert.match(md, /完成：2 个（已完成 1，已完成，有遗留问题 1）/);
   assert.match(md, /\| 等待确认方案 \| 1 \| 2 小时 \|/);
   const csv = statsCsv(s);
@@ -282,10 +282,10 @@ test("req stats：导出本机记录，合并多台机器的导出生成汇报�
     console.log = log;
   }
   assert.match(printed[0], /已导出 1 条运行记录/);
-  const md = fs.readFileSync(path.join(dir, "out", "req-kit-usage-2026-10.md"), "utf8");
+  const md = fs.readFileSync(path.join(dir, "out", "laoshi-usage-2026-10.md"), "utf8");
   assert.match(md, /机器：pc-1、pc-2/);
   assert.match(md, /有进展的需求：2 个/);
-  assert.equal(fs.readFileSync(path.join(dir, "out", "req-kit-usage-2026-10.csv"), "utf8").trim().split("\n").length, 3);
+  assert.equal(fs.readFileSync(path.join(dir, "out", "laoshi-usage-2026-10.csv"), "utf8").trim().split("\n").length, 3);
   assert.throws(() => statsMain(["--merge", "missing.jsonl"], process.env, dir), /没有这个文件/);
   assert.throws(() => statsMain(["--month", "October"], process.env, dir), /看不懂月份/);
 });

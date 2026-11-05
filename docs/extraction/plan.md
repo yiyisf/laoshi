@@ -80,6 +80,17 @@ npm 包名：**`laoshi`（已确认可用）**。
 - `laoshi migrate`（预览 / 应用 / 回滚演练），`paseo-req-kit` 2.0 薄分发包，发布到公网 npm 供内网镜像同步，站点与内网 Git Pages 同步。
 - 完成标准：[compat-migration §4](../design/compat-migration.md) 的"对等"五条全部满足。
 
+## 发布 laoshi（2026-11-05 起）
+
+目标是发布 laoshi 工具包。正式版本号从 **0.1.0** 起（待定项 2 已决定），文档站点参照 paseo-req-kit（待定项 5 已决定）。M3、M4（摸高）、M5、M6 不在 0.1.0 的范围内。
+
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| R1 | `laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 进行中 |
+| R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 待做 |
+| R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 待做 |
+| 0.1.0 之后 | `laoshi migrate`、paseo-req-kit 2.0 薄分发包、Paseo 插件界面迁入；以 1.0 达到对等为目标（M7） | — |
+
 ## 风险登记
 
 | 风险 | 影响 | 应对 |
@@ -100,8 +111,8 @@ npm 包名：**`laoshi`（已确认可用）**。
 ## 待定项汇总（评审时逐条定）
 
 1. ~~skill 名~~：已决定 `/laoshi*`，`paseo-req-kit` 2.0 额外装转发薄 skill（[ADR 0005](../adr/0005-skill-names.md)）。
-2. **laoshi 版本号**：`0.1.0` 起、对等时 `1.0.0`，是否接受？
+2. ~~laoshi 版本号~~：已决定，正式版从 `0.1.0` 起（2026-11-05）。
 3. **模式 B 的命令集**与"谁调用 `record`"。（[in-chat-orchestration §7](../design/in-chat-orchestration.md)）
 4. ~~锁定文件~~：已决定放安装根，不进代码库（[ADR 0007](../adr/0007-one-install-many-repos.md)）。
-5. **文档站**：laoshi 站点与 req-kit 站点并存还是替换；内网 Git Pages 同步流程。
+5. ~~文档站~~：已决定，参照 paseo-req-kit 的站点（2026-11-05）；内网同步方式随 R2 确定。
 6. 探针对内部平台的用量与副作用是否可接受。

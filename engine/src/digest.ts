@@ -29,7 +29,7 @@ const GROUPS: Array<{ title: string; match: (stage: string) => boolean }> = [
 export function digestText(project: string, features: FeatureSummary[], now = new Date(), days = 7, lessons: RecurringLesson[] = []): string {
   const since = now.getTime() - days * 24 * 3600_000;
   const recent = features.filter((f) => new Date(f.updatedAt).getTime() >= since);
-  const lines = [`【req-kit 需求总览】${project}（${now.toLocaleDateString("zh-CN")}）`];
+  const lines = [`【laoshi 需求总览】${project}（${now.toLocaleDateString("zh-CN")}）`];
   if (features.length === 0) return `${lines[0]}\n还没有需求。`;
   const counts = GROUPS.map((g) => [g.title, features.filter((f) => g.match(f.stage)).length] as const).filter(([, n]) => n > 0);
   lines.push(`共 ${features.length} 个需求：${counts.map(([t, n]) => `${t} ${n}`).join("，")}；最近 ${days} 天有变化的 ${recent.length} 个。`);
@@ -77,7 +77,7 @@ async function main(): Promise<number> {
       config = await resolveProfiles(config, runtime);
       const command = `node "${path.join(KIT_ROOT, "bin", "req.mjs").split(path.sep).join("/")}" digest --notify --repo "${repo}"${values.config ? ` --config "${configPath}"` : ""}`;
       const id = await runtime.scheduleNewAgent({
-        name: `req-kit 需求总览：${path.basename(repo)}`,
+        name: `laoshi 需求总览：${path.basename(repo)}`,
         cron: values.schedule as string,
         cwd: repo,
         profile: config.agents.builder,

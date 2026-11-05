@@ -566,7 +566,7 @@ function validateProvider(label: string, profile: unknown): void {
     throw new ConfigError(`${label}.provider 必须是 "provider/model" 格式，当前为 "${profile.provider}"`);
   }
   if (profile.provider.includes("CHANGE-ME")) {
-    throw new ConfigError(`${label}.provider 还是示例值，请在终端运行配置向导 req configure（或在 req-kit 安装目录运行 node install.mjs --configure），也可以手工填写真实的 provider/model`);
+    throw new ConfigError(`${label}.provider 还是示例值，请在终端运行配置向导 laoshi configure，也可以手工填写真实的 provider/model`);
   }
 }
 
@@ -828,7 +828,7 @@ function stripMachineKeys(
 export function loadConfig(configPath: string, repo?: string): LoadedConfig {
   if (!fs.existsSync(configPath)) {
     throw new ConfigError(
-      `找不到配置文件 ${configPath}。请在 req-kit 的安装目录运行 node install.mjs，它会生成这个文件；然后填写两个 agent 的 provider/model。`,
+      `找不到配置文件 ${configPath}。请运行 laoshi install --platform <平台>，它会生成这个文件；然后用 laoshi configure 选择两个 agent。`,
     );
   }
   let config = merge(DEFAULT_CONFIG, resolveNotifiers(readJson(configPath, "配置文件"), configPath));

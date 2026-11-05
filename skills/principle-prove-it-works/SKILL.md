@@ -1,6 +1,6 @@
 ---
 name: principle-prove-it-works
-description: req-kit 工作原则：证明它能用。"通过"必须有实际运行过的命令和看到的输出作为证据。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
+description: laoshi 工作原则：证明它能用。"通过"必须有实际运行过的命令和看到的输出作为证据。在使用 /laoshi 对齐需求、或作为需求开发流水线的步骤工作时参考。
 ---
 
 # 证明它能用

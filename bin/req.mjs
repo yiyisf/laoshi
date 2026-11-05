@@ -1,88 +1,79 @@
 #!/usr/bin/env node
-// The `req` command: short names for the things people do in a terminal.
-// install.mjs writes ~/.req-kit/bin/req (and req.cmd on Windows) pointing here.
-// Everything it does is also available through the full commands it prints in `req help`.
+// The `laoshi` command (alias `req`): short names for the things people do in a terminal.
+// npm puts it on PATH; `laoshi install` also writes <install root>/bin/laoshi (and .cmd) pointing here.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findTsxCli, layoutOf } from "./locate.mjs";
+import { findTsxCli } from "./locate.mjs";
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const version = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8")).version;
 const tsxCli = findTsxCli(kitRoot) ?? path.join(kitRoot, "node_modules", "tsx", "dist", "cli.mjs");
 const launcher = path.join(kitRoot, "bin", "start-pipeline.mjs");
 
-const HELP = `req-kit ${version}（${kitRoot}）
+const HELP = `laoshi ${version}（${kitRoot}）
 
 在项目目录（或它的工作区）中运行：
-  req list                     列出这个项目的所有需求和阶段
-  req status [需求]            查看进度；只有一个需求运行过时可以不写
-  req stop <需求>              停止流水线（之后可以继续）
-  req resume <需求>            从上次中断处继续；需求改过时只处理变化的部分
-  req approve <需求>           需求方确认了方案（方案确认点，见 preview.md），继续开发
-  req verify <需求> [--verify-env local|deployed] [--defects fix|handback|report]
+  laoshi list                  列出这个项目的所有需求和阶段
+  laoshi status [需求]         查看进度；只有一个需求运行过时可以不写
+  laoshi stop <需求>           停止流水线（之后可以继续）
+  laoshi resume <需求>         从上次中断处继续；需求改过时只处理变化的部分
+  laoshi approve <需求>        需求方确认了方案（方案确认点，见 preview.md），继续开发
+  laoshi verify <需求> [--verify-env local|deployed] [--defects fix|handback|report]
                                研发完成后开始测试验证（分阶段执行时）
-  req start <需求> [--profile quick|standard] [--phases gated] [--at 22:00]
+  laoshi start <需求> [--profile quick|standard] [--phases gated] [--at 22:00]
                                启动流水线（通常由 /laoshi 在对话中启动，这里用于终端中手工启动）
-  req digest [--notify]        项目的需求总览；--notify 同时发到外部通知（如企业 IM）
-  req digest --schedule "0 9 * * 1"
-                               让 Paseo 按时间表发送需求总览（例子为每周一 9:00）；取消：req digest --cancel <ID>
-  req sync <需求>              把需求同步到对接的外部系统（补发失败的调用、补建卡片、更新状态）
-  req review <需求>            在浏览器打开原型审查页：点选要改的地方、直接改文字，提交意见或确认方案
-  req code-review <需求>       代码审查页：看这次的改动和 AI 评审意见，在代码行上写意见，退回修改或评审通过
-  req review-fix <需求>        按代码审查页上退回的意见开始修改（插件里提交"退回修改"时自动执行）
-  req try <需求> [--stop]      把做好的需求跑起来试用：给出访问地址和测试数据（--stop 停止）
-  req checklist <需求>         验收清单：按验收标准逐条勾选，提交后写成验收记录
-  req ui-check <网址> [--prototype <原型文件>] [--width 1280,390]
+  laoshi digest [--notify]     项目的需求总览；--notify 同时发到外部通知（如企业 IM）
+  laoshi digest --schedule "0 9 * * 1"
+                               让平台按时间表发送需求总览（例子为每周一 9:00）；取消：req digest --cancel <ID>
+  laoshi sync <需求>           把需求同步到对接的外部系统（补发失败的调用、补建卡片、更新状态）
+  laoshi review <需求>         在浏览器打开原型审查页：点选要改的地方、直接改文字，提交意见或确认方案
+  laoshi code-review <需求>    代码审查页：看这次的改动和 AI 评审意见，在代码行上写意见，退回修改或评审通过
+  laoshi review-fix <需求>     按代码审查页上退回的意见开始修改（插件里提交"退回修改"时自动执行）
+  laoshi try <需求> [--stop]   把做好的需求跑起来试用：给出访问地址和测试数据（--stop 停止）
+  laoshi checklist <需求>      验收清单：按验收标准逐条勾选，提交后写成验收记录
+  laoshi ui-check <网址> [--prototype <原型文件>] [--width 1280,390]
                                不靠看图检查网页：显示不全、遮挡、超出屏幕、文字太淡、报错，和原型对文字
-  req reply <需求> <回复>      把回答或方案意见转给需求的对话（插件的"等你处理"用它）
-  req integration test [需求]  只显示对接外部系统时会执行的命令，不真正调用
-  req start --from <系统>:<卡号>  从需求管理系统中的一张卡片开始需求（没有人开着对话也可以）
-  req card check [<卡号>|--all]  读取需求方在卡片中的回复，转给需求的会话
-  req card publish <卡号>      把需求会话写的 card-ai.md 写进卡片的 AI 区
-  req card list                本机从卡片开始的需求
-  req card route               本机接收卡片的仓库和子系统（--add <仓库> 登记）
-  req factory start|stop|status  接单器：定时为标题带 [AI] 的新卡片开始需求、转达回复（once 检查一次）
+  laoshi reply <需求> <回复>   把回答或方案意见转给需求的对话（需求插件的"等你处理"用它）
+  laoshi integration test [需求]  只显示对接外部系统时会执行的命令，不真正调用
+  laoshi start --from <系统>:<卡号>  从需求管理系统中的一张卡片开始需求（没有人开着对话也可以）
+  laoshi card check [<卡号>|--all]  读取需求方在卡片中的回复，转给需求的会话
+  laoshi card publish <卡号>   把需求会话写的 card-ai.md 写进卡片的 AI 区
+  laoshi card list             本机从卡片开始的需求
+  laoshi card route            本机接收卡片的仓库和子系统（--add <仓库> 登记）
+  laoshi factory start|stop|status  接单器：定时为标题带 [AI] 的新卡片开始需求、转达回复（once 检查一次）
 
 使用情况（可以在任何目录运行）：
-  req stats [--since 30d] [--month 2026-10]
+  laoshi stats [--since 30d] [--month 2026-10]
                                本机的使用统计：需求数、交付周期、返工、等待、各步骤用时、用量
-  req stats --report [--out 目录]
+  laoshi stats --report [--out 目录]
                                生成汇报用的汇总（.md）和每个需求一行的表格（.csv）
-  req stats --export [文件]    导出本机的运行记录；汇总多台机器：req stats --merge <文件…> --report
-  req outcome                  查找已合并进主干的需求和合并后发现的问题，记入使用记录（req stats 也会自动查）
-  req outcome <需求> --merged | --issue "<问题>"
+  laoshi stats --export [文件]    导出本机的运行记录；汇总多台机器：req stats --merge <文件…> --report
+  laoshi outcome               查找已合并进主干的需求和合并后发现的问题，记入使用记录（req stats 也会自动查）
+  laoshi outcome <需求> --merged | --issue "<问题>"
                                手动记一笔：已合并，或合并后发现的问题
-  req index [--rebuild [目录…]] [--prune]
-                               本机记录的需求（Paseo 插件据此找到所有需求）；1.9 之前运行过的用 --rebuild 补登
-  req api <命令> …             给程序用的 JSON 输出（见 contracts/cli-json.md）
-
-Paseo 插件（在 Paseo 中查看和管理需求）：
-  req plugin install [--yes]   安装或更新插件；需要时会询问是否打开 Paseo 的插件总开关
-  req plugin status            插件是否在运行
-  req plugin remove            从 Paseo 移除插件
+  laoshi index [--rebuild [目录…]] [--prune]
+                               本机记录的需求（需求插件据此找到所有需求）；1.9 之前运行过的用 --rebuild 补登
+  laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
 
 本机维护：
-  req install [--registry <npm 源>]
-                               安装或升级（检查环境、Paseo、启用、配置 agent、插件），同 npx -y paseo-req-kit@latest install
-  req docs [--port <端口>] [--no-open]
+  laoshi install --platform <平台> [--home <安装根>] [--target <skill 目录>] [--force]
+                               安装或更新：安装级配置、按平台渲染的 skill、平台需要的插件；平台：paseo、dsh
+  laoshi install --check    只检查会做什么，不改动
+  laoshi install --uninstall   移除 laoshi 安装的 skill 和插件（保留安装根）
+  laoshi upgrade            升级：npm install -g laoshi@latest，然后 laoshi install
+  laoshi docs [--port <端口>] [--no-open]
                                在本机打开这个版本的文档站点（不需要外网）
-  req doctor [--no-project]    体检：安装、配置、daemon、当前项目
-  req configure                配置向导：选择 builder 和 reviewer 用的 agent
-  req configure --auto         不提问，按推荐选好 builder、reviewer 和备用模型
-  req upgrade [版本] [--beta]  升级到最新版本（或指定版本），自动选能支持本机 Paseo 的版本；
-                               req upgrade --check 只看有没有新版本
-  req versions                 已安装的版本和 npm 上的版本
-  req use <版本>               切换到已安装的另一个版本（回滚）
-  req check                    检查安装状态
-  req notify-test [--type blocked|failed|completed|milestone|permission]
+  laoshi doctor [--no-project] 体检：安装、配置、平台、当前项目
+  laoshi configure          配置向导：选择 builder 和 reviewer 用的 agent
+  laoshi configure --auto   不提问，按推荐选好 builder、reviewer 和备用模型
+  laoshi notify-test [--type blocked|failed|completed|milestone|permission]
                                给配置的外部通知（如企业 IM）发一条测试消息
-  req version                  显示版本和安装位置
+  laoshi version            显示版本和安装位置
 
 <需求> 可以写功能目录（docs/features/20261012-sms-login）、目录名，或名称中能唯一确定的一部分（sms-login）。
-在对话中的用法见 /laoshi；完整说明：req docs（或 ${path.join(kitRoot, "docs", "guide")}）。`;
+req 是 laoshi 的别名。在对话中的用法见 /laoshi；完整说明：laoshi docs（或 ${path.join(kitRoot, "docs", "guide")}）。`;
 
 function readJson(file) {
   try {
@@ -103,7 +94,7 @@ function node(args) {
 
 function needTsx() {
   if (fs.existsSync(tsxCli)) return true;
-  console.error(`依赖未安装：在 ${kitRoot} 中执行 npm install，然后运行 node install.mjs`);
+  console.error(`依赖未安装：在 ${kitRoot} 中执行 npm ci --omit=dev，然后运行 laoshi install`);
   return false;
 }
 
@@ -111,45 +102,15 @@ function needTsx() {
 function feature(rest, required) {
   if (rest[0] && !rest[0].startsWith("-")) return ["--feature", rest[0], ...rest.slice(1)];
   if (required) {
-    console.error(`请写出是哪个需求，例如：req ${command} sms-login（用 req list 查看全部需求）`);
+    console.error(`请写出是哪个需求，例如：laoshi ${command} sms-login（用 laoshi list 查看全部需求）`);
     process.exit(2);
   }
   return rest;
 }
 
 const [command = "help", ...rest] = process.argv.slice(2);
-const installer = path.join(kitRoot, "install.mjs");
-const MANAGED = { setup: ["--setup"], upgrade: ["--upgrade"], use: ["--use"], versions: ["--versions"] };
-
-// The one-step install (1.13), e.g. `npx -y paseo-req-kit@latest install`: runs from whatever
-// copy npx fetched, before anything else.
-if (command === "install") process.exit(node([path.join(kitRoot, "bin", "bootstrap.mjs"), ...rest]));
-
-// Installed with `npm i -g`: this copy manages the versions under ~/tools/req-kit/versions
-// and hands every other command to the version in use.
-if (layoutOf(kitRoot).kind === "manager") {
-  if (command in MANAGED) {
-    const flags = command === "upgrade" && rest.includes("--check") ? ["--latest"] : MANAGED[command];
-    process.exit(node([installer, ...flags, ...rest.filter((a) => a !== "--check")]));
-  }
-  const kitHome = process.env.REQ_KIT_HOME?.trim() ? path.resolve(process.env.REQ_KIT_HOME.trim()) : path.join(os.homedir(), ".req-kit");
-  const active = readJson(path.join(kitHome, "active.json"));
-  const activeReq = active?.root ? path.join(active.root, "bin", "req.mjs") : null;
-  if (command === "version" || command === "--version" || command === "-v") {
-    console.log(`req-kit 管理器 ${version}（${kitRoot}）`);
-    console.log(active ? `当前启用的版本：${active.version}（${active.root}）` : "还没有启用任何版本：运行 req setup");
-    process.exit(0);
-  }
-  if (!activeReq || !fs.existsSync(activeReq)) {
-    if (["help", "--help", "-h"].includes(command)) {
-      console.log(`req-kit 管理器 ${version}\n\n还没有安装任何版本。先运行：req setup\n\n其他命令：req versions、req upgrade、req use <版本>`);
-      process.exit(0);
-    }
-    console.error(active ? `当前启用的版本 ${active.version} 不在了（${active.root}）。运行 req versions 查看已安装的版本，再 req use <版本>。` : "还没有安装任何 req-kit 版本。先运行：req setup");
-    process.exit(1);
-  }
-  process.exit(node([activeReq, command, ...rest]));
-}
+// `laoshi install` sets up this machine for this copy (bin/install.mjs).
+if (command === "install") process.exit(node([path.join(kitRoot, "bin", "install.mjs"), ...rest]));
 
 let code;
 switch (command) {
@@ -195,20 +156,14 @@ switch (command) {
     break;
   case "configure":
   case "config":
-    code = node([path.join(kitRoot, "install.mjs"), "--configure", ...rest]);
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "configure.ts"), ...rest]) : 1;
     break;
   case "upgrade":
-    code = rest.includes("--check")
-      ? node([path.join(kitRoot, "install.mjs"), "--latest", ...rest.filter((a) => a !== "--check")])
-      : node([path.join(kitRoot, "install.mjs"), "--upgrade", ...rest]);
-    break;
-  case "setup":
-  case "use":
-  case "versions":
-    code = node([installer, ...MANAGED[command], ...rest]);
+    console.log(`laoshi 用 npm 升级：\n  npm install -g laoshi@latest\n  laoshi install\n内网离线安装包：解压新版本，在新目录中运行 node bin/install.mjs（安装根和配置不受影响）。回到旧版本：npm install -g laoshi@<版本>，再 laoshi install。`);
+    code = 0;
     break;
   case "check":
-    code = node([path.join(kitRoot, "install.mjs"), "--check", ...rest]);
+    code = node([path.join(kitRoot, "bin", "install.mjs"), "--check", ...rest]);
     break;
   case "digest":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "digest.ts"), ...rest]) : 1;
@@ -250,7 +205,8 @@ switch (command) {
     code = node([path.join(kitRoot, "bin", "req-docs.mjs"), ...rest]);
     break;
   case "plugin":
-    code = node([path.join(kitRoot, "bin", "req-plugin.mjs"), ...rest]);
+    console.error("Paseo 的需求插件由 paseo-req-kit 提供：req plugin install（paseo-req-kit 的命令）。");
+    code = 2;
     break;
   case "notify-test":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "notify-test.ts"), ...rest]) : 1;
@@ -258,7 +214,7 @@ switch (command) {
   case "version":
   case "--version":
   case "-v":
-    console.log(`req-kit ${version}（${kitRoot}）`);
+    console.log(`laoshi ${version}（${kitRoot}）`);
     code = 0;
     break;
   case "help":

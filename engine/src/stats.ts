@@ -566,7 +566,7 @@ function list(m: Record<string, number>, labels: Record<string, string>): string
 
 /** The summary as a Markdown report for people (management included). */
 export function describeStats(s: StatsSummary): string {
-  const lines = [`# req-kit 使用情况：${s.period.label}`, ""];
+  const lines = [`# laoshi 使用情况：${s.period.label}`, ""];
   if (s.active === 0) {
     lines.push("这段时间没有流水线运行记录。");
     return lines.join("\n");
@@ -777,7 +777,7 @@ export function statsMain(argv: string[], env: NodeJS.ProcessEnv = process.env, 
     // Events of the requirements exported (any time, so first reviews count right), and the period's others.
     const keys = new Set(picked.map((r) => `${r.requirement.project}\0${r.requirement.key}`));
     const pickedEvents = dedupeEvents(events).filter((e) => keys.has(`${e.requirement.project}\0${e.requirement.key}`) || inPeriod(e.at, period));
-    const file = path.resolve(cwd, a.export === true ? `req-kit-usage-${os.hostname()}-${stamp()}.jsonl` : a.export);
+    const file = path.resolve(cwd, a.export === true ? `laoshi-usage-${os.hostname()}-${stamp()}.jsonl` : a.export);
     const lines = [...picked, ...pickedEvents].map((r) => JSON.stringify(r));
     fs.writeFileSync(file, lines.join("\n") + (lines.length ? "\n" : ""));
     console.log(`已导出 ${picked.length} 条运行记录和 ${pickedEvents.length} 条评审、验收、合并记录（${period.label}）：${file}\n汇总多台机器：req stats --merge <各机器导出的文件> --report`);
@@ -788,7 +788,7 @@ export function statsMain(argv: string[], env: NodeJS.ProcessEnv = process.env, 
   if (a.report) {
     const dir = path.resolve(cwd, a.out ?? ".");
     fs.mkdirSync(dir, { recursive: true });
-    const base = path.join(dir, `req-kit-usage-${a.month ?? stamp()}`);
+    const base = path.join(dir, `laoshi-usage-${a.month ?? stamp()}`);
     fs.writeFileSync(`${base}.md`, `${describeStats(summary)}\n`);
     fs.writeFileSync(`${base}.csv`, statsCsv(summary));
     console.log(`已生成：\n  ${base}.md（汇报用的汇总）\n  ${base}.csv（每个需求一行，可以用表格软件打开）`);

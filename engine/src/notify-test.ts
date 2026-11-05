@@ -12,7 +12,7 @@ import { wordsFor } from "./runtime-loader.js";
 /** A realistic event of the given type, with the details the pipeline would send. */
 export function sampleEvent(type: NotifierEventType, repo: string): NotifierEvent {
   const featureDir = "docs/features/20261012-sms-login";
-  const resume = `node "<req-kit>/bin/start-pipeline.mjs" --feature ${featureDir} --resume`;
+  const resume = `node "<laoshi>/bin/start-pipeline.mjs" --feature ${featureDir} --resume`;
   const samples: Record<NotifierEventType, { text: string; details: Record<string, unknown> }> = {
     milestone: { text: "技术方案已经确定（审核 1 轮），开始写代码。", details: { milestone: "design-settled" } },
     blocked: {
@@ -28,7 +28,7 @@ export function sampleEvent(type: NotifierEventType, repo: string): NotifierEven
       details: { stepTitle: "代码评审", reason: "agent 连续出错", logPath: `${featureDir}/.pipeline/pipeline.log`, resumeCommand: resume },
     },
     digest: {
-      text: "【req-kit 需求总览】shop\n共 3 个需求：需要处理 1，待验收 1，开发中 1。",
+      text: "【laoshi 需求总览】shop\n共 3 个需求：需要处理 1，待验收 1，开发中 1。",
       details: { features: [{ name: "20261012-sms-login", title: "短信验证码登录", stage: "待验收" }] },
     },
     phase_done: {

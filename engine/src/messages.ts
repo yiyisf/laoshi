@@ -463,7 +463,7 @@ export function pluginReplyMessage(input: { featureDir: string; waitingFor: "bus
 /** 1.14: the requirement's chat is reminded once that a confirmed spec has not started development. */
 export function notStartedNotice(featureDir: string): string {
   return [
-    "【需求开发流水线提示】这条消息来自 req-kit 的后台检查，不是用户发的。",
+    "【需求开发流水线提示】这条消息来自 laoshi 的后台检查，不是用户发的。",
     "",
     `需求 ${featureDir} 的需求说明已经确认超过 30 分钟，但开发流水线还没有启动。`,
     "如果用户确实要开发它：请按 /laoshi 的手册启动开发（或者告诉用户可以在插件\"等你处理\"里点\"开始开发\"）。",

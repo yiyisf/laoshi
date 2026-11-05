@@ -689,7 +689,7 @@ async function serve(env: NodeJS.ProcessEnv): Promise<void> {
   };
   fs.mkdirSync(kitHome(env), { recursive: true });
   fs.writeFileSync(infoFile(env), JSON.stringify(info, null, 2), { mode: 0o600 });
-  console.log(`[${info.startedAt}] 原型审查页在 ${host}:${port} 运行（req-kit ${info.version}）`);
+  console.log(`[${info.startedAt}] 原型审查页在 ${host}:${port} 运行（laoshi ${info.version}）`);
   const timer = setInterval(() => {
     if (Date.now() - last < IDLE_EXIT_MS) return;
     clearInterval(timer);

@@ -1,6 +1,6 @@
 ---
 name: spec-writing
-description: req-kit 方法：把访谈记录（alignment.md）整理成标准需求说明 spec.md，自查后给需求方一份 10 行以内的摘要请其确认，确认后标记为"已确认"并提交。由 /laoshi 的手册调用。
+description: laoshi 方法：把访谈记录（alignment.md）整理成标准需求说明 spec.md，自查后给需求方一份 10 行以内的摘要请其确认，确认后标记为"已确认"并提交。由 /laoshi 的手册调用。
 ---
 
 # 需求说明（spec）

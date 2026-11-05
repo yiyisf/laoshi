@@ -1,11 +1,11 @@
 ---
 name: laoshi
-description: req-kit 需求开发入口。提新需求或小改动、查看进度、暂停或继续、修改需求、验收、报告上线后的问题、接手别人的需求时使用；也可以直接调用 /laoshi 加一句话描述。由它判断走哪本手册，需求确认后在后台启动开发流水线（设计、实现、评审、验证、报告）。
+description: laoshi 需求开发入口。提新需求或小改动、查看进度、暂停或继续、修改需求、验收、报告上线后的问题、接手别人的需求时使用；也可以直接调用 /laoshi 加一句话描述。由它判断走哪本手册，需求确认后在后台启动开发流水线（设计、实现、评审、验证、报告）。
 metadata:
   opencode/slash: "true"
 ---
 
-# req-kit 需求开发入口（{{REQ_KIT_VERSION}}）
+# laoshi 需求开发入口（{{REQ_KIT_VERSION}}）
 
 用户的话：$ARGUMENTS
 
@@ -33,7 +33,7 @@ metadata:
 | 验收 | "做完了，我来验收""帮我对一下验收标准" | `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/accept.md` |
 | 上线后发现问题 | "线上发现……不对""用户反馈……" | `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/incident.md` |
 | 接手或回顾一个需求 | "这个需求是之前同事提的""这个需求现在什么情况" | `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/takeover.md` |
-| 从卡片自动开始的需求（没有人在对话里） | 消息以"/laoshi 无人值守"开头，或这个对话由 req-kit 接单创建、功能目录中有 `source.json` | `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/unattended.md` |
+| 从卡片自动开始的需求（没有人在对话里） | 消息以"/laoshi 无人值守"开头，或这个对话由 laoshi 接单创建、功能目录中有 `source.json` | `{{REQ_KIT_ROOT}}/skills/laoshi/playbooks/unattended.md` |
 
 判断方法：
 

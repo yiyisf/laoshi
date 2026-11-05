@@ -1,11 +1,11 @@
 ---
 name: laoshi-doctor
-description: req-kit 体检。检查 req-kit 的安装、本机配置、平台与 agent、当前项目和进行中的流水线，给出 ✓ / ⚠ / ✗ 清单和修复方法。在 /laoshi 报错、升级之后、更换 agent 或平台版本之后，或用户输入 /laoshi-doctor 时使用。
+description: laoshi 体检。检查 laoshi 的安装、本机配置、平台与 agent、当前项目和进行中的流水线，给出 ✓ / ⚠ / ✗ 清单和修复方法。在 /laoshi 报错、升级之后、更换 agent 或平台版本之后，或用户输入 /laoshi-doctor 时使用。
 metadata:
   opencode/slash: "true"
 ---
 
-# req-kit 体检（{{REQ_KIT_VERSION}}）
+# laoshi 体检（{{REQ_KIT_VERSION}}）
 
 体检只读取信息，不修改任何文件。
 
@@ -23,7 +23,7 @@ node "{{REQ_KIT_ROOT}}/bin/req-doctor.mjs"
 
 1. 先说总体结论：全部正常，或者有几项需要处理。
 2. 逐项说明 ✗（必须处理）和 ⚠（建议处理）：是什么问题、会造成什么影响、怎么修。输出里每项都附了修复方法，照着讲清楚即可；命令原样给出。
-3. 涉及安装目录、本机配置（`~/.req-kit/config.json`）或 {{platform.name}} 设置的修改，由用户自己（或开发同事）完成。你不要直接改这些文件，除非用户明确要求。
+3. 涉及安装目录、本机配置（`<安装根>/config.json`（默认 `~/.laoshi`））或 {{platform.name}} 设置的修改，由用户自己（或开发同事）完成。你不要直接改这些文件，除非用户明确要求。
 4. 修好后建议再运行一次 `/laoshi-doctor` 确认。
 
 ## 常见问题

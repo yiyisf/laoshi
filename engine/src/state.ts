@@ -340,8 +340,8 @@ export const STATE_MIGRATIONS: Record<number, StateMigration> = {
 export class StateVersionError extends Error {
   constructor(file: string, found: number, supported: number) {
     super(
-      `${file} 是由更新版本的 req-kit 写入的（格式第 ${found} 版，当前版本只支持到第 ${supported} 版）。` +
-        "请升级 req-kit 后再操作；如果是回滚到旧版本造成的，可以把同目录下的 state.json.bak-v<旧版本号> 恢复为 state.json，" +
+      `${file} 是由更新版本的 laoshi 写入的（格式第 ${found} 版，当前版本只支持到第 ${supported} 版）。` +
+        "请升级 laoshi 后再操作；如果是回滚到旧版本造成的，可以把同目录下的 state.json.bak-v<旧版本号> 恢复为 state.json，" +
         "或者删除 state.json 后用 --restart 从头开始。",
     );
     this.name = "StateVersionError";

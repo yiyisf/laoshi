@@ -74,7 +74,7 @@ function installation(offline: boolean): void {
   section("安装");
   // laoshi M1: the installer stays in paseo-req-kit until M7; without it there is no installation to check.
   if (!fs.existsSync(path.join(KIT_ROOT, "install.mjs"))) {
-    console.log("· 这个目录没有安装器（laoshi M1：安装与升级在 M7 之前由 paseo-req-kit 提供），跳过安装检查");
+    console.log("· 安装检查：laoshi install --check");
     return;
   }
   const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "install.mjs"), "--check", "--quiet"], {
@@ -93,7 +93,7 @@ function installation(offline: boolean): void {
 function configuration(configPath: string, repo: string | null): PipelineConfig | null {
   section("配置");
   if (!fs.existsSync(configPath)) {
-    report("fail", `找不到本机配置 ${configPath}`, "在 req-kit 安装目录运行 node install.mjs 生成，或用 node install.mjs --import-legacy <旧安装目录> 导入旧配置");
+    report("fail", `找不到本机配置 ${configPath}`, "运行 laoshi install --platform <平台> 生成");
     return null;
   }
   try {
@@ -151,7 +151,7 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
     const required = loaded.config.requiredVersion;
     if (required) {
       if (satisfies(kitVersion(), required)) report("ok", `版本要求 ${required}：当前 ${kitVersion()} 满足`);
-      else report("warn", `团队或项目要求 req-kit ${required}，当前为 ${kitVersion()}`, "按 docs/guide/安装与升级.md 升级到符合要求的版本");
+      else report("warn", `团队或项目要求 laoshi ${required}，当前为 ${kitVersion()}`, "升级：npm install -g laoshi@<版本>，然后 laoshi install");
     }
     budgetUsage(loaded.config);
     return loaded.config;
@@ -289,7 +289,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
     }
     const version = typeof raw.version === "number" ? raw.version : 1;
     if (version > STATE_VERSION) {
-      report("fail", `${name}：状态文件由更新版本的 req-kit 写入（第 ${version} 版）`, "升级 req-kit，或恢复同目录下的 state.json.bak-v* 备份");
+      report("fail", `${name}：状态文件由更新版本的 laoshi 写入（第 ${version} 版）`, "升级 laoshi，或恢复同目录下的 state.json.bak-v* 备份");
       continue;
     }
     const migrate = version < STATE_VERSION ? `（格式第 ${version} 版，下次继续时会自动迁移并保留备份）` : "";
@@ -380,7 +380,7 @@ async function main(): Promise<number> {
   const adapter = adapterForFile(configPath);
   const repo = values["no-project"] ? null : path.resolve(values.repo ?? originFromEnv(process.env, adapter)?.cwd ?? process.cwd());
 
-  console.log(`req-kit ${kitVersion()} 体检（安装目录 ${KIT_ROOT}）`);
+  console.log(`laoshi ${kitVersion()} 体检（程序目录 ${KIT_ROOT}）`);
   identity(repo);
   installation(values.offline ?? false);
   const config = configuration(configPath, repo);

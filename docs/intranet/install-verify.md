@@ -272,8 +272,7 @@ node node_modules\tsx\dist\cli.mjs engine\src\eval.ts --case text-utils-tb --con
 ## 7. 卸载
 
 1. 关闭 dsh。
-2. 删除 `<dsh 目录>\profiles\<profile>\node_modules\laoshi-dsh-plugin`，并删掉 `cordis.patch.yml` 中 `laoshi-dsh-plugin` 那一段。
-3. 删除 `<dsh 目录>\skills` 中本次写入的 skill 目录：`laoshi*`、`principle-*`、`acceptance-criteria`、`requirement-*`、`result-report`、`spec-writing`。
-4. 删除 laoshi 程序目录和安装根。
+2. 执行 `node D:\laoshi\kit\bin\install.mjs --uninstall`：删除 laoshi 安装的 skill（只删带 `.laoshi-install.json` 标记的目录）、dsh 中的插件及其挂载，以及安装根里的 `laoshi`、`req` 命令。
+3. 删除 laoshi 程序目录；安装根（配置、使用记录）不再需要时也可以删除。
 
 样例项目可以直接删除。

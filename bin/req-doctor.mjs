@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// req-kit doctor: read-only health check. Same in bash, PowerShell and cmd:
-//   node "<req-kit>/bin/req-doctor.mjs" [--repo <dir>] [--no-project] [--offline]
+// laoshi doctor: read-only health check. Same in bash, PowerShell and cmd:
+//   node "<laoshi>/bin/req-doctor.mjs" [--repo <dir>] [--no-project] [--offline]
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

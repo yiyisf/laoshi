@@ -55,7 +55,7 @@ function placeholder(value: string): boolean {
 
 const TEST_OR_DOC = /(^|\/)(tests?|__tests__|spec|specs|fixtures?|mocks?|testdata|examples?|docs?)\/|\.(test|spec)\.[a-z]+$|_test\.go$|Test\.java$|\.(md|txt|rst|adoc)$/i;
 const SKIP_FILE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|go\.sum|poetry\.lock|composer\.lock)$|\.(min\.js|map|svg|png|jpe?g|gif|ico|pdf|zip|jar|woff2?)$/i;
-const ALLOW_MARK = /req-kit:allow-secret|gitleaks:allow/;
+const ALLOW_MARK = /laoshi:allow-secret|req-kit:allow-secret|gitleaks:allow/;
 
 function mask(line: string, secret: string): string {
   const shown = secret.length > 6 ? `${secret.slice(0, 4)}…` : "…";
@@ -171,7 +171,7 @@ export function secretFollowUp(input: { findings: SecretFinding[]; base: string;
     commits.length > 0
       ? `2. 这些值已经写进了本需求的提交（${commits.join("、")}）。这些提交还没有推送，要把它们从历史里去掉：改好文件后用 \`git commit --fixup=<那个提交>\` 提交，再运行 \`git -c sequence.editor=: rebase -i --autosquash <那个提交>^\`（不会打开编辑器）；只在本需求的分支上做，不要动 ${input.base.slice(0, 8)} 之前的提交。`
       : "2. 这些值还没有提交，改好文件再提交即可。",
-    "3. 确实不是密钥的（例如示例里的假值），在那一行末尾加注释 `req-kit:allow-secret`。",
+    "3. 确实不是密钥的（例如示例里的假值），在那一行末尾加注释 `laoshi:allow-secret`。",
     "4. 在本步骤产物里记一笔：哪些地方、怎么处理的。如果它是真实的密钥，写明\"建议更换这个密钥\"，由人来做。",
   ].join("\n");
 }
