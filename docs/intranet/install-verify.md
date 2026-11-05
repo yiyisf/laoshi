@@ -219,6 +219,17 @@ node node_modules\tsx\dist\cli.mjs engine\src\eval.ts --case text-utils-tb --con
   - 没有因为 PowerShell 被禁止而报错；
   - laoshi 自己启动的进程（服务、准备命令）只有 `node` 和 `cmd`。
 
+### V11 按角色选择模型（可选，需要 2026-11-04 之后的安装包）
+
+- **做法**：
+  1. 先体检，输出中的"dsh 中可用的模型："一行列出了 dsh 里配置好的模型。
+  2. 编辑 `<安装根>\config.json`，把 reviewer 改成其中一个模型，例如 `"reviewer": { "provider": "<提供方>/<模型>" }`。需要时加上 `"thinkingOptionId": "high"` 作为推理强度。
+  3. 再体检一次，然后在 demo-b 跑一个小需求。
+- **期望**：
+  - 体检显示 ✓ reviewer：<提供方>/<模型>；
+  - 方案审核、代码评审、功能验证这几个步骤在 dsh 中用的是这个模型（可以在子 agent 的会话里看到），其余步骤用对话的模型；
+  - 写错模型名时，体检显示 ✗ 并列出可用的模型。
+
 ## 5. 记录结果
 
 | 项 | 结果（通过 / 不通过 / 未出现） | 用时 | 说明（不通过时：现象、时间、对话里的原话、相关日志的位置） |
@@ -235,6 +246,7 @@ node node_modules\tsx\dist\cli.mjs engine\src\eval.ts --case text-utils-tb --con
 | V8 两个代码库 | | | |
 | V9 评估 | | | |
 | V10 shell | | | |
+| V11 按角色选模型 | | | |
 
 请把以下材料一起反馈（反馈前确认其中没有口令、令牌）：
 

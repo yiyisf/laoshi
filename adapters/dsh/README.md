@@ -38,7 +38,13 @@
    { "platform": { "adapter": "dsh" } }
    ```
 
-3. 在 dsh 的对话里发起流水线。引擎从 `DSH_SESSION_ID` 识别发起的对话，从 `DSH_HOME` 找到插件。对话的 shell 运行在会话目录中，所以仓库目录就是当前目录。
+3. 选择各角色的模型（可选，M4b）：agent 的 `provider` 写成 `<dsh 的提供方>/<模型>`（如 `deepseek/deepseek-reasoner`），这个角色的步骤就用它；`thinkingOptionId` 作为推理强度。写 `dsh/chat-model` 时用对话的模型（安装脚本的默认值）。`laoshi doctor` 列出 dsh 中可用的模型，并逐个角色检查。
+
+   ```json
+   { "agents": { "builder": { "provider": "dsh/chat-model" }, "reviewer": { "provider": "deepseek/deepseek-reasoner", "thinkingOptionId": "high" } } }
+   ```
+
+4. 在 dsh 的对话里发起流水线。引擎从 `DSH_SESSION_ID` 识别发起的对话，从 `DSH_HOME` 找到插件。对话的 shell 运行在会话目录中，所以仓库目录就是当前目录。
 
 ## 原型的范围
 
@@ -49,7 +55,6 @@
 | 能力 | 现在的行为 | 计划 |
 | --- | --- | --- |
 | 联合需求（几个仓库各建工作区） | 用内置 worktree，单元测试覆盖了新建工作区，但还没有端到端检查 | — |
-| 按角色选择模型（builder / reviewer 的 `provider`） | 步骤 agent 使用对话的模型 | 用 dsh 的 agent 预设或子 agent 的模型选项 |
 | 定时任务的截止时间（`expiresAt`） | 忽略，在日志里说明 | — |
 | 额度、profile、provider 状态 | 返回 `null` | — |
 | Windows | 运行时和插件按 Windows 写好（命名管道），但没有在 Windows 上跑过端到端检查；dsh 在 Windows 上的 shell 见[摸底报告](../../docs/discovery/dsh/report.md#内网-windows-自测结果2026-10-30) | 内网验证 |

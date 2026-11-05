@@ -134,6 +134,12 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 M2b 起，`--worktree` 和服务改用 laoshi 的内置实现（[builtin-capabilities](builtin-capabilities.md)），端到端检查加 `--worktree` 时覆盖这两项。还没有做的，见 adapters/dsh 的 README，主要有：
 
 - 联合需求的端到端检查；
-- 按角色选择模型；
 - Windows 上的端到端检查。
 
+
+## 10. 正式版的进展（M4b，2026-11-04）
+
+- **按角色选择模型**：agent 的 `provider` 写成 `<dsh 的提供方>/<模型>`，插件在 `startActivation` 的 `request.agentOptions` 中传入 `provider`、`model`，以及来自 `thinkingOptionId` 的 `reasoningEffort`。dsh 的 spawn 后端支持这一项，子 agent 默认继承父 agent 的模型，这里可以覆盖。`dsh/chat-model` 表示用对话的模型。
+- **列出模型**：插件新增 `models` 操作（`ctx.llm.listProviders()` / `listModels()`）。`doctor` 显示可用的模型并逐个角色检查；运行时的 `providerStatus` 也由它提供，接单器的自检因此能用。插件因此多注入一个 `llm` 服务。
+- 在真实 dsh（0.2.2-alpha.2）上验证：reviewer 的三个步骤用自己的模型，builder 的步骤用对话的模型；`doctor` 列出模型、逐个角色检查通过（`adapters/dsh/e2e`）。
+- 能力表中还是"无"的：平台的 agent profile（dsh 的 agent 预设可以对应，暂不做）、定时启动 agent（需求总览定时发送）、额度、平台工具信息。按契约，这几项缺失只影响对应的附加功能。

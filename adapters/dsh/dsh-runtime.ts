@@ -3,13 +3,14 @@
 // engine never calls dsh's /api (ADR 0008: the plugin calls on the engine's behalf).
 //
 // Worktrees and services are laoshi's builtin ones (engine/src/builtin, laoshi M2b): the methods
-// below are placeholders the runtime layer replaces. Not yet: provider quota, agent profiles per
-// role (step agents use the chat's model), recurring schedules' expiry.
+// below are placeholders the runtime layer replaces. Each role can run on its own dsh model
+// (stepModel). Not yet: provider quota, platform agent profiles, recurring schedules' expiry.
 import fs from "node:fs";
 import net from "node:net";
 import type { RunningTool } from "../../engine/src/scan-guard.js";
 import type { ToolCall } from "../../engine/src/danger-guard.js";
 import { samePath } from "../../engine/src/paths.js";
+import type { AgentProfile } from "../../engine/src/config.js";
 import type { AgentRuntime, RuntimeFactory, StepAgent, WaitOutcome } from "../../engine/src/runtime.js";
 import { localTimeZone } from "../../engine/src/schedule-time.js";
 import type { AgentUsage } from "../../engine/src/usage.js";
@@ -73,6 +74,26 @@ export function toAgentUsage(u: Status["usage"]): AgentUsage | null {
   return { inputTokens: (u.uncachedInputTokens ?? 0) + cached + (u.cacheWriteTokens ?? 0), cachedInputTokens: cached, outputTokens: u.outputTokens ?? 0 };
 }
 
+/** laoshi's "use the chat's model" for a role on dsh (what the installer writes). */
+export const CHAT_MODEL = "dsh/chat-model";
+
+/** A provider route and its models, as the plugin lists them. */
+export interface DshModels {
+  providers: Array<{ provider: string; name: string; models: Array<{ id: string; name: string }> }>;
+}
+
+/**
+ * The model a role's settings ask for on dsh: provider "<dsh provider route>/<model id>", reasoning
+ * effort from thinkingOptionId. Null for the chat's own model (CHAT_MODEL, or no provider).
+ */
+export function stepModel(profile: AgentProfile | undefined): { provider: string; model: string; reasoningEffort?: string } | null {
+  const route = profile?.provider?.trim();
+  if (!route || route === CHAT_MODEL) return null;
+  const slash = route.indexOf("/");
+  if (slash <= 0 || slash === route.length - 1) return null;
+  return { provider: route.slice(0, slash), model: route.slice(slash + 1), ...(profile?.thinkingOptionId ? { reasoningEffort: profile.thinkingOptionId } : {}) };
+}
+
 /** Schedule IDs carry the session, which the plugin needs to cancel them. */
 const scheduleId = (sessionId: string, id: string) => `dsh:${sessionId}/${id}`;
 function parseScheduleId(id: string): { sessionId: string; id: string } | null {
@@ -128,7 +149,8 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
         const { sessionId } = await call<{ sessionId: string }>("startSession", { cwd: input.cwd, prompt: input.prompt });
         return stepAgent(sessionId);
       }
-      const { childId } = await call<{ childId: string }>("spawn", { parent: input.parentAgentId, label: input.title, prompt: input.prompt, cwd: input.cwd });
+      const model = stepModel(input.profile);
+      const { childId } = await call<{ childId: string }>("spawn", { parent: input.parentAgentId, label: input.title, prompt: input.prompt, cwd: input.cwd, ...(model ? { model } : {}) });
       return stepAgent(childId);
     },
 
@@ -175,7 +197,12 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
 
     toolCalls,
     capabilities: async () => null,
-    providerStatus: async () => null,
+    async providerStatus() {
+      // dsh's provider routes with an adapter are ready to use; "dsh" stands for the chat's own model.
+      const listed = await call<DshModels>("models").catch(() => null);
+      if (!listed) return null;
+      return [{ provider: CHAT_MODEL.split("/")[0], status: "ready" }, ...listed.providers.map((p) => ({ provider: p.provider, status: p.models.length > 0 ? "ready" : "no_models" }))];
+    },
 
     async scheduleMessage(input) {
       if (input.expiresAt) log("dsh 的定时任务不能设截止时间：这条定时消息会一直有效，直到被取消");

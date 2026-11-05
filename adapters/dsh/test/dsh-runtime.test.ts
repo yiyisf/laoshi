@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { createRuntimeWithClient, PluginUnavailableError, pluginClient, toAgentUsage } from "../dsh-runtime.js";
+import { CHAT_MODEL, createRuntimeWithClient, stepModel, PluginUnavailableError, pluginClient, toAgentUsage } from "../dsh-runtime.js";
 import { channelPaths } from "../plugin/channel.mjs";
 import { apply } from "../plugin/index.mjs";
 
@@ -27,11 +27,18 @@ function fakeHost(script: { runningPolls?: number } = {}) {
       else list.push(fn);
       listeners.set(event, list);
     },
+    llm: {
+      listProviders: () => [
+        { id: "deepseek", name: "DeepSeek" },
+        { id: "gateway", name: "内网网关" },
+      ],
+      listModels: async (provider: string) => (provider === "deepseek" ? [{ id: "deepseek-chat", name: "Chat" }, { id: "deepseek-reasoner", name: "Reasoner" }] : []),
+    },
     agents: { get: (id: string) => (sessions.has(id) ? { id } : undefined), resume: async () => ({ agent: { id: "resumed" } }) },
     subagents: {
-      async startActivation(spec: { label: string; request: { cwd: string } }) {
+      async startActivation(spec: { label: string; request: { cwd: string; agentOptions?: unknown } }) {
         const childId = `child-${++childCount}`;
-        calls.push({ method: "startActivation", args: { label: spec.label, cwd: spec.request.cwd } });
+        calls.push({ method: "startActivation", args: { label: spec.label, cwd: spec.request.cwd, ...(spec.request.agentOptions ? { agentOptions: spec.request.agentOptions } : {}) } });
         sessions.set(childId, { cwd: spec.request.cwd, running: true, polls: 0 });
         return { childId, result: new Promise((resolve) => (resolveFirst = resolve)) };
       },
@@ -211,4 +218,33 @@ test("dsh 运行时：定时消息的 ID 带着会话，取消时用得上；对
 test("dsh 用量换算成引擎的格式", () => {
   assert.equal(toAgentUsage(null), null);
   assert.deepEqual(toAgentUsage({ uncachedInputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 2, outputTokens: 3 }), { inputTokens: 17, cachedInputTokens: 5, outputTokens: 3 });
+});
+
+test("dsh 按角色选模型（M4b）：provider 写成\"<提供方>/<模型>\"时步骤用它，dsh/chat-model 用对话的模型；插件列出可用的模型", async () => {
+  assert.equal(stepModel({ provider: CHAT_MODEL }), null);
+  assert.equal(stepModel(undefined), null);
+  assert.deepEqual(stepModel({ provider: "deepseek/deepseek-reasoner", thinkingOptionId: "high" }), { provider: "deepseek", model: "deepseek-reasoner", reasoningEffort: "high" });
+  assert.deepEqual(stepModel({ provider: "gateway/team/model-x" }), { provider: "gateway", model: "team/model-x" }, "模型 ID 里可以有斜杠");
+  const { host, call } = await started();
+  try {
+    const runtime = createRuntimeWithClient(call, () => undefined, 10);
+    await runtime.startAgent({ role: "reviewer", title: "方案审核", prompt: "审方案", cwd: "/repo", labels: {}, parentAgentId: "chat-1", profile: { provider: "deepseek/deepseek-reasoner", thinkingOptionId: "high" } });
+    assert.deepEqual(host.calls.at(-1), { method: "startActivation", args: { label: "方案审核", cwd: "/repo", agentOptions: { provider: "deepseek", model: "deepseek-reasoner", reasoningEffort: "high" } } });
+    await runtime.startAgent({ role: "builder", title: "方案设计", prompt: "做方案", cwd: "/repo", labels: {}, parentAgentId: "chat-1", profile: { provider: CHAT_MODEL } });
+    assert.deepEqual(host.calls.at(-1), { method: "startActivation", args: { label: "方案设计", cwd: "/repo" } });
+
+    assert.deepEqual(await call("models"), {
+      providers: [
+        { provider: "deepseek", name: "DeepSeek", models: [{ id: "deepseek-chat", name: "Chat" }, { id: "deepseek-reasoner", name: "Reasoner" }] },
+        { provider: "gateway", name: "内网网关", models: [] },
+      ],
+    });
+    assert.deepEqual(await runtime.providerStatus(), [
+      { provider: "dsh", status: "ready" },
+      { provider: "deepseek", status: "ready" },
+      { provider: "gateway", status: "no_models" },
+    ]);
+  } finally {
+    host.dispose();
+  }
 });
