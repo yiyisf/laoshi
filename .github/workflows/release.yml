@@ -126,12 +126,14 @@ jobs:
           cp -R site/.vitepress/dist site-dist
           test -f site-dist/index.html
           du -sh site-dist
+      # A scoped name packs as <scope>-<name>-<version>.tgz; the later steps use package.tgz.
       - name: Package
         run: |
           npm pack
-          ls -l laoshi-*.tgz
+          mv ./*laoshi-"$TAG".tgz package.tgz
+          ls -l package.tgz
       - name: Check the package as users install it
-        run: node scripts/check-package.mjs --tgz "laoshi-$TAG.tgz" --require-docs
+        run: node scripts/check-package.mjs --tgz package.tgz --require-docs
       # For machines without any npm registry (docs/intranet/install-verify.md).
       - name: Offline package for Windows
         run: |
@@ -152,14 +154,17 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if npm view "laoshi@$TAG" version >/dev/null 2>&1; then
-            echo "::notice::laoshi@$TAG is already on npm; skipping publish."
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$TAG" version >/dev/null 2>&1; then
+            echo "::notice::$NAME@$TAG is already on npm; skipping publish."
             exit 0
           fi
           case "$TAG" in
-            *-*) npm publish "laoshi-$TAG.tgz" --tag beta ;;
-            *)   npm publish "laoshi-$TAG.tgz" ;;
+            *-*) npm publish package.tgz --tag beta ;;
+            *)   npm publish package.tgz ;;
           esac
+      - name: Name the package for the Release
+        run: mv package.tgz "laoshi-$TAG.tgz"
       - name: Release notes from CHANGELOG.md
         run: |
           node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const m=new RegExp('^## '+process.env.TAG.replace(/\./g,'\\\\.')+'( .*)?$','m').exec(s);const rest=m?s.slice(m.index+m[0].length):'';const j=rest.search(/^## /m);require('fs').writeFileSync(process.env.RUNNER_TEMP+'/notes.md',(j<0?rest:rest.slice(0,j)).trim()+'\n')"

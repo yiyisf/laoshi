@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { findTsxCli } from "./locate.mjs";
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const version = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8")).version;
+const { name: packageName, version } = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8"));
 const tsxCli = findTsxCli(kitRoot) ?? path.join(kitRoot, "node_modules", "tsx", "dist", "cli.mjs");
 const launcher = path.join(kitRoot, "bin", "start-pipeline.mjs");
 
@@ -58,7 +58,7 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
 
 本机维护：
-  npx -y [--registry=<npm 源>] laoshi@latest install --platform <平台>
+  npx -y [--registry=<npm 源>] @yiyi_zhang/laoshi@latest install --platform <平台>
                                一步安装：从 npm 装好 laoshi，再完成下面的 laoshi install
   laoshi install --platform <平台> [--home <安装根>] [--target <skill 目录>] [--force]
                                安装或更新：安装级配置、按平台渲染的 skill、平台需要的插件；平台：paseo、dsh
@@ -113,7 +113,7 @@ function feature(rest, required) {
 
 const [command = "help", ...rest] = process.argv.slice(2);
 // `laoshi install` sets up this machine for this copy (bin/install.mjs). Run from npx's temporary
-// copy (`npx -y laoshi@latest install`), it first installs laoshi from npm (bin/bootstrap.mjs).
+// copy (`npx -y @yiyi_zhang/laoshi@latest install`), it first installs laoshi from npm (bin/bootstrap.mjs).
 const fromNpx = kitRoot.split(/[\\/]/).includes("_npx");
 if (command === "install") process.exit(node([path.join(kitRoot, "bin", fromNpx ? "bootstrap.mjs" : "install.mjs"), ...rest]));
 
@@ -165,7 +165,7 @@ switch (command) {
     break;
   case "upgrade":
     // The newest (or the given) version from npm, then its `laoshi install`: bin/bootstrap.mjs.
-    code = node([path.join(kitRoot, "bin", "bootstrap.mjs"), "--spec", `laoshi@${rest[0] && !rest[0].startsWith("-") ? rest.shift() : "latest"}`, ...rest]);
+    code = node([path.join(kitRoot, "bin", "bootstrap.mjs"), "--spec", `${packageName}@${rest[0] && !rest[0].startsWith("-") ? rest.shift() : "latest"}`, ...rest]);
     break;
   case "check":
     code = node([path.join(kitRoot, "bin", "install.mjs"), "--check", ...rest]);

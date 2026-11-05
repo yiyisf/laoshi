@@ -19,7 +19,7 @@
 | Git for Windows | 已安装，`git` 在 PATH 中 | `git --version` |
 | dsh | 已安装，能用真实模型对话（经内网网关）；知道自己用的是哪个 profile（下文以 `web` 为例） | 打开 dsh 的网页界面，随便问一句 |
 | bash 插件 | 团队的 dsh 专属 bash 插件已在同一个 profile 中启用，步骤 agent 能执行 bash 命令 | 在 dsh 对话里让它执行 `git --version` |
-| 安装包 | `laoshi-…-win32-x64.zip`（已带依赖，不需要 npm 源和外网）；正式版附在 GitHub Release 上。能访问 npm 镜像的机器不需要它，用 `npx -y --registry=<镜像地址> laoshi@latest install --platform dsh` | — |
+| 安装包 | `laoshi-…-win32-x64.zip`（已带依赖，不需要 npm 源和外网）；正式版附在 GitHub Release 上。能访问 npm 镜像的机器不需要它，用 `npx -y --registry=<镜像地址> @yiyi_zhang/laoshi@latest install --platform dsh` | — |
 
 下文的目录约定（可以按需要换成别的位置，**路径中最好不要有空格和中文**）：
 

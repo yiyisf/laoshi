@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, projectConfigPath, resolveRelatedRepo } from "./config.js";
 import { gitInfo } from "./git.js";
 import { codebaseOf, userOf } from "./identity.js";
-import { defaultConfigPath, homeOf, KIT_ROOT, kitVersion } from "./locations.js";
+import { defaultConfigPath, homeOf, KIT_ROOT, kitPackageName, kitVersion } from "./locations.js";
 import { PROJECT_DIR } from "./prompts.js";
 import { readProjectServices, SERVICES_FILE } from "./builtin/project-services.js";
 import { CAPABILITIES, type CapabilityName, type DoctorTools, type PlatformAdapter, SOURCE_LABELS, sourceOf } from "./platform.js";
@@ -39,7 +39,7 @@ function section(title: string): void {
 /** Newer published version (npm view, from the configured npm registry), as an informational line; never counted as a problem. */
 function newVersion(): void {
   const windows = process.platform === "win32";
-  const result = spawnSync(windows ? "npm.cmd" : "npm", ["view", "laoshi@latest", "version"], {
+  const result = spawnSync(windows ? "npm.cmd" : "npm", ["view", `${kitPackageName()}@latest`, "version"], {
     encoding: "utf8",
     windowsHide: true,
     shell: windows,
@@ -155,7 +155,7 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
     const required = loaded.config.requiredVersion;
     if (required) {
       if (satisfies(kitVersion(), required)) report("ok", `版本要求 ${required}：当前 ${kitVersion()} 满足`);
-      else report("warn", `团队或项目要求 laoshi ${required}，当前为 ${kitVersion()}`, "升级：npm install -g laoshi@<版本>，然后 laoshi install");
+      else report("warn", `团队或项目要求 laoshi ${required}，当前为 ${kitVersion()}`, "升级：laoshi upgrade <版本>");
     }
     budgetUsage(loaded.config);
     return loaded.config;

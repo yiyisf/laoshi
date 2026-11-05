@@ -93,9 +93,9 @@ Pi 中写作 `/skill:req`。同一个对话里，之后的"做到哪了""先停�
 
 | 场合 | 命令 |
 | --- | --- |
-| 一步安装 | `npx -y laoshi@latest install --platform dsh\|paseo` |
-| 公司内网（npm 镜像） | `npx -y --registry=<镜像地址> laoshi@latest install --platform dsh` |
-| 指定版本 | `npx -y laoshi@0.1.0 install --platform dsh` |
+| 一步安装 | `npx -y @yiyi_zhang/laoshi@latest install --platform dsh\|paseo` |
+| 公司内网（npm 镜像） | `npx -y --registry=<镜像地址> @yiyi_zhang/laoshi@latest install --platform dsh` |
+| 指定版本 | `npx -y @yiyi_zhang/laoshi@0.1.1 install --platform dsh` |
 | 已有程序目录（离线安装包、git 克隆） | `laoshi install --platform dsh`（即 `node bin/req.mjs install …`） |
 
 一步安装的选项：`--registry <地址>`（使用并保存这个 npm 源）、`--no-save-registry`（只这次用）、`--spec <包>`（安装哪个版本）。其余选项交给 `laoshi install`：`--platform`、`--home`、`--target`、`--force`、`--check`、`--dry-run`、`--uninstall`，以及 dsh 的 `--dsh-home`、`--profile`、`--dsh-bin`、`--approvals ask|allow`，说明见 [安装与升级](../guide/install#安装选项)。
