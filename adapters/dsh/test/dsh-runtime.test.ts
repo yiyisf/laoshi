@@ -117,7 +117,8 @@ async function started(config: { approvals?: "ask" | "allow" } = {}, script = {}
 test("dsh 插件：只接受带令牌的调用；插件没启动时说明原因", async () => {
   const { home, host, env, call } = await started();
   try {
-    assert.deepEqual(await call("hello"), { plugin: "0.1.0-dev", approvals: "ask" });
+    const version = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "plugin", "package.json"), "utf8")).version;
+    assert.deepEqual(await call("hello"), { plugin: version, approvals: "ask" });
     fs.writeFileSync(channelPaths(home).token, "0".repeat(64));
     await assert.rejects(pluginClient(env, 5_000)("hello"), /unauthorized/);
   } finally {

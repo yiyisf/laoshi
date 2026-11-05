@@ -2,7 +2,7 @@
 
 本文用于在内网的 Windows 机器上安装 laoshi，并按清单验证它在 DeepSeek Harness（dsh）上的效果。按顺序做一遍，大约需要半天，其中真实模型跑需求的时间占大部分。
 
-- **适用**：laoshi M2 完成后的版本，即安装包 `laoshi-0.1.0-dev-<提交>-win32-x64.zip`。
+- **适用**：laoshi M2 完成后的版本，即安装包 `laoshi-<版本>-<提交>-win32-x64.zip`（0.1.0 起附在 GitHub Release 上）。
 - **环境约定**：
   - 内网机器是 Windows，Node.js 22.20；
   - **PowerShell 被禁止运行**，本文所有命令都在 **cmd** 中执行（Git Bash 也可以）；
@@ -39,8 +39,8 @@
 ```bat
 mkdir D:\laoshi
 cd /d D:\laoshi
-tar -xf laoshi-0.1.0-dev-<提交>-win32-x64.zip
-ren laoshi-0.1.0-dev-<提交>-win32-x64 kit
+tar -xf laoshi-<版本>-<提交>-win32-x64.zip
+ren laoshi-<版本>-<提交>-win32-x64 kit
 type kit\BUILD.txt
 ```
 
