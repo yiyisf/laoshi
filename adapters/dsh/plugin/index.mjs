@@ -14,7 +14,7 @@ import { channelPaths, dshHome } from "./channel.mjs";
 export const name = "laoshi-dsh";
 export const inject = ["agents", "subagents", "schedule", "approval", "sessionController", "llm"];
 
-const VERSION = "0.1.0-dev";
+const VERSION = "0.1.0";
 const SHELL_TOOLS = new Set(["bash", "pwsh"]);
 const SEARCH_TOOLS = new Set(["grep", "glob"]);
 

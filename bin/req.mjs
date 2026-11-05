@@ -54,7 +54,7 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi outcome <需求> --merged | --issue "<问题>"
                                手动记一笔：已合并，或合并后发现的问题
   laoshi index [--rebuild [目录…]] [--prune]
-                               本机记录的需求（需求插件据此找到所有需求）；1.9 之前运行过的用 --rebuild 补登
+                               本机记录的需求（需求插件据此找到所有需求）；索引里缺的需求用 --rebuild 补登
   laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
 
 本机维护：

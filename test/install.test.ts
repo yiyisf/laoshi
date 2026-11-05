@@ -9,6 +9,7 @@ import { test } from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const INSTALL = path.join(ROOT, "bin", "install.mjs");
+const VERSION: string = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 
 function machine() {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-install-")));
@@ -100,7 +101,7 @@ const [cmd, sub] = args;
 if (cmd === "--version") console.log("10.9.0");
 else if (cmd === "config" && sub === "get") console.log("https://registry.npmjs.org/");
 else if (cmd === "config") process.exit(0);
-else if (cmd === "view") console.log("0.1.0-dev");
+else if (cmd === "view") console.log(process.env.FAKE_VERSION);
 else if (cmd === "prefix") console.log(process.env.FAKE_NPM_PREFIX);
 else if (cmd === "root") console.log(root());
 else if (cmd === "install") {
@@ -123,7 +124,7 @@ test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，�
   fs.mkdirSync(path.join(dshHome, "profiles", "web"), { recursive: true });
   const fakeDsh = path.join(base, "fake-dsh.mjs");
   fs.writeFileSync(fakeDsh, "process.exit(1);\n");
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_NPM: npmScript, FAKE_NPM_LOG: log, FAKE_NPM_PREFIX: prefix, FAKE_KIT: ROOT };
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_NPM: npmScript, FAKE_NPM_LOG: log, FAKE_NPM_PREFIX: prefix, FAKE_KIT: ROOT, FAKE_VERSION: VERSION };
   delete env.LAOSHI_HOME;
   const r = spawnSync(
     process.execPath,
@@ -134,7 +135,7 @@ test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，�
   assert.equal(r.status, 0, out);
   const calls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const installCall = calls.find((c) => c.args[0] === "install");
-  assert.deepEqual(installCall.args, ["install", "-g", "laoshi@0.1.0-dev"]);
+  assert.deepEqual(installCall.args, ["install", "-g", `laoshi@${VERSION}`]);
   assert.equal(installCall.registry, "https://npm.example.internal/");
   assert.equal(calls.some((c) => c.args[0] === "config" && c.args[1] === "set"), false, "--no-save-registry 时不改本机的 npm 源");
   const copy = path.join(prefix, process.platform === "win32" ? "node_modules" : path.join("lib", "node_modules"), "laoshi");
