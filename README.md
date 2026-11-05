@@ -8,13 +8,16 @@ laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit
 
 ## 安装
 
+与 paseo-req-kit 一样从 npm 分发，一步安装：
+
 ```bash
-npm install -g laoshi              # 或解压内网离线安装包（见 docs/intranet/install-verify.md）
-laoshi install --platform dsh      # 或 --platform paseo
+npx -y laoshi@latest install --platform dsh          # 或 --platform paseo
+# 公司内网只有 npm 镜像时：
+npx -y --registry=https://npm.example.internal/ laoshi@latest install --platform dsh
 laoshi doctor --no-project
 ```
 
-`laoshi install` 写入安装级配置（安装根默认 `~/.laoshi`，可用 `LAOSHI_HOME` 指定），把 skill 按平台渲染后装进平台读取 skill 的目录，并完成平台需要的设置（dsh：安装并挂载 laoshi 的 dsh 插件）。升级：`npm install -g laoshi@latest`，然后再运行一次 `laoshi install`。卸载：`laoshi install --uninstall`。
+它先用 npm 全局安装 laoshi（全局目录不可写时装到 `~/.laoshi/npm`），再运行装好的那份的 `laoshi install`：写入安装级配置（安装根默认 `~/.laoshi`，可用 `LAOSHI_HOME` 指定），把 skill 按平台渲染后装进平台读取 skill 的目录，并完成平台需要的设置（dsh：安装并挂载 laoshi 的 dsh 插件）。升级：`laoshi upgrade`（回到旧版本：`laoshi upgrade <版本>`）。卸载：`laoshi install --uninstall`。连 npm 镜像也没有时，用离线安装包（见 [docs/intranet/install-verify.md](docs/intranet/install-verify.md)）。
 
 ## 设计思路
 

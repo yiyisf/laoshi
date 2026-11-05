@@ -58,11 +58,14 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
 
 本机维护：
+  npx -y [--registry=<npm 源>] laoshi@latest install --platform <平台>
+                               一步安装：从 npm 装好 laoshi，再完成下面的 laoshi install
   laoshi install --platform <平台> [--home <安装根>] [--target <skill 目录>] [--force]
                                安装或更新：安装级配置、按平台渲染的 skill、平台需要的插件；平台：paseo、dsh
   laoshi install --check    只检查会做什么，不改动
   laoshi install --uninstall   移除 laoshi 安装的 skill 和插件（保留安装根）
-  laoshi upgrade            升级：npm install -g laoshi@latest，然后 laoshi install
+  laoshi upgrade [版本] [--registry <npm 源>]
+                               升级到最新版本（或指定版本），并重新运行 laoshi install；回到旧版本：laoshi upgrade <旧版本>
   laoshi docs [--port <端口>] [--no-open]
                                在本机打开这个版本的文档站点（不需要外网）
   laoshi doctor [--no-project] 体检：安装、配置、平台、当前项目
@@ -109,8 +112,10 @@ function feature(rest, required) {
 }
 
 const [command = "help", ...rest] = process.argv.slice(2);
-// `laoshi install` sets up this machine for this copy (bin/install.mjs).
-if (command === "install") process.exit(node([path.join(kitRoot, "bin", "install.mjs"), ...rest]));
+// `laoshi install` sets up this machine for this copy (bin/install.mjs). Run from npx's temporary
+// copy (`npx -y laoshi@latest install`), it first installs laoshi from npm (bin/bootstrap.mjs).
+const fromNpx = kitRoot.split(/[\\/]/).includes("_npx");
+if (command === "install") process.exit(node([path.join(kitRoot, "bin", fromNpx ? "bootstrap.mjs" : "install.mjs"), ...rest]));
 
 let code;
 switch (command) {
@@ -159,8 +164,8 @@ switch (command) {
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "configure.ts"), ...rest]) : 1;
     break;
   case "upgrade":
-    console.log(`laoshi 用 npm 升级：\n  npm install -g laoshi@latest\n  laoshi install\n内网离线安装包：解压新版本，在新目录中运行 node bin/install.mjs（安装根和配置不受影响）。回到旧版本：npm install -g laoshi@<版本>，再 laoshi install。`);
-    code = 0;
+    // The newest (or the given) version from npm, then its `laoshi install`: bin/bootstrap.mjs.
+    code = node([path.join(kitRoot, "bin", "bootstrap.mjs"), "--spec", `laoshi@${rest[0] && !rest[0].startsWith("-") ? rest.shift() : "latest"}`, ...rest]);
     break;
   case "check":
     code = node([path.join(kitRoot, "bin", "install.mjs"), "--check", ...rest]);

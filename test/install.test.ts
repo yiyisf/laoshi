@@ -87,3 +87,59 @@ test("安装到 Paseo 用的 skill 目录：别人的和 req-kit 装的同名 sk
   assert.equal(other.code, 1);
   assert.match(other.out, /用的平台是 paseo，这次要装的是 dsh/);
 });
+
+// A stand-in for npm (LAOSHI_NPM): "installs" this checkout into the prefix and logs each call.
+const FAKE_NPM = `
+import fs from "node:fs";
+import path from "node:path";
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FAKE_NPM_LOG, JSON.stringify({ args, registry: process.env.npm_config_registry ?? null }) + "\\n");
+const prefixOf = () => (args.includes("--prefix") ? args[args.indexOf("--prefix") + 1] : process.env.FAKE_NPM_PREFIX);
+const root = () => path.join(prefixOf(), process.platform === "win32" ? "node_modules" : path.join("lib", "node_modules"));
+const [cmd, sub] = args;
+if (cmd === "--version") console.log("10.9.0");
+else if (cmd === "config" && sub === "get") console.log("https://registry.npmjs.org/");
+else if (cmd === "config") process.exit(0);
+else if (cmd === "view") console.log("0.1.0-dev");
+else if (cmd === "prefix") console.log(process.env.FAKE_NPM_PREFIX);
+else if (cmd === "root") console.log(root());
+else if (cmd === "install") {
+  const kit = process.env.FAKE_KIT;
+  const dest = path.join(root(), "laoshi");
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.cpSync(kit, dest, { recursive: true, filter: (src) => !/[\\\\/](\\.git|node_modules|evals[\\\\/]results)$/.test(src) });
+  fs.symlinkSync(path.join(kit, "node_modules"), path.join(dest, "node_modules"), "junction");
+} else process.exit(1);
+`;
+
+test("一步安装（npx -y laoshi@latest install）：从 npm 装好 laoshi，用装好的那份完成安装，npm 源按 --registry", () => {
+  const { base, home } = machine();
+  const npmScript = path.join(base, "fake-npm.mjs");
+  fs.writeFileSync(npmScript, FAKE_NPM);
+  const prefix = path.join(base, "npm-global");
+  fs.mkdirSync(prefix);
+  const log = path.join(base, "npm.log");
+  const dshHome = path.join(base, "dsh");
+  fs.mkdirSync(path.join(dshHome, "profiles", "web"), { recursive: true });
+  const fakeDsh = path.join(base, "fake-dsh.mjs");
+  fs.writeFileSync(fakeDsh, "process.exit(1);\n");
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_NPM: npmScript, FAKE_NPM_LOG: log, FAKE_NPM_PREFIX: prefix, FAKE_KIT: ROOT };
+  delete env.LAOSHI_HOME;
+  const r = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "bin", "bootstrap.mjs"), "--registry", "https://npm.example.internal/", "--no-save-registry", "--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh],
+    { env, encoding: "utf8", timeout: 300_000 },
+  );
+  const out = `${r.stdout}${r.stderr}`;
+  assert.equal(r.status, 0, out);
+  const calls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const installCall = calls.find((c) => c.args[0] === "install");
+  assert.deepEqual(installCall.args, ["install", "-g", "laoshi@0.1.0-dev"]);
+  assert.equal(installCall.registry, "https://npm.example.internal/");
+  assert.equal(calls.some((c) => c.args[0] === "config" && c.args[1] === "set"), false, "--no-save-registry 时不改本机的 npm 源");
+  const copy = path.join(prefix, process.platform === "win32" ? "node_modules" : path.join("lib", "node_modules"), "laoshi");
+  const record = JSON.parse(fs.readFileSync(path.join(home, ".laoshi", "install.json"), "utf8"));
+  assert.equal(fs.realpathSync(record.root), fs.realpathSync(copy), "安装记录指向 npm 装好的那份，而不是 npx 的临时目录");
+  const skill = fs.readFileSync(path.join(dshHome, "skills", "laoshi", "SKILL.md"), "utf8");
+  assert.ok(skill.includes(copy.split(path.sep).join("/")), "skill 中的路径指向装好的那份");
+});
