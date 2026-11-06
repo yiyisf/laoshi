@@ -61,3 +61,15 @@ bash /data/workspace/probe.sh --check
 ## 交付
 
 把 `laoshi-probe-out.tar.gz`、两次 `--check` 的输出、S1～S4 的记录发回来。我据此写摸底报告（`docs/discovery/mogao/report.md`），定专家的形态，然后开始做。
+
+## 第二轮（第一轮结果见 [report.md](report.md)）
+
+第一轮确认了后台进程活不过一次执行，所以要看平台命令行 `aimax` 能不能"在一次执行内起一个 agent 并等它做完"。
+
+1. 把 [probe2.sh](probe2.sh) 放到 `/data/workspace` 下运行：`bash /data/workspace/probe2.sh`（约 3 分钟）。它收集 `aimax` 每个子命令的帮助、`/aimax/extensions` 下 skill 的开头，并从内网镜像试装 `@yiyi_zhang/laoshi`、运行一次。最后一项会 `sleep 75`，用来看超过 60 秒的命令对话会不会等它结束。
+2. 看完帮助后，按帮助里的写法用 `aimax run` 起一个最小任务（提示词："在当前目录创建文件 hello.txt，内容为 ok，然后结束"），记录：完整命令行；是阻塞到结束还是立即返回；返回什么（任务 ID、输出格式）；`hello.txt` 出现在哪个目录；有没有查状态、取消的命令；能否指定工作目录、模型、提示词文件。
+3. 在对话里问 agent：`你有没有起子 agent（子任务）的工具？叫什么？` 有的话让它起一个子 agent 创建 sub.txt，记录主对话能否等它做完、拿到结果。
+4. 在对话里让 agent 运行 `sleep 600; date`，记录：对话是否一直等到结束；有没有总时限（超时后返回什么）。
+5. 问组织方或看平台文档：专家怎么定义和提交（能否带脚本等附加文件）；评审在谁的沙箱里试用；是否允许第一次使用时从内网镜像安装依赖。
+
+把 `laoshi-probe-out2.tar.gz` 和第 2～5 项的记录发回来（同样先脱敏）。
