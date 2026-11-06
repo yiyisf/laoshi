@@ -10,7 +10,7 @@ import path from "node:path";
 import { PROFILE_LABELS, type ProfileName } from "./config.js";
 import { samePath } from "./paths.js";
 import { isSpecConfirmed, specProfile } from "./preflight.js";
-import { isAlive } from "./state.js";
+import { engineAlive } from "./state.js";
 import { describeTotals, totals } from "./usage.js";
 
 export const FEATURES_DIR = path.join("docs", "features");
@@ -102,7 +102,7 @@ function stageOf(confirmed: boolean, state: RawState | null, acceptance: string 
   }
   switch (state.status) {
     case "running":
-      return state.pid && isAlive(state.pid) ? "开发中" : "已中断（可继续）";
+      return state.pid && engineAlive({ pid: state.pid, host: (state as { host?: string }).host }) ? "开发中" : "已中断（可继续）";
     case "waiting_for_business":
       return "等待需求方决定";
     case "waiting_for_approval":

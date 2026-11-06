@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { dshAdapter } from "../../adapters/dsh/adapter.js";
+import { mogaoAdapter } from "../../adapters/mogao/adapter.js";
 import { paseoAdapter } from "../../adapters/paseo/adapter.js";
 import { withBuiltins } from "./builtin/index.js";
 import type { AgentProfile, PipelineConfig } from "./config.js";
@@ -15,6 +16,7 @@ import { defaultConfigPath } from "./locations.js";
 const ADAPTERS: Record<string, PlatformAdapter> = {
   paseo: paseoAdapter,
   dsh: dshAdapter,
+  mogao: mogaoAdapter,
 };
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);

@@ -171,7 +171,7 @@ const config = existing ?? { platform: mod.platformConfig(args) };
 
 // ---------------------------------------------------------------------------------------------
 section("skill");
-const targets = [...mod.skillTargets(args, config), ...args.target.map((t) => ({ dir: path.resolve(t), label: `自定义目录 ${path.resolve(t)}` }))];
+const targets = [...mod.skillTargets(args, config, process.env, home), ...args.target.map((t) => ({ dir: path.resolve(t), label: `自定义目录 ${path.resolve(t)}` }))];
 const rendered = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-skills-"));
 const renderConfig = path.join(rendered, "config.json");
 fs.writeFileSync(renderConfig, JSON.stringify(config));

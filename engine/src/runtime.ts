@@ -175,6 +175,11 @@ export interface AgentRuntime {
   /** A platform schedule that starts a fresh agent on `cron` (e.g. to run a command weekly). */
   scheduleNewAgent(input: ScheduledAgent): Promise<string | null>;
   cancelSchedule(id: string): Promise<void>;
+  /**
+   * Answers a step agent's pending approval on the platform's behalf (platforms whose approvals
+   * cannot be answered in their own interface); `requestId` null for the one now pending.
+   */
+  answerPermission?(agentId: string, requestId: string | null, approve: boolean, reason: string): Promise<void>;
   close(): Promise<void>;
 }
 

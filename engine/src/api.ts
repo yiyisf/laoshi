@@ -28,7 +28,7 @@ import { configView } from "./config-view.js";
 import { pruneIndex, readIndex, registerRequirement, requirementKey } from "./records.js";
 import { listWorktreeRecords } from "./worktree.js";
 import { readHumanReview } from "./code-review.js";
-import { isAlive, type PipelineState, readState, statePath, type StepRecord } from "./state.js";
+import { engineAlive, readState, statePath, type PipelineState, type StepRecord } from "./state.js";
 import { notStartedNotice } from "./messages.js";
 import { scanOutcomes } from "./outcomes.js";
 import { parsePeriod, summarizeRuns } from "./stats.js";
@@ -79,10 +79,10 @@ export type Attention = "approval" | "business" | "permission" | "interrupted" |
 /** What a person needs to do about a requirement, if anything. */
 export function attentionOf(state: Pick<PipelineState, "status" | "pid" | "outcome" | "waitingPermission"> | null): Attention {
   if (!state) return null;
-  if (state.status === "running" && state.waitingPermission && isAlive(state.pid)) return "permission";
+  if (state.status === "running" && state.waitingPermission && engineAlive(state)) return "permission";
   if (state.status === "waiting_for_approval") return "approval";
   if (state.status === "waiting_for_business") return "business";
-  if (state.status === "failed" || (state.status === "running" && !isAlive(state.pid))) return "interrupted";
+  if (state.status === "failed" || (state.status === "running" && !engineAlive(state))) return "interrupted";
   if (state.status === "completed" && state.outcome === "not_completed") return "not_completed";
   return null;
 }
@@ -102,7 +102,7 @@ function readStateSafe(repo: string, featureDir: string): PipelineState | null {
 }
 
 function currentSteps(state: PipelineState | null) {
-  if (!state || state.status !== "running" || !isAlive(state.pid)) return [];
+  if (!state || state.status !== "running" || !engineAlive(state)) return [];
   return state.history.filter((h) => h.outcome === "running").map((h) => ({ key: h.key, title: stepName(h, state), agentId: h.agentId }));
 }
 
@@ -213,7 +213,7 @@ function item(repo: string, branch: string | null, featureDir: string, extra: { 
     branch: state?.branch ?? summary.branch,
     stage: summary.stage,
     status: state?.status ?? null,
-    running: !!state && state.status === "running" && isAlive(state.pid),
+    running: !!state && state.status === "running" && engineAlive(state),
     phase: state?.phase ?? null,
     attention: attentionOf(state) ?? (notStarted ? "not_started" : null),
     current: currentSteps(state),

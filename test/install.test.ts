@@ -89,6 +89,20 @@ test("安装到 Paseo 用的 skill 目录：别人的和 req-kit 装的同名 sk
   assert.match(other.out, /用的平台是 paseo，这次要装的是 dsh/);
 });
 
+test("安装到摸高：安装根在工作区，按摸高渲染的 skill 放在安装根的 skills 目录（专家的 skill 包）", () => {
+  const { base, home } = machine();
+  const root = path.join(base, "workspace", ".laoshi");
+  const r = install(home, ["--platform", "mogao", "--home", root]);
+  assert.equal(r.code, 0, r.out);
+  const config = JSON.parse(fs.readFileSync(path.join(root, "config.json"), "utf8"));
+  assert.equal(config.platform.adapter, "mogao");
+  assert.equal(config.agents.builder.provider, "mogao/chat-model");
+  const skill = fs.readFileSync(path.join(root, "skills", "laoshi", "SKILL.md"), "utf8");
+  assert.match(skill, /摸高提供的 `AIMAX_SESSION_ID`/);
+  assert.doesNotMatch(skill, /\{\{|paseo/i);
+  assert.match(r.out, /专家的 skill 目录/);
+});
+
 // A stand-in for npm (LAOSHI_NPM): "installs" this checkout into the prefix and logs each call.
 const FAKE_NPM = `
 import fs from "node:fs";

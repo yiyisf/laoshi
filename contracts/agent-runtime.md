@@ -48,6 +48,9 @@
 | `createWorktree(request)`、`waitForWorkspaceSetup(id, timeoutMs)` | `--worktree`（`worktree.ts`）和联合需求（`joint.ts`） | ⚠ 创建失败是硬错误。没有平台工作区的适配器，可以在适配器内用 `git worktree` 实现并返回 `{ workspaceId, directory }`；`waitForWorkspaceSetup` 可恒返回 `{ status: "none" }` |
 | `startSessionAgent(input)` | 从卡片接单（`card-cmd.ts`）：为需求新开一个顶层会话 | 没有则不能用接单器 |
 | `scheduleNewAgent(input)` | 需求总览的定时发送（`digest.ts --schedule`） | 返回 `null` 时该功能关闭 |
+| `answerPermission(agentId, requestId, approve, reason)` | `laoshi permission <需求> approve\|deny`（`permission-cmd.ts`）：平台的审批不能在它自己的界面里回答、由对话问人时，laoshi 转达人的决定；`requestId` 为 `null` 表示现在等待的那一个 | 没有时，审批按平台自己的方式处理（如 Paseo、dsh 的界面） |
+
+适配器还可以声明 `runsInChat`（`PlatformAdapter`）：平台只在对话的一个轮次内保留对话的机器时，引擎不能在后台运行，`launch.ts` 让它在对话的命令里运行，给对话的消息（`notifyAgent`）写进 `chat.log` 并显示在命令输出里。状态文件记下运行引擎的机器（`host`），另一台机器上记录的进程不算还在运行。
 
 ## 调度
 

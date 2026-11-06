@@ -35,6 +35,8 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi checklist <需求>      验收清单：按验收标准逐条勾选，提交后写成验收记录
   laoshi ui-check <网址> [--prototype <原型文件>] [--width 1280,390]
                                不靠看图检查网页：显示不全、遮挡、超出屏幕、文字太淡、报错，和原型对文字
+  laoshi permission <需求> approve|deny [理由]
+                               批准或拒绝步骤等待批准的操作，并接着运行（平台在对话里问人时用）
   laoshi reply <需求> <回复>   把回答或方案意见转给需求的对话（需求插件的"等你处理"用它）
   laoshi integration test [需求]  只显示对接外部系统时会执行的命令，不真正调用
   laoshi start --from <系统>:<卡号>  从需求管理系统中的一张卡片开始需求（没有人开着对话也可以）
@@ -184,6 +186,12 @@ switch (command) {
     break;
   case "reply":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "reply.ts"), ...rest]) : 1;
+    break;
+  case "permission":
+    // Answers a step's pending approval, then continues the run (the step picks up the answer).
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "permission-cmd.ts"), ...rest]) : 1;
+    if (code === 0) code = node([launcher, "--resume", ...feature(rest.slice(0, 1), true)]);
+    else if (code === 3) code = 0;
     break;
   case "sync":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "integration-cmd.ts"), "sync", ...rest]) : 1;
