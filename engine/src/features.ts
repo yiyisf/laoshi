@@ -72,6 +72,7 @@ function headerValue(spec: string, key: string): string | null {
 interface RawState {
   status?: string;
   pid?: number;
+  mode?: "engine" | "chat";
   outcome?: string | null;
   updatedAt?: string;
   phases?: { mode?: string } | null;
@@ -102,7 +103,7 @@ function stageOf(confirmed: boolean, state: RawState | null, acceptance: string 
   }
   switch (state.status) {
     case "running":
-      return state.pid && isAlive(state.pid) ? "开发中" : "已中断（可继续）";
+      return state.mode === "chat" ? "开发中（对话编排）" : state.pid && isAlive(state.pid) ? "开发中" : "已中断（可继续）";
     case "waiting_for_business":
       return "等待需求方决定";
     case "waiting_for_approval":

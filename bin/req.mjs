@@ -22,8 +22,12 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi approve <需求>        需求方确认了方案（方案确认点，见 preview.md），继续开发
   laoshi verify <需求> [--verify-env local|deployed] [--defects fix|handback|report]
                                研发完成后开始测试验证（分阶段执行时）
-  laoshi start <需求> [--profile quick|standard] [--phases gated] [--at 22:00]
+  laoshi start <需求> [--profile quick|standard] [--phases gated] [--flow <流程>] [--at 22:00]
                                启动流水线（通常由 /laoshi 在对话中启动，这里用于终端中手工启动）
+  laoshi run next|record|approve|verify|status|mode [--feature <需求>] [--flow <流程>]
+                               会话内编排（模式 B）：由当前对话推进每一步，质量门和状态由引擎检验
+  laoshi flow list|show|validate|init [<流程>]
+                               查看、校验或初始化自定义编排流程（.laoshi/flows/<名称>.json）
   laoshi digest [--notify]     项目的需求总览；--notify 同时发到外部通知（如企业 IM）
   laoshi digest --schedule "0 9 * * 1"
                                让平台按时间表发送需求总览（例子为每周一 9:00）；取消：laoshi digest --cancel <ID>
@@ -149,6 +153,12 @@ switch (command) {
     // From a card in the requirement management system (1.10): no chat needed to begin.
     if (rest.some((a) => a === "--from" || a.startsWith("--from="))) code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "card-cmd.ts"), "start", ...rest]) : 1;
     else code = node([launcher, ...feature(rest, true)]);
+    break;
+  case "run":
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "run-cmd.ts"), ...rest]) : 1;
+    break;
+  case "flow":
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "flow-cmd.ts"), ...rest]) : 1;
     break;
   case "card":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "card-cmd.ts"), ...rest]) : 1;

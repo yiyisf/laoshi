@@ -52,6 +52,7 @@
     "bin/",
     "engine/src/",
     "engine/prompts/",
+    "engine/flows/",
     "engine/skill-fragments/",
     "adapters/*/*.ts",
     "adapters/*/*.mjs",

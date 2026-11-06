@@ -107,7 +107,7 @@ export function watchdogPass(input: { env?: NodeJS.ProcessEnv; by: "plugin" | "f
       continue;
     }
     result.checked++;
-    if (state.status !== "running" || isAlive(state.pid)) continue;
+    if (state.status !== "running" || state.mode === "chat" || isAlive(state.pid)) continue;
     if (now.getTime() - new Date(state.updatedAt).getTime() < SETTLE_MS) continue;
     const h = handled[entry.key];
     if (h?.pid === state.pid) continue;

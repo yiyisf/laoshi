@@ -32,7 +32,9 @@
 | `wakeups` | array | 可选。这次运行在平台上预约的唤醒（定时任务）：`ref`（平台的定时任务 ID）、`kind`（`reminder` 提醒 / `auto-resume` 自动继续 / `watchdog` 定时检查）、`at`。下一次运行或暂停命令会取消它们。第 1 版叫 `schedules`，其中 `ref` 叫 `id` |
 | `adapter` | object \| null | 可选，第 2 版起。这次运行用的平台适配器：`id`（如 `paseo`、`dsh`），便于排查 |
 | `mode` | `engine` \| `chat` | 可选，第 2 版起。谁编排步骤：引擎（缺省）或对话（模式 B，见 docs/design/in-chat-orchestration.md） |
-| `stepRequest` | object \| null | 可选，第 2 版起，只用于模式 B：`{ key, since }`，等待对话中的 agent 执行的步骤 |
+| `flow` | string | 可选，第 2 版起。这次运行使用的编排流程名称（默认 `"default"`，或自定义流程名如 `"quick"`、`"hotfix"`，见 docs/design/custom-flows.md） |
+| `stepRequest` | object \| null | 可选，第 2 版起，只用于模式 B：指向当前待执行的首个步骤请求（与 `stepRequests[0]` 同步，保持向后兼容） |
+| `stepRequests` | array \| null | 可选，第 2 版起，只用于模式 B：`[{ key, stepId, title, role, promptFile, resultFile, since, followUps?, gateFixes?, secretFixes? }]`，等待对话中的 agent 执行的步骤列表（单步时为 1 项，并行步骤如评审小组或联合开发时为多项） |
 | `autoResumes` | object \| null | 可选，1.6.0 起。`attempt`、`count`：这次尝试已经预约过几次自动继续 |
 | `queuedSince` | string \| null | 可选，1.6.0 起。正在排队（`maxConcurrentPipelines`）时为开始排队的时间 |
 | `phases` | object \| null | 可选，1.7.0 起。这次运行的执行方式：`mode`（`continuous` / `gated` / `develop-only`）、`environment`（`local` / `deployed`）、`defects`（`fix` / `handback` / `report`）。没有时按 `continuous`、`local`、`fix` 处理 |

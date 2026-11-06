@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, projectConfigPath, resolveRelatedRepo } from "./config.js";
+import { FlowError, loadFlow, PROJECT_FLOWS_DIR, readFlowFile } from "./flows.js";
 import { gitInfo } from "./git.js";
 import { codebaseOf, userOf } from "./identity.js";
 import { defaultConfigPath, homeOf, KIT_ROOT, kitVersion } from "./locations.js";
@@ -242,11 +243,38 @@ function verifyInstructions(repo: string, isRepo: boolean): void {
 interface RawState {
   version?: number;
   status?: string;
+  mode?: string;
+  updatedAt?: string;
   pid?: number;
   stopReason?: string | null;
 }
 
-function project(repo: string, adapter: PlatformAdapter): void {
+function projectFlows(repo: string, config: PipelineConfig | null): void {
+  const dir = path.join(repo, PROJECT_FLOWS_DIR);
+  if (fs.existsSync(dir)) {
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+    for (const f of files) {
+      const full = path.join(dir, f);
+      try {
+        const flow = readFlowFile(full);
+        report("ok", `自定义流程 ${PROJECT_FLOWS_DIR}/${f}：${flow.title}（${flow.nodes.length} 项顶层节点）`);
+      } catch (e) {
+        report("fail", `自定义流程 ${PROJECT_FLOWS_DIR}/${f} 无效：${(e as Error).message}`, `修正 ${full} 或运行 laoshi flow validate ${full}`);
+      }
+    }
+  }
+  const activeFlow = config?.orchestration?.flow;
+  if (activeFlow && activeFlow !== "default") {
+    try {
+      const loaded = loadFlow(activeFlow, repo);
+      if (loaded) report("ok", `配置的默认流程 "${activeFlow}"：${loaded.title}（来自 ${loaded.source}）`);
+    } catch (e) {
+      if (e instanceof FlowError) report("fail", e.message, "修正 orchestration.flow 配置，或用 laoshi flow init 创建该流程");
+    }
+  }
+}
+
+function project(repo: string, adapter: PlatformAdapter, config: PipelineConfig | null = null): void {
   section(`项目：${repo}`);
   const git = gitInfo(repo);
   if (!git.isRepo) {
@@ -260,6 +288,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
   }
   const projectConfig = projectConfigPath(repo);
   if (fs.existsSync(projectConfig)) report("ok", `项目配置：${path.basename(projectConfig)}${path.basename(projectConfig) === PROJECT_CONFIG_FILE ? "" : `（旧名，可以改名为 ${PROJECT_CONFIG_FILE}）`}`);
+  projectFlows(repo, config);
   const notes = path.join(repo, PROJECT_DIR, "project-notes.md");
   if (fs.existsSync(notes)) report("ok", `项目说明：${PROJECT_DIR}/project-notes.md`);
   else report("warn", "没有项目说明（包管理工具、不能改的目录、提交格式等），步骤 agent 需要自己摸索", "在项目根目录的对话中运行 /laoshi-setup");
@@ -300,7 +329,14 @@ function project(repo: string, adapter: PlatformAdapter): void {
     const label = `docs/features/${name}`;
     switch (raw.status) {
       case "running":
-        if (raw.pid && isAlive(raw.pid)) report("ok", `${label}：运行中（进程 ${raw.pid}）${migrate}`);
+        if (raw.mode === "chat") {
+          const staleHours = raw.updatedAt ? (Date.now() - Date.parse(String(raw.updatedAt))) / 3_600_000 : 0;
+          if (staleHours > 2) {
+            report("warn", `${label}：会话内编排进行中，但已超过 ${Math.floor(staleHours)} 小时没有新记录${migrate}`, `在对话中运行 laoshi run status --feature ${label} 查看待执行的步骤，或用 laoshi run next --feature ${label} 继续`);
+          } else {
+            report("ok", `${label}：会话内编排进行中（模式 B）${migrate}`);
+          }
+        } else if (raw.pid && isAlive(raw.pid)) report("ok", `${label}：运行中（进程 ${raw.pid}）${migrate}`);
         else report("warn", `${label}：状态为运行中，但进程已不在${migrate}`, `在该需求的对话中对 /laoshi 说"继续开发"，或执行 start-pipeline --feature ${label} --resume`);
         break;
       case "waiting_for_approval":
@@ -393,7 +429,7 @@ async function main(): Promise<number> {
   else if (adapter.doctorPlatform) await adapter.doctorPlatform({ config, configPath, tools: { report, info } });
   else console.log("（没有要检查的项目）");
   capabilities(adapter);
-  if (repo) project(repo, adapter);
+  if (repo) project(repo, adapter, config);
 
   console.log("");
   if (counts.fail === 0 && counts.warn === 0) console.log("结论：全部正常。");

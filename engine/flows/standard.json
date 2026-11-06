@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "title": "标准开发流程（模板）",
+  "description": "与内置流程同结构的声明式定义：方案设计 → 方案审核 ⇄ 修订 → 方案确认点 → 代码实现 → 代码评审 ⇄ 修复 → 提测说明 → 阶段关口 → 服务启动验证 → 功能验证 → 缺陷修复 ⇄ 复验 → 完成报告。可用 laoshi flow init 复制到项目的 .laoshi/flows/ 中按需裁剪或插入自定义步骤。",
+  "flow": [
+    { "step": "design" },
+    {
+      "loop": {
+        "check": "design_review",
+        "fix": "design_revise",
+        "rounds": "designReview",
+        "until": { "verdict": ["approved"] },
+        "order": "check-first"
+      }
+    },
+    { "checkpoint": "approval", "mode": "config" },
+    { "step": "implement" },
+    {
+      "loop": {
+        "check": "code_review",
+        "fix": "review_fix",
+        "rounds": "codeReview",
+        "until": { "verdict": ["pass"] },
+        "order": "check-first"
+      }
+    },
+    { "step": "handoff" },
+    { "checkpoint": "phase" },
+    {
+      "step": "service_start",
+      "when": {
+        "profile": ["standard"],
+        "result": "design.has_runnable_service",
+        "equals": true
+      }
+    },
+    { "step": "verify" },
+    {
+      "loop": {
+        "check": "reverify",
+        "fix": "defect_fix",
+        "rounds": "defectFix",
+        "until": { "result": ["pass"] },
+        "order": "fix-first"
+      },
+      "when": {
+        "result": "verify.result",
+        "equals": "defects_found"
+      }
+    },
+    { "step": "report" }
+  ]
+}

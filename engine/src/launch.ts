@@ -20,6 +20,7 @@ import { trackRequirement } from "./records.js";
 import { describeFeatures, featuresWithRuns, findWorktreeRun, listFeatures, resolveFeatureArg } from "./features.js";
 import { checkChatCwd, normalizeFeatureDir, preflight, type PreflightResult, specProfile, verifyPhaseProblem } from "./preflight.js";
 import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
+import { loadFlow } from "./flows.js";
 import type { AgentRuntime } from "./runtime.js";
 import { remainingLine, typical, typicalLine } from "./estimate.js";
 import { ensurePipelineDir, hashFile, isAlive, pipelineDir, readState, statePath } from "./state.js";
@@ -278,6 +279,14 @@ try {
 let loaded;
 try {
   loaded = loadConfig(configPath, checked.repo);
+  const previous = checked.mode.kind === "fresh" ? null : checked.mode.previous;
+  const flowName =
+    args.flow ??
+    (checked.mode.kind === "resume-reuse" ? previous?.flow?.name : null) ??
+    checked.specFlow ??
+    previous?.flow?.name ??
+    loaded.config.orchestration.flow;
+  loadFlow(flowName, checked.repo);
 } catch (error) {
   fail((error as Error).message);
 }

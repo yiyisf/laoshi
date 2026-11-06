@@ -1,7 +1,7 @@
 # 0002 两种编排模式：外部引擎与会话内编排
 
-- 状态：提议（模式 B 依赖一个待验证的假设）
-- 详见：[architecture.md §4](../design/architecture.md)、[in-chat-orchestration.md](../design/in-chat-orchestration.md)
+- 状态：已采纳（续跑复用假设已验证并落地，详见 [0009](0009-custom-flows-and-dual-mode.md)）
+- 详见：[architecture.md §4](../design/architecture.md)、[in-chat-orchestration.md](../design/in-chat-orchestration.md)、[custom-flows.md](../design/custom-flows.md)
 
 ## 背景
 

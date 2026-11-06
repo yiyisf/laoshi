@@ -41,10 +41,12 @@ import { describeExternal, type IntegrationEvent, renderArgs, resolveCommand, ty
 import { cardSlug, planAppendix, publishCard, readSource } from "./card.js";
 import { principlesSection, projectAdditions, type PromptLocations, readToolPrompt } from "./prompts.js";
 import type { AgentRuntime, ManagedService, ServiceTarget, StepAgent, WaitOutcome } from "./runtime.js";
-import { type CheckOutcome, type GateRun, type JointRepo, type PhaseName, type PipelineState, type Recovery, type SecretScanRun, type RunPhases, type StepRecord, type StopKind, writeState } from "./state.js";
+import { type CheckOutcome, type GateRun, type JointRepo, type PhaseName, type PipelineState, type Recovery, type SecretScanRun, type RunPhases, type StepRecord, type StepRequest, type StopKind, writeState } from "./state.js";
 import { type PanelStep, STEPS, type StepDef, type StepId, stepKey, validateResult, VERIFY_PHASE_STEPS } from "./steps.js";
 import { wordsFor } from "./runtime-loader.js";
 import type { PlatformWords } from "./words.js";
+import { type CustomStepDef, type FlowDef, GATED_STEPS } from "./flows.js";
+import { type FlowOps, runCustomFlow } from "./flow-runner.js";
 
 export interface PipelineContext {
   repo: string;
@@ -78,9 +80,37 @@ export interface PipelineContext {
   jointServices?: Map<string, string[]>;
   /** Quality-gate checks of the joint repositories, read once. */
   jointChecksCache?: Map<string, PipelineConfig["checks"]>;
+  /**
+   * ADR 0009: who runs the steps. "engine" (default, mode A): agents the engine starts through the
+   * runtime. "chat" (mode B): each step is handed to the chat agent (state.stepRequests), which runs
+   * it with its own subagent tool and reports back with `laoshi run record`.
+   */
+  mode?: "engine" | "chat";
+  /** ADR 0009: the custom flow to follow; null or absent: the builtin flow. */
+  flowDef?: FlowDef | null;
+  /** Mode B: step keys the chat says are done in this invocation (`laoshi run record --step`). */
+  chatRecord?: Set<string>;
+  /** Mode B: this invocation continues a run the chat is driving (no second "started" for integrations). */
+  chatContinuing?: boolean;
+  /** Mode B: what would have been sent to the chat, returned to it in the command's output instead. */
+  notices?: string[];
+  /** Mode B: the steps handed to the chat in this invocation, by key. */
+  requested?: Map<string, StepRequest>;
 }
 
-export type PipelineOutcome = "completed" | "waiting_for_business" | "failed" | "phase_done" | "waiting_for_approval";
+export type PipelineOutcome = "completed" | "waiting_for_business" | "failed" | "phase_done" | "waiting_for_approval" | "step_requested";
+
+/**
+ * Mode B: the flow reached a step without a result, and the step was handed to the chat. The run
+ * stops here (state saved); the next `laoshi run next / record` runs the flow again from the top,
+ * reusing every result it already has, and so arrives at the same place.
+ */
+class StepRequested extends Error {
+  constructor() {
+    super("等待对话中的 agent 执行步骤");
+    this.name = "StepRequested";
+  }
+}
 
 /** The develop phase is done and the run stops at the gate (phases.mode "gated"). */
 class PhaseGate extends Error {
@@ -248,6 +278,11 @@ function save(ctx: PipelineContext): void {
 async function notifyOrigin(ctx: PipelineContext, text: string): Promise<void> {
   const origin = ctx.state.originSessionId;
   ctx.log(`通知：\n${text}`);
+  // Mode B: the chat reads these in the output of the command it just ran.
+  if (ctx.notices) {
+    ctx.notices.push(text);
+    return;
+  }
   if (!origin) {
     ctx.log("没有发起对话的 agent ID，通知只写入日志。");
     return;
@@ -304,7 +339,19 @@ function keyFor(base: string, target: StepTarget | undefined): string {
 
 /** The step as this requirement sees it: a playbook may rename it (e.g. 方案设计 → 复现与定位). */
 function stepDef(ctx: PipelineContext, id: StepId): StepDef {
+  const custom = customStep(ctx, id);
+  if (custom) return custom;
   return { ...STEPS[id], title: stepTitle(ctx.state.type, id) };
+}
+
+/** ADR 0009: a step the custom flow defines itself, or null. */
+function customStep(ctx: PipelineContext, id: string): CustomStepDef | null {
+  return ctx.flowDef?.customSteps[id] ?? null;
+}
+
+/** A step's time limit in minutes: the configuration's, or the custom step's own. */
+function timeoutOf(ctx: PipelineContext, def: StepDef): number {
+  return customStep(ctx, def.id)?.timeoutMinutes ?? ctx.config.stepTimeoutMinutes[def.id];
 }
 
 /** Related repositories that exist on this machine, with the branch and commit they are at. */
@@ -355,7 +402,7 @@ function buildPrompt(
     `功能目录：${ctx.featureDir}`,
     def.id === "spec_review" ? "工作分支：（本步骤不提交）" : `工作分支：${branch ?? "（不是 git 仓库，不需要提交）"}`,
     `档位：${PROFILE_LABELS[profile]}${profile === "quick" ? "（小改动：各产物只写必要内容，保持简短）" : ""}`,
-    `本步骤：${def.title}（流水线第 ${def.number} 步）`,
+    customStep(ctx, def.id) ? `本步骤：${def.title}（自定义流程「${ctx.flowDef!.title}」中的一步）` : `本步骤：${def.title}（流水线第 ${def.number} 步）`,
   ];
   if (round !== null && maxRounds !== null) lines.push(`轮次：第 ${round} 轮，最多 ${maxRounds} 轮`);
   const type = ctx.state.type ?? null;
@@ -415,7 +462,7 @@ function buildPrompt(
   const parts = [readToolPrompt(sources, "00-shared-context.md")];
   const principles = principlesSection(sources);
   if (principles) parts.push(principles);
-  parts.push(readToolPrompt(sources, def.promptFile));
+  parts.push(customStep(ctx, def.id) ? renderCustomPrompt(ctx, customStep(ctx, def.id)!) : readToolPrompt(sources, def.promptFile));
   if (type) {
     const playbook = playbookSection(sources, type, extras.additionsFor ?? def.id);
     if (playbook) parts.push(playbook);
@@ -442,6 +489,35 @@ function buildPrompt(
   if (extra) parts.push(extra);
   parts.push(lines.join("\n"));
   return `${parts.join("\n\n")}\n`;
+}
+
+/**
+ * The task of a custom step: its own prompt, plus what the result file must contain (from the
+ * flow file), so a project's prompt does not have to repeat the result format.
+ */
+function renderCustomPrompt(ctx: PipelineContext, def: CustomStepDef): string {
+  const body = fs.readFileSync(def.promptPath, "utf8").trim();
+  const describe = (spec: StepDef["result"]["required"][string]) =>
+    spec.kind === "enum" ? spec.values.map((v) => `"${v}"`).join(" / ") : spec.kind === "string[]" ? "字符串数组" : spec.kind === "boolean" ? "true / false" : "非空字符串";
+  const fields = [
+    ...Object.entries(def.result.required).map(([name, spec]) => `- \`${name}\`（必填）：${describe(spec)}`),
+    ...Object.entries(def.result.optional ?? {}).map(([name, spec]) => `- \`${name}\`（可选）：${describe(spec)}`),
+  ];
+  return [
+    `# 本步骤任务：${def.title}`,
+    "",
+    "这一步由项目的自定义流程定义，任务说明如下。",
+    "",
+    body,
+    "",
+    "## 结果文件",
+    "",
+    "完成后把结果写成一个 JSON 对象，保存到下文 <pipeline-context> 中的\"结果文件\"。字段：",
+    "",
+    ...fields,
+    "",
+    `结果文件只写这些字段。没有做完的，如实写在你的产物里，不要写成已完成（${ctx.featureDir} 中的文件是交接的依据）。`,
+  ].join("\n");
 }
 
 /**
@@ -738,12 +814,12 @@ async function waitForTurn(ctx: PipelineContext, agent: StepAgent, def: StepDef,
       // Usually a big step, not a stuck one: the agent keeps its progress and gets as long again.
       deadline.extended = true;
       if (deadline.record) deadline.record.extendedTimeout = true;
-      deadline.at = Date.now() + ctx.config.stepTimeoutMinutes[def.id] * 60_000;
+      deadline.at = Date.now() + timeoutOf(ctx, def) * 60_000;
       remaining = deadline.at - Date.now();
-      recover(ctx, deadline.key, "extend_timeout", `超过 ${ctx.config.stepTimeoutMinutes[def.id]} 分钟仍未完成，agent 还在做，再给它同样长的时间`);
+      recover(ctx, deadline.key, "extend_timeout", `超过 ${timeoutOf(ctx, def)} 分钟仍未完成，agent 还在做，再给它同样长的时间`);
     }
     if (remaining <= 0) {
-      const total = ctx.config.stepTimeoutMinutes[def.id] * (deadline.extended ? 2 : 1);
+      const total = timeoutOf(ctx, def) * (deadline.extended ? 2 : 1);
       throw new AgentLeftRunning(
         def.title,
         `超过 ${total} 分钟仍未完成。agent「${agentTitle}」还在运行，没有停止它；继续时会先看它的情况：做完了就用它的结果，还在做就接着等它，不会另起一个 agent 重复做。`,
@@ -834,6 +910,9 @@ async function runStep(
 ): Promise<Record<string, unknown>> {
   const { attempts, backoffSeconds } = ctx.config.retry;
   const key = extras.key ?? keyFor(stepKey(id, round), extras.target);
+  // Mode B: the chat runs the step; retries and model fallbacks are the chat's business, and an
+  // invalid result is sent back through `record` (see chatStep).
+  if (ctx.mode === "chat") return runStepOnce(ctx, id, round, maxRounds, extras);
   const fallback = ctx.config.agents.fallback ?? null;
   let redone = false;
   let usedFallback = false;
@@ -911,25 +990,15 @@ async function runStepOnce(
   const resultAbs = path.join(stepRepo, resultRel);
   fs.mkdirSync(path.dirname(resultAbs), { recursive: true });
 
+  if (ctx.mode === "chat") return chatStep(ctx, def, key, round, maxRounds, resultRel, extras);
+
   // An earlier run of this step may have left its agent working: use it, never run a second one.
   const leftover = await checkLeftover(ctx, key, def, resultAbs);
   if (leftover.done) return leftover.done;
   if (!leftover.agent) fs.rmSync(resultAbs, { force: true });
 
   // Services, the browser and the deployed environment belong to the steps in this repository.
-  const managed = target
-    ? null
-    : mergeExtras(
-        mergeExtras(mergeExtras(await serviceExtras(ctx, id), await jointServiceExtras(ctx, id)), await browserExtras(ctx, id)),
-        deployedExtras(ctx, id),
-      );
-  if (managed) {
-    extras = {
-      ...extras,
-      contextLines: [...(extras.contextLines ?? []), ...managed.contextLines],
-      sections: [...(extras.sections ?? []), ...managed.sections],
-    };
-  }
+  extras = await withManagedExtras(ctx, id, extras);
 
   const agentTitle =
     `[${featureName(ctx.featureDir)}] ` +
@@ -977,7 +1046,7 @@ async function runStepOnce(
     ctx.state.history.push(record);
     save(ctx);
 
-    const deadline: Deadline = { at: Date.now() + ctx.config.stepTimeoutMinutes[id] * 60_000, extended: leftover.extended ?? false, key, record };
+    const deadline: Deadline = { at: Date.now() + timeoutOf(ctx, def) * 60_000, extended: leftover.extended ?? false, key, record };
     if (deadline.extended) record.extendedTimeout = true;
     record.usage = (await waitForTurn(ctx, agent, def, agentTitle, deadline)) ?? record.usage ?? null;
     let validation = readResultFile(resultAbs, def);
@@ -1025,6 +1094,155 @@ async function runStepOnce(
     if (error instanceof StepFailure) throw error;
     throw new StepFailure(def.title, (error as Error).message);
   }
+}
+
+/** Adds what the step is told about services, the browser and the deployed environment (steps in this repository). */
+async function withManagedExtras(ctx: PipelineContext, id: StepId, extras: StepExtras): Promise<StepExtras> {
+  if (extras.target) return extras;
+  const managed = mergeExtras(
+    mergeExtras(mergeExtras(await serviceExtras(ctx, id), await jointServiceExtras(ctx, id)), await browserExtras(ctx, id)),
+    deployedExtras(ctx, id),
+  );
+  if (!managed) return extras;
+  return {
+    ...extras,
+    contextLines: [...(extras.contextLines ?? []), ...managed.contextLines],
+    sections: [...(extras.sections ?? []), ...managed.sections],
+  };
+}
+
+/** The agent ID mode B records for a step the chat runs (there is no agent the engine can reach). */
+function chatAgentId(key: string): string {
+  return `chat:${key}`;
+}
+
+/**
+ * Mode B (ADR 0009): instead of starting an agent, hands the step to the chat and stops the run
+ * (StepRequested). The same checks as an engine-run step apply when the chat reports back:
+ *
+ * - The first time the flow reaches the step, the full prompt is written to
+ *   .pipeline/requests/<key>.md and the step is added to state.stepRequests.
+ * - Only `laoshi run record --step <key>` moves the step on (ctx.chatRecord); `next` alone returns
+ *   the same request again, so the chat cannot skip a step by asking twice.
+ * - An invalid result file is sent back with the same reminder an engine-run agent gets, up to
+ *   resultFollowUps times; then the step fails like an engine-run one.
+ * - Code-changing steps run the quality gate and the secret scan; new failures go back to the
+ *   chat as the request's followUp (the counts are kept in the request, so they stay bounded).
+ */
+async function chatStep(
+  ctx: PipelineContext,
+  def: StepDef,
+  key: string,
+  round: number | null,
+  maxRounds: number | null,
+  resultRel: string,
+  extras: StepExtras,
+): Promise<Record<string, unknown>> {
+  const target = extras.target;
+  const stepRepo = target?.repo ?? ctx.repo;
+  const resultAbs = path.join(stepRepo, resultRel);
+  const requests = (ctx.state.stepRequests ??= []);
+  let request = requests.find((r) => r.key === key);
+  const ask = (): never => {
+    (ctx.requested ??= new Map()).set(key, request!);
+    throw new StepRequested();
+  };
+
+  if (!request) {
+    const withManaged = await withManagedExtras(ctx, def.id, extras);
+    const promptRel = `${ctx.featureDir}/.pipeline/requests/${key}.md`;
+    const promptAbs = path.join(stepRepo, promptRel);
+    fs.mkdirSync(path.dirname(promptAbs), { recursive: true });
+    fs.writeFileSync(promptAbs, buildPrompt(ctx, def, round, maxRounds, resultRel, withManaged));
+    fs.rmSync(resultAbs, { force: true });
+    const now = new Date().toISOString();
+    request = {
+      key,
+      stepId: def.id,
+      title: extras.title ?? `${def.title}${round !== null && round > 1 ? ` 第${round}轮` : ""}${target ? `（${target.name}）` : ""}`,
+      role: def.role,
+      promptFile: promptRel,
+      resultFile: resultRel,
+      since: now,
+      followUps: 0,
+      gateFixes: 0,
+      secretFixes: 0,
+      followUp: null,
+    };
+    requests.push(request);
+    ctx.state.history.push({
+      key,
+      stepId: def.id,
+      round,
+      attempt: ctx.state.attempt,
+      agentId: chatAgentId(key),
+      startedAt: now,
+      endedAt: null,
+      outcome: "running",
+      followUps: 0,
+      result: null,
+      error: null,
+      phase: phaseOf(ctx),
+      agent: "对话中的子 agent",
+    });
+    save(ctx);
+    ctx.log(`请对话执行 ${key}（${def.title}）：提示词 ${promptRel}，结果文件 ${resultRel}`);
+    ask();
+  }
+  const pending = request!;
+  if (!ctx.chatRecord?.has(key)) ask();
+
+  const record = [...ctx.state.history].reverse().find((h) => h.key === key && h.agentId === chatAgentId(key));
+  let validation = readResultFile(resultAbs, def);
+  if (!validation.ok) {
+    pending.followUps += 1;
+    if (record) record.followUps = pending.followUps;
+    if (pending.followUps > ctx.config.resultFollowUps) {
+      const idx = requests.findIndex((r) => r.key === key);
+      if (idx !== -1) requests.splice(idx, 1);
+      if (record) {
+        record.outcome = "failed";
+        record.endedAt = new Date().toISOString();
+        record.error = validation.error;
+      }
+      save(ctx);
+      throw new ResultInvalid(def.title, `退回 ${pending.followUps - 1} 次后仍没有得到有效的结果文件：${validation.error}`);
+    }
+    pending.followUp = resultFollowUp({ resultFile: resultAbs, problem: validation.error });
+    save(ctx);
+    ctx.log(`${key} 的结果无效（${validation.error}），第 ${pending.followUps} 次退回对话`);
+    ask();
+  }
+
+  const gate = extras.gate ?? false;
+  if (gate) {
+    // The gate's findings go back to the subagent that made the change, through the chat.
+    const fix = (counter: "gateFixes" | "secretFixes") => async (text: string) => {
+      pending[counter] += 1;
+      pending.followUp = text;
+      save(ctx);
+      ctx.log(`${key}：${counter === "gateFixes" ? "质量门" : "密钥扫描"}发现新问题，第 ${pending[counter]} 次退回对话`);
+      ask();
+    };
+    await qualityGate(ctx, key, target, fix("gateFixes"), pending.gateFixes);
+    await secretGate(ctx, key, target, fix("secretFixes"), pending.secretFixes);
+    const again = readResultFile(resultAbs, def);
+    if (again.ok) validation = again;
+  }
+
+  const value = (validation as { ok: true; value: Record<string, unknown> }).value;
+  const idx = requests.findIndex((r) => r.key === key);
+  if (idx !== -1) requests.splice(idx, 1);
+  if (record) {
+    record.outcome = "completed";
+    record.endedAt = new Date().toISOString();
+    record.result = value;
+    record.error = null;
+  }
+  ctx.state.results[key] = value;
+  save(ctx);
+  ctx.log(`完成 ${key}（对话执行）：${JSON.stringify(value)}`);
+  return value;
 }
 
 /**
@@ -1498,6 +1716,8 @@ async function runPanel(
     }).then(() => findings);
   });
   const settled = await Promise.allSettled(runs);
+  const stepReq = settled.find((s): s is PromiseRejectedResult => s.status === "rejected" && s.reason instanceof StepRequested);
+  if (stepReq) throw stepReq.reason;
   const done: string[] = [];
   settled.forEach((outcome, i) => {
     if (outcome.status === "fulfilled") done.push(outcome.value);
@@ -1572,6 +1792,8 @@ async function runProposals(ctx: PipelineContext): Promise<string[]> {
     }).then(() => file);
   });
   const settled = await Promise.allSettled(runs);
+  const stepReq = settled.find((s): s is PromiseRejectedResult => s.status === "rejected" && s.reason instanceof StepRequested);
+  if (stepReq) throw stepReq.reason;
   const done: string[] = [];
   settled.forEach((outcome, i) => {
     if (outcome.status === "fulfilled") done.push(outcome.value);
@@ -1728,7 +1950,13 @@ async function gateBaseline(ctx: PipelineContext, target?: StepTarget): Promise<
  * step's agent through `fix` (a follow-up turn) until they pass or the attempts run out;
  * either way the run goes on, and the outcome is recorded for the review and the report.
  */
-async function qualityGate(ctx: PipelineContext, key: string, target: StepTarget | undefined, fix: (text: string) => Promise<void>): Promise<void> {
+async function qualityGate(
+  ctx: PipelineContext,
+  key: string,
+  target: StepTarget | undefined,
+  fix: (text: string) => Promise<void>,
+  initialFixRounds = 0,
+): Promise<void> {
   const checks = checksOf(ctx, target);
   if (checks.length === 0) return;
   const repo = target?.repo ?? ctx.repo;
@@ -1737,7 +1965,7 @@ async function qualityGate(ctx: PipelineContext, key: string, target: StepTarget
   const max = ctx.config.qualityGate.fixAttempts;
   const dir = checksDir(ctx, key, target);
   fs.mkdirSync(dir, { recursive: true });
-  for (let fixRounds = 0; ; fixRounds += 1) {
+  for (let fixRounds = initialFixRounds; ; fixRounds += 1) {
     const files = changedFiles(repo, codeBaseCommit(ctx, target));
     const runs: GateRun["checks"] = [];
     const failures: Parameters<typeof gateFollowUp>[0]["failures"] = [];
@@ -1797,12 +2025,18 @@ function secretBase(ctx: PipelineContext, target?: StepTarget): string | null {
  * what it finds goes back to the step's agent, like a failing check, up to qualityGate.fixAttempts
  * times. The outcome is kept for the review, the report and the push.
  */
-async function secretGate(ctx: PipelineContext, key: string, target: StepTarget | undefined, fix: (text: string) => Promise<void>): Promise<void> {
+async function secretGate(
+  ctx: PipelineContext,
+  key: string,
+  target: StepTarget | undefined,
+  fix: (text: string) => Promise<void>,
+  initialFixRounds = 0,
+): Promise<void> {
   if (!ctx.config.secretScan.enabled) return;
   const repo = target?.repo ?? ctx.repo;
   const base = secretBase(ctx, target);
   const max = ctx.config.qualityGate.fixAttempts;
-  for (let fixRounds = 0; ; fixRounds += 1) {
+  for (let fixRounds = initialFixRounds; ; fixRounds += 1) {
     const findings = scanChange(repo, base, ctx.config.secretScan);
     if (findings === null) {
       ctx.log(`密钥扫描（${key} 之后）：找不到改动的起点，没有扫描`);
@@ -1949,8 +2183,8 @@ function approvalMode(ctx: PipelineContext): "ui" | "always" | null {
  * (preview.md, a prototype for UI changes) and says "yes" before any code is written. The run
  * stops here once per attempt; --approve continues, a changed spec starts over from design.
  */
-function confirmDesign(ctx: PipelineContext): void {
-  const mode = approvalMode(ctx);
+function confirmDesign(ctx: PipelineContext, override?: "always" | "config"): void {
+  const mode = override === "always" ? "always" : approvalMode(ctx);
   if (!mode) return;
   const uiChange = currentPlan(ctx).uiChange;
   if (mode === "ui" && uiChange !== true) return;
@@ -2285,9 +2519,101 @@ function reportLines(ctx: PipelineContext): string[] {
   return lines;
 }
 
+/** Connects the custom flow interpreter (flow-runner.ts) to this pipeline's step machinery. */
+function customFlowOps(ctx: PipelineContext, def: FlowDef): FlowOps {
+  const rounds = ctx.config.profiles[ctx.state.profile].rounds;
+  return {
+    profile: ctx.state.profile,
+    type: ctx.state.type ?? null,
+    rounds,
+    result: (key) => ctx.state.results[key],
+    log: ctx.log,
+    async begin() {
+      recordCodeBase(ctx);
+      if (ctx.state.type !== "assessment") await gateBaseline(ctx);
+    },
+    async design() {
+      let designExtras: StepExtras = {};
+      if (proposalsApply(ctx) && !ctx.state.results.design) {
+        const files = await runProposals(ctx);
+        if (files.length > 0) designExtras = { sections: [proposalsSection(files, proposalMembers(ctx).length)] };
+        else ctx.log("方案提案都没有完成，按原来的方式由一个 agent 做方案设计");
+      }
+      const design = await runStep(ctx, "design", null, null, designExtras);
+      if (ctx.state.type === "defect" && design.reproduced === false) {
+        throw new BusinessDecisionNeeded(design.questions as string[], "reproduce");
+      }
+      return design;
+    },
+    async implement() {
+      const slices = implementationSlices(ctx);
+      if (slices.length === 0) return runStep(ctx, "implement", null, null, { gate: true });
+      let last: Record<string, unknown> = { status: "done" };
+      for (const [i, title] of slices.entries()) {
+        last = await runStep(ctx, "implement", null, null, {
+          key: `implement-s${i + 1}`,
+          title: `5-代码实现 第${i + 1}/${slices.length}片`,
+          contextLines: [`切片：第 ${i + 1} 片，共 ${slices.length} 片（${title}）`],
+          sections: [sliceSection(i + 1, slices.length, title)],
+          gate: true,
+        });
+      }
+      // Record a synthetic "implement" result so condition checks (`implement.status`) see it too.
+      ctx.state.results.implement ??= last;
+      save(ctx);
+      return last;
+    },
+    run(id, round, maxRounds, options) {
+      return runStep(ctx, id, round, maxRounds, { gate: options.gate, contextLines: options.contextLines });
+    },
+    review(id, round, maxRounds, contextLines) {
+      if (id === "design_review" || id === "code_review") return runReview(ctx, id, round, maxRounds, contextLines);
+      return runStep(ctx, id, round, maxRounds, { gate: false, contextLines });
+    },
+    checkLines(id) {
+      if (id === "code_review") return [...gateLines(ctx), ...secretLines(ctx), ...scopeLines(ctx), ...acceptanceLines(ctx)];
+      return [];
+    },
+    answerFirst(review, round, maxRounds) {
+      return answerFirst(ctx, review, round, maxRounds);
+    },
+    approval(mode) {
+      confirmDesign(ctx, mode);
+    },
+    async phase() {
+      const phases = runPhases(ctx.state);
+      if (phaseOf(ctx) === "verify") return "continue";
+      if (phases.mode === "develop-only") {
+        await stopManagedServices(ctx);
+        return "report";
+      }
+      if (phases.mode === "gated") {
+        const at = ctx.state.verifyAt ? new Date(ctx.state.verifyAt) : null;
+        if (!at || at.getTime() > Date.now()) throw new PhaseGate();
+        ctx.log("研发完成时已经过了预约的测试验证时间，直接开始测试验证");
+        ctx.state.verifyAt = null;
+      } else {
+        await milestone(ctx, "code-reviewed", "代码已经写完并通过检查，开始按验收标准逐条验证功能。");
+      }
+      ctx.state.phase = "verify";
+      save(ctx);
+      await integrate(ctx, "verify");
+      return "continue";
+    },
+    async report(extraLines) {
+      await stopManagedServices(ctx);
+      return runStep(ctx, "report", null, null, { contextLines: [...reportLines(ctx), ...extraLines] });
+    },
+    gated(id) {
+      return def.customSteps[id]?.gate ?? GATED_STEPS.includes(id as StepId);
+    },
+  };
+}
+
 /** Steps 3–11. Loop rounds and optional steps come from the run's profile; the gate from the execution mode. */
 async function flow(ctx: PipelineContext): Promise<Record<string, unknown>> {
   await setUpJoint(ctx);
+  if (ctx.flowDef) return runCustomFlow(ctx.flowDef, customFlowOps(ctx, ctx.flowDef));
   if (ctx.state.type === "assessment") {
     // Read-only: no code, so no implementation, review of code, handoff or verification.
     await assessmentPhase(ctx);
@@ -2337,9 +2663,12 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
   ctx.state.stopKind = null;
   ctx.state.pendingQuestions = null;
   save(ctx);
-  await integrate(ctx, phaseOf(ctx) === "verify" ? "verify" : "started");
+  if (!ctx.chatContinuing) {
+    await integrate(ctx, phaseOf(ctx) === "verify" ? "verify" : "started");
+  }
+  let keepServices = false;
   try {
-    await checkQuota(ctx);
+    if (!ctx.chatContinuing) await checkQuota(ctx);
     const report = await flow(ctx);
     ctx.state.status = "completed";
     ctx.state.outcome = report.outcome as string;
@@ -2374,6 +2703,10 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
     });
     return "completed";
   } catch (error) {
+    if (error instanceof StepRequested) {
+      keepServices = true;
+      return "step_requested";
+    }
     if (error instanceof PhaseGate) {
       ctx.state.status = "phase_done";
       ctx.state.stopReason = null;
@@ -2512,6 +2845,6 @@ export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome
     });
     return "failed";
   } finally {
-    await stopManagedServices(ctx);
+    if (!keepServices) await stopManagedServices(ctx);
   }
 }

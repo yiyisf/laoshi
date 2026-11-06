@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "title": "调研与文档流程",
+  "description": "不改动业务代码：方案/调研编写 → 独立审核 ⇄ 修订 → 完成报告。",
+  "flow": [
+    { "step": "design" },
+    {
+      "loop": {
+        "check": "design_review",
+        "fix": "design_revise",
+        "rounds": "designReview",
+        "until": { "verdict": ["approved"] },
+        "order": "check-first"
+      }
+    },
+    { "step": "report" }
+  ]
+}

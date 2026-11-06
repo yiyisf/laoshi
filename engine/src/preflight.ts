@@ -62,6 +62,8 @@ export interface LaunchArgs {
   defects: DefectHandling | null;
   /** --approve: the requester confirmed the design waiting at the confirmation point. Implies --resume. */
   approve: boolean;
+  /** --flow: custom flow name (overrides spec "- 流程：" and config orchestration.flow). */
+  flow?: string | null;
 }
 
 export class PreflightError extends Error {
@@ -153,6 +155,10 @@ export interface PreflightResult {
   specType: RequirementType | null;
   /** Related repositories the spec says this requirement also changes. */
   specJoint: string[];
+  /** Custom flow named in the spec ("- 流程：<名称>"), if any. */
+  specFlow: string | null;
+  /** Orchestration mode named in the spec ("- 编排模式：对话 | 引擎"), if any. */
+  specMode: "engine" | "chat" | null;
   /** This start begins the verify phase (the develop phase is done). */
   entersVerify: boolean;
 }
@@ -200,6 +206,26 @@ export function specProfile(specText: string): ProfileName | null {
   for (const name of PROFILE_NAMES) {
     if (match[1].startsWith(PROFILE_LABELS[name]) || match[1].toLowerCase().startsWith(name)) return name;
   }
+  return null;
+}
+
+/** Reads "- 流程：<名称>" from the spec header; "默认" and "内置" return "default". */
+export function specFlow(specText: string): string | null {
+  const match = /^\s*-\s*流程\s*[:：]\s*(\S+)/m.exec(specText);
+  if (!match) return null;
+  const raw = match[1].replace(/[（(].*$/, "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "默认" || raw === "内置" || raw === "标准流程") return "default";
+  return raw;
+}
+
+/** Reads "- 编排模式：对话 | 引擎" (or chat / engine / 模式 A / 模式 B) from the spec header. */
+export function specOrchestrationMode(specText: string): "engine" | "chat" | null {
+  const match = /^\s*-\s*编排(?:模式|方式)?\s*[:：]\s*(.+)$/m.exec(specText);
+  if (!match) return null;
+  const raw = match[1].trim().toLowerCase();
+  if (/^(chat|模式\s*b|会话内|对话)/.test(raw)) return "chat";
+  if (/^(engine|模式\s*a|外部引擎|后台引擎|引擎)/.test(raw)) return "engine";
   return null;
 }
 
@@ -317,7 +343,20 @@ export function preflight(
       throw new PreflightError("这个需求已经在这里运行过，不能再改为在新工作区中开发。请用 --resume 继续，或去掉 --worktree。");
     }
     if (!git.isRepo) throw new PreflightError("--worktree 需要 git 仓库。");
-    return { repo, featureDir, specPath, mode, branch: git.branch, specProfile: specProfile(specText), specPhases: specPhases(specText), specType: specType(specText), specJoint: specJoint(specText), entersVerify: false };
+    return {
+      repo,
+      featureDir,
+      specPath,
+      mode,
+      branch: git.branch,
+      specProfile: specProfile(specText),
+      specPhases: specPhases(specText),
+      specType: specType(specText),
+      specJoint: specJoint(specText),
+      specFlow: specFlow(specText),
+      specMode: specOrchestrationMode(specText),
+      entersVerify: false,
+    };
   }
   // The run commits to the branch that is checked out now, and never to the default branch.
   if (git.isRepo && git.detached) {
@@ -337,7 +376,20 @@ export function preflight(
     );
   }
   const entersVerify = mode.kind === "resume-reuse" && developDone(mode.previous);
-  return { repo, featureDir, specPath, mode, branch: git.branch, specProfile: specProfile(specText), specPhases: specPhases(specText), specType: specType(specText), specJoint: specJoint(specText), entersVerify };
+  return {
+    repo,
+    featureDir,
+    specPath,
+    mode,
+    branch: git.branch,
+    specProfile: specProfile(specText),
+    specPhases: specPhases(specText),
+    specType: specType(specText),
+    specJoint: specJoint(specText),
+    specFlow: specFlow(specText),
+    specMode: specOrchestrationMode(specText),
+    entersVerify,
+  };
 }
 
 /** Why the verify phase cannot start in this environment, or null. */
