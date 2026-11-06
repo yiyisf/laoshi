@@ -74,3 +74,19 @@
 | `estimate` | 1.13 起。`{ basis, profile, typicalAgentMinutes, typicalTokens, usedAgentMinutes, usedTokens, leftMinutes, over }`：按本机已完成的同档位需求（至少 3 个）的中位数估算；数据不够或已完成时为 null |
 | `joint` | 联合需求的其他仓库：`[{ name, slug, repo, sourceRepo, branch, workspaceId, gate }]` |
 | `external` | 外部系统中的卡片（1.9.0 起）：`[{ name, id, url, status, syncedAt, pending, lastError }]`；`pending` 是等待补发的调用数 |
+
+## 会话内编排与自定义流程 JSON 输出（`laoshi run --json` / `laoshi flow --json`）
+
+ADR 0009 起。供对话中的 agent（模式 B）或脚本调用，输出单行或多行格式化 JSON（均带 `schema: 1`）：
+
+| 命令 | 输出主要字段 |
+| --- | --- |
+| `laoshi run mode [--feature <需求>] --json` | `{ schema: 1, mode: "engine" \| "chat", flow, source, reason }`：当前需求或仓库生效的编排模式与流程名称 |
+| `laoshi run next [--feature <需求>] [--flow <流程>] --json` | `{ schema: 1, ok, action: "next", featureDir, status, mode: "chat", flow, outcome, requests, message, notices }`：`outcome` 为 `"step_requested"` 时，`requests` 数组列出待执行的步骤（`{ key, stepId, title, role, promptFile, resultFile, since }`） |
+| `laoshi run record --feature <需求> --step <步骤键> --json` | 校验结果文件并运行质量门与密钥扫描。通过时推进到下一步并返回与 `next` 相同结构的响应（含 `recorded: { key, accepted: true }`）；未通过时 `recorded.accepted` 为 `false`，返回更新后的跟进 `promptFile` |
+| `laoshi run approve --feature <需求> --json` | 方案确认点通过后继续推进，返回下一步请求或完成状态 |
+| `laoshi run verify --feature <需求> --json` | 分阶段执行（`phase_done`）时进入测试验证阶段并推进 |
+| `laoshi run status [--feature <需求>] --json` | 当前状态、已完成步骤和待执行的 `requests` |
+| `laoshi flow list --json` | `{ schema: 1, flows: [{ name, title, description, source, path }] }` |
+| `laoshi flow show <名称> --json` | 流程的完整结构与文字说明 |
+| `laoshi flow validate <文件或名称> --json` | `{ schema: 1, valid, name, title, source, error? }` |

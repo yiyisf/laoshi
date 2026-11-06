@@ -72,6 +72,8 @@ metadata:
 | 启动（自动新建工作区） | `node "{{PIPELINE_LAUNCHER}}" --feature <功能目录> --worktree` |
 | 预约启动 | `node "{{PIPELINE_LAUNCHER}}" --feature <功能目录> --at <时间>`（时间写 `22:00`、`明天 8:30`、`2026-10-14 08:30` 或 `+2h`；可以和 `--worktree` 一起用） |
 | 指定执行方式 | 在启动命令后加 `--phases gated`（分阶段：研发完成后停下等待测试验证）或 `--phases develop-only`（只做研发）；通常写在需求说明的"执行方式"一行，不用加 |
+| 指定编排流程 | 在启动或继续命令后加 `--flow <流程名>`（如 `standard`、`quick`、`hotfix`、`doc-only` 或项目 `.laoshi/flows/<流程名>.json`）；也可写在需求说明的 `- 流程：<流程名>` 或项目配置的 `orchestration.flow` 中 |
+| 查看与校验流程 | `req flow list`（列出可用流程）、`req flow show <流程名>`（查看步骤与门禁）、`req flow validate <文件>`、`req flow init <流程名> [--from <模板>]` |
 | 预约测试验证 | 在启动或继续命令后加 `--verify-at <时间>`：研发完成后到这个时间自动开始测试验证（隐含分阶段） |
 | 开始测试验证 | `node "{{PIPELINE_LAUNCHER}}" --feature <功能目录> --phase verify`（可以加 `--verify-env local\|deployed`、`--defects fix\|handback\|report`、`--at <时间>`） |
 | 查看进度 | `node "{{PIPELINE_LAUNCHER}}" --feature <功能目录> --status` |
@@ -88,6 +90,25 @@ metadata:
 启动命令检查条件后在后台运行，一两秒内返回：
 - 输出"已在后台启动"：告诉用户开发已经开始。每个步骤会以"[功能目录名] 步骤名"出现在这个对话的子 agent 列表里，想看可以点开。
 - 输出"未启动"：把原因告诉用户。spec 未确认 → 回到确认；同一目录已有流水线在运行 → 等它结束；工作目录不一致 → 到需求所在的项目中开对话；当前在默认分支 → 问用户是否改用"启动（自动新建工作区）"；其他原因（找不到程序、配置有误等）→ 请用户运行 `/laoshi-doctor` 或联系开发同事，并附上输出。
+
+## 会话内编排（模式 B）
+
+laoshi 支持两种编排模式（均可运行默认自适应流程或任何自定义流程）：
+- **模式 A（后台引擎，`engine`）**：默认模式。执行上面的"启动"命令后，后台进程按步骤创建独立的步骤 agent 并推进流水线。
+- **模式 B（会话内编排，`chat`）**：当配置 `orchestration.mode` 为 `"chat"`、需求说明写有 `- 编排模式：对话`，或平台不支持后台进程自动创建 agent 时使用。由当前对话按步骤调用 `req run` 推进，状态机、提示词组装、结果文件校验、质量门和密钥扫描仍由 CLI 确定性执行：
+
+1. **查看当前生效的模式**：`req run mode --feature <功能目录> --json`
+2. **取下一步请求**：`req run next --feature <功能目录> [--flow <流程名>] --json`
+   - 返回 `outcome: "step_requested"` 时，`requests` 数组给出当前待执行的步骤（单步或并行多步），每项包含 `key`、`title`、`role`（`builder` 或 `reviewer`）、`promptFile`（已组装好的完整步骤提示词文件）和 `resultFile`（要求写入的 JSON 结果路径）。
+3. **执行步骤并登记结果**：
+   - 优先使用当前平台的子 agent 工具（并行请求可同时启动多个子 agent），让子 agent 读取 `promptFile` 执行任务并把结果写入 `resultFile`；没有子 agent 工具时在当前对话中按 `promptFile` 完成。
+   - 每完成一个 `key`，执行 `req run record --feature <功能目录> --step <key> --json`。
+   - 若结果文件缺失、字段不合契约，或质量门 / 密钥扫描未通过，`req run record` 会返回 `outcome: "step_requested"` 并附上带修复说明的跟进 `promptFile`；按新提示词补写或修复后再次执行 `req run record`，直到进入下一步。
+4. **门禁与阶段推进**：
+   - `outcome: "waiting_for_approval"`（方案确认点）：向用户展示 `preview.md`，用户确认后执行 `req run approve --feature <功能目录> --json` 继续。
+   - `outcome: "waiting_for_business"`（需需求方决定）：向用户提问并更新 `spec.md` 后，再次执行 `req run next --feature <功能目录> --json` 继续。
+   - `outcome: "phase_done"`（分阶段待提测）：提测时执行 `req run verify --feature <功能目录> --json` 进入验证阶段。
+   - `outcome: "completed"`：流水线完成，按下面"流水线结束"向用户汇报。
 
 ## 收到流水线通知时
 

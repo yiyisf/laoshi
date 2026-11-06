@@ -77,12 +77,12 @@ const MAX_FILE_BYTES = 512 * 1024;
 export type Attention = "approval" | "business" | "permission" | "interrupted" | "not_completed" | "not_started" | null;
 
 /** What a person needs to do about a requirement, if anything. */
-export function attentionOf(state: Pick<PipelineState, "status" | "pid" | "outcome" | "waitingPermission"> | null): Attention {
+export function attentionOf(state: Pick<PipelineState, "status" | "pid" | "outcome" | "waitingPermission" | "mode"> | null): Attention {
   if (!state) return null;
   if (state.status === "running" && state.waitingPermission && isAlive(state.pid)) return "permission";
   if (state.status === "waiting_for_approval") return "approval";
   if (state.status === "waiting_for_business") return "business";
-  if (state.status === "failed" || (state.status === "running" && !isAlive(state.pid))) return "interrupted";
+  if (state.status === "failed" || (state.status === "running" && state.mode !== "chat" && !isAlive(state.pid))) return "interrupted";
   if (state.status === "completed" && state.outcome === "not_completed") return "not_completed";
   return null;
 }
@@ -102,7 +102,7 @@ function readStateSafe(repo: string, featureDir: string): PipelineState | null {
 }
 
 function currentSteps(state: PipelineState | null) {
-  if (!state || state.status !== "running" || !isAlive(state.pid)) return [];
+  if (!state || state.status !== "running" || (state.mode !== "chat" && !isAlive(state.pid))) return [];
   return state.history.filter((h) => h.outcome === "running").map((h) => ({ key: h.key, title: stepName(h, state), agentId: h.agentId }));
 }
 

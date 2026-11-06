@@ -167,7 +167,7 @@ export const createRuntime: RuntimeFactory = async () => {
       const resultAbs = path.join(input.cwd, resultRel);
       const startNumber = (startsByKey.get(key) ?? 0) + 1;
       startsByKey.set(key, startNumber);
-      const result = behavior.resultsByStart?.[startNumber - 1] ?? behavior.result ?? DEFAULT_RESULTS[stepId];
+      const result = behavior.resultsByStart?.[startNumber - 1] ?? behavior.result ?? DEFAULT_RESULTS[stepId] ?? { status: "done" };
       const transient = startNumber <= (behavior.transientErrors ?? 0);
       const errored = startNumber <= (behavior.errorStarts ?? 0);
       const noResult = startNumber <= (behavior.noResultStarts ?? 0);
@@ -206,7 +206,7 @@ export const createRuntime: RuntimeFactory = async () => {
           fs.mkdirSync(path.dirname(findings), { recursive: true });
           fs.appendFileSync(findings, `## ${key} 的意见（模拟评审者）\n`);
         } else {
-          const artifact = path.join(input.cwd, featureDir, ARTIFACTS[stepId]);
+          const artifact = path.join(input.cwd, featureDir, ARTIFACTS[stepId] ?? `${stepId}.md`);
           fs.appendFileSync(artifact, `\n## ${key}（模拟 agent，第 ${turn + 1} 个回合）\n`);
           fs.appendFileSync(path.join(input.cwd, featureDir, "progress.md"), `- ${key}：完成\n`);
         }

@@ -1,7 +1,7 @@
 # 会话内编排（模式 B）
 
-- 状态：提议，含一个**待验证的关键假设**（见 §3）
-- 背景：[architecture.md §4](architecture.md)。模式 A（外部引擎）要求平台有程序化 agent API；模式 B 让只有"skill + 会话内子 agent 工具"的平台也能用同一套流程。
+- 状态：已实现（[ADR 0002](../adr/0002-two-orchestration-modes.md)、[ADR 0009](../adr/0009-custom-flows-and-dual-mode.md)，代码见 `engine/src/run-cmd.ts` 与 `engine/src/pipeline.ts`）
+- 背景：[architecture.md §4](architecture.md)。模式 A（外部引擎）要求平台有程序化 agent API；模式 B 让只有"skill + 会话内子 agent 工具"的平台也能用同一套流程（包括默认流程与所有自定义编排流程）。
 
 ## 1. 要解决的问题
 
@@ -36,7 +36,10 @@ req-kit 的 `flow(ctx)`（`engine/src/pipeline.ts`，`runPipeline` 在 2198 行�
 
 这样 `flow` 的流程逻辑一行不改，只替换"执行一步"这个动作。
 
-**这个假设还没有验证。** 需要确认：（a）每个步骤键在续跑时是确定的；（b）循环轮次、质量门基线、`incremental` 等状态在"每步退出再进入"的情况下仍然正确；（c）每次 `next` 重新跑 `flow` 前面的部分（读配置、检查额度、`integrate(started)` 等）不会重复产生副作用。验证办法：用 `fake-runtime` 写一个"外包执行器"，让现有 `pipeline.test.ts` 的用例通过同样的断言。
+**该假设已验证通过并实现：**
+- （a）每个步骤键（包括循环轮次 `design_review-r1`、切片 `implement-s1`、评审小组 `code_review-r1-panel-1`、联合开发 `implement@backend`、自定义步骤）在续跑时完全由 `state.results` 决定；
+- （b）当 `ctx.mode === "chat"` 时，`chatStep` 将组装好的提示词写入 `.pipeline/requests/<key>.md`，在 `state.stepRequests` 中登记请求（包含 `followUps`、`gateFixes`、`secretFixes` 计数），并抛出 `StepRequested`；并行步骤通过 `Promise.allSettled` 一次性登记所有并发分支的 `StepRequest`；
+- （c）首次 `laoshi run next` 执行完整的启动准备（分支检查、`checkQuota`、`integrate(started)`），后续 `next` / `record` 传入 `chatContinuing: true`，不重复触发启动副作用。
 
 ## 4. 保证的强弱
 

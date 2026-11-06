@@ -20,7 +20,7 @@ const TITLES: Record<RequirementType, Partial<Record<StepId, string>>> = {
 
 /** The step's title for this requirement type. */
 export function stepTitle(type: RequirementType | null | undefined, id: StepId): string {
-  return (type && TITLES[type][id]) || STEPS[id].title;
+  return (type && TITLES[type][id]) || STEPS[id]?.title || id;
 }
 
 /**

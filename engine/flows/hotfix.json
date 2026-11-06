@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "title": "紧急修复流程（hotfix）",
+  "description": "定位问题 → 实现修复（带质量门）→ 1 轮代码评审与修复 → 功能验证与复验 → 完成报告。",
+  "flow": [
+    { "step": "design" },
+    { "step": "implement" },
+    {
+      "loop": {
+        "check": "code_review",
+        "fix": "review_fix",
+        "rounds": 1,
+        "until": { "verdict": ["pass"] },
+        "order": "check-first"
+      }
+    },
+    { "step": "verify" },
+    {
+      "loop": {
+        "check": "reverify",
+        "fix": "defect_fix",
+        "rounds": 1,
+        "until": { "result": ["pass"] },
+        "order": "fix-first"
+      },
+      "when": {
+        "result": "verify.result",
+        "equals": "defects_found"
+      }
+    },
+    { "step": "report" }
+  ]
+}

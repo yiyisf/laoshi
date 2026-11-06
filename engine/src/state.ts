@@ -179,8 +179,14 @@ export interface PipelineState {
   adapter?: { id: string; version?: string | null } | null;
   /** laoshi M2d: who orchestrates the steps: the engine (default) or the chat (mode B, docs/design/in-chat-orchestration.md). */
   mode?: "engine" | "chat";
-  /** laoshi M2d, mode B only: the step waiting for the chat agent to run it. */
-  stepRequest?: { key: string; since: string } | null;
+  /**
+   * Mode B (ADR 0009): the steps waiting for the chat agent to run them (several when they can run in
+   * parallel, e.g. review panel members); empty or absent when none. Replaces the single
+   * `stepRequest` that M2d defined but never used.
+   */
+  stepRequests?: StepRequest[] | null;
+  /** ADR 0009: the custom flow this run follows (absent: the builtin flow), and the hash of its file. */
+  flow?: { name: string; hash: string; source: string } | null;
   /** Automatic continuations used in this attempt. */
   autoResumes?: { attempt: number; count: number } | null;
   /** Set while waiting for a free slot (maxConcurrentPipelines). */
@@ -224,6 +230,37 @@ export interface PipelineState {
 }
 
 export type WakeupKind = "reminder" | "auto-resume" | "watchdog" | "verify-start" | "approval-continue";
+
+/**
+ * Mode B: a step the chat agent is asked to run with its own subagent tool (contracts/cli-json.md,
+ * `laoshi run`). Paths are relative to the repository the step works in.
+ */
+export interface StepRequest {
+  key: string;
+  stepId: string;
+  title: string;
+  role: "builder" | "reviewer";
+  /** The full prompt for the subagent (the same text an engine-started agent gets). */
+  promptFile: string;
+  /** Where the subagent writes its result; checked by `laoshi run record`. */
+  resultFile: string;
+  since: string;
+  /** Invalid results recorded so far (like the engine's reminders, up to resultFollowUps). */
+  followUps: number;
+  /** Times the quality gate / the secret scan sent the change back to the subagent. */
+  gateFixes: number;
+  secretFixes: number;
+  /** What the subagent has to do before the next record (a reminder or the gate's findings); null: run the prompt. */
+  followUp: string | null;
+}
+
+/**
+ * Whether a run is in progress: the engine's process is alive, or (mode B) the chat is driving it,
+ * which has no process to check.
+ */
+export function isActive(state: Pick<PipelineState, "status" | "pid" | "mode">): boolean {
+  return state.status === "running" && (state.mode === "chat" || isAlive(state.pid));
+}
 
 /** A wake-up scheduled on the platform: `ref` is the platform's schedule ID (v1: schedules[].id). */
 export interface Wakeup {

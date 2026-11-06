@@ -13,6 +13,7 @@ import { loadConfig, PHASE_MODE_LABELS, PROFILE_LABELS, REQUIREMENT_TYPE_LABELS 
 import { defaultConfigPath, kitVersion, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
 import { describeProfile, loadRuntimeFactory, resolveProfiles, wordsFor } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
+import { loadFlow } from "./flows.js";
 import { jointProblem } from "./joint.js";
 import { runPipeline } from "./pipeline.js";
 import { appendRun, runRecord } from "./records.js";
@@ -69,6 +70,9 @@ async function main(): Promise<number> {
 
   const previousState = mode.kind === "fresh" ? null : mode.previous;
   const reuse = mode.kind === "resume-reuse";
+  const flowName =
+    args.flow ?? (reuse ? previousState?.flow?.name : null) ?? checked.specFlow ?? previousState?.flow?.name ?? config.orchestration.flow;
+  let flowDef = null;
   // Execution mode: --phases, else what this run already uses (continuing), else the spec, else the config.
   let phaseMode =
     args.phases ?? (reuse ? previousState?.phases?.mode : null) ?? checked.specPhases ?? previousState?.phases?.mode ?? config.phases.mode;
@@ -98,6 +102,7 @@ async function main(): Promise<number> {
       if (type === "assessment" && (verifyAtText || args.phase === "verify")) throw new Error("评估类需求只做调研、不写代码，没有测试验证阶段");
       const jointIssue = jointProblem(jointNames, config.relatedRepos, chatDir);
       if (jointIssue) throw new Error(jointIssue);
+      flowDef = loadFlow(flowName, repo);
       if (checked.entersVerify) {
         const problem = verifyPhaseProblem(repo, featureDir, phases.environment);
         if (problem) throw new Error(problem);
@@ -136,6 +141,8 @@ async function main(): Promise<number> {
       originSessionId: originAgentId,
       // laoshi M2d: which adapter ran it, for troubleshooting.
       adapter: { id: config.platform.adapter },
+      mode: "engine",
+      flow: flowDef ? { name: flowDef.name, hash: flowDef.hash, source: flowDef.source } : null,
       pid: process.pid,
       startedAt: now,
       updatedAt: now,
@@ -170,6 +177,9 @@ async function main(): Promise<number> {
       originSessionId: originAgentId,
       // laoshi M2d: which adapter ran it, for troubleshooting.
       adapter: { id: config.platform.adapter },
+      mode: "engine",
+      stepRequests: null,
+      flow: flowDef ? { name: flowDef.name, hash: flowDef.hash, source: flowDef.source } : null,
       pid: process.pid,
       results: startOver ? {} : mode.previous.results,
       stopReason: null,
@@ -361,6 +371,7 @@ async function main(): Promise<number> {
       verifyCommand: commands.verify,
       approveCommand: commands.approve,
       jointNames,
+      flowDef,
       log,
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     });

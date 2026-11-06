@@ -329,6 +329,13 @@ export interface PipelineConfig {
    * in parallel; the reviewer consolidates. A configured review panel takes precedence.
    */
   reviewAxes: { enabled: boolean; profiles: ProfileName[] };
+  /**
+   * ADR 0009: how a requirement is orchestrated. `flow`: the builtin flow ("default") or the name of
+   * a custom flow (.laoshi/flows/<name>.json, <install root>/flows/, engine/flows/). `mode`: who
+   * drives the steps — the engine process (mode A, `laoshi start`) or the chat agent (mode B,
+   * `laoshi run next / record`); the entry skill reads it to pick the commands.
+   */
+  orchestration: { mode: "engine" | "chat"; flow: string };
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
@@ -406,6 +413,7 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   relatedRepos: [],
   designApproval: { mode: "ui", profiles: ["standard"], autoContinueHours: 0 },
   reviewAxes: { enabled: true, profiles: ["standard"] },
+  orchestration: { mode: "engine", flow: "default" },
 };
 
 /** Project file, at the repository root, that overrides the install-level configuration (laoshi M2c). */
@@ -547,6 +555,10 @@ function merge(base: PipelineConfig, raw: Record<string, unknown>): PipelineConf
     ...(isRecord(raw.designApproval) ? (raw.designApproval as Partial<PipelineConfig["designApproval"]>) : {}),
   };
   merged.reviewAxes = { ...base.reviewAxes, ...(isRecord(raw.reviewAxes) ? (raw.reviewAxes as Partial<PipelineConfig["reviewAxes"]>) : {}) };
+  merged.orchestration = {
+    ...base.orchestration,
+    ...(isRecord(raw.orchestration) ? (raw.orchestration as Partial<PipelineConfig["orchestration"]>) : {}),
+  };
   delete (merged as unknown as Record<string, unknown>).rounds;
   return merged;
 }
@@ -637,6 +649,11 @@ function validateChecks(config: PipelineConfig): void {
   if (typeof config.reviewAxes.enabled !== "boolean") throw new ConfigError("reviewAxes.enabled 必须是 true 或 false");
   if (!Array.isArray(config.reviewAxes.profiles) || !config.reviewAxes.profiles.every((p) => PROFILE_NAMES.includes(p))) {
     throw new ConfigError('reviewAxes.profiles 只能包含 "quick" 和 "standard"');
+  }
+  const o = config.orchestration;
+  if (!isRecord(o) || (o.mode !== "engine" && o.mode !== "chat")) throw new ConfigError('orchestration.mode 只能是 "engine"（后台引擎）或 "chat"（会话内编排）');
+  if (typeof o.flow !== "string" || !/^[a-z][a-z0-9_-]{0,39}$/.test(o.flow)) {
+    throw new ConfigError('orchestration.flow 必须是流程名："default"（内置流程）或 .laoshi/flows/ 中的文件名（不含 .json）');
   }
   if (!Array.isArray(config.relatedRepos)) throw new ConfigError('relatedRepos 必须是数组，例如 [{ "name": "后端", "path": "../backend" }]');
   config.relatedRepos.forEach((r, i) => {

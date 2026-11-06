@@ -55,9 +55,12 @@ export function stepName(record: StepRecord, state: Pick<PipelineState, "type" |
 
 export function describeStatus(state: PipelineState | null, featureDir: string, now = new Date()): string {
   if (!state) return `需求 ${featureDir} 还没有启动过开发流水线。`;
-  const running = state.status === "running" && isAlive(state.pid);
+  const chatMode = state.mode === "chat";
+  const running = state.status === "running" && (chatMode || isAlive(state.pid));
   const statusText = running
-    ? "运行中"
+    ? chatMode
+      ? "会话内编排进行中（等待对话中的子 agent 完成当前步骤并记录结果）"
+      : "运行中"
     : state.status === "running"
       ? "已中断（后台进程意外退出，可以继续）"
       : state.status === "waiting_for_business"
@@ -73,7 +76,7 @@ export function describeStatus(state: PipelineState | null, featureDir: string, 
             : `已完成（${RESULT_TEXT[state.outcome ?? ""] ?? state.outcome ?? ""}）`;
 
   const lines = [
-    `需求：${featureDir}（档位：${PROFILE_LABELS[state.profile ?? "standard"]}${state.type ? `，类型：${REQUIREMENT_TYPE_LABELS[state.type]}` : ""}）`,
+    `需求：${featureDir}（档位：${PROFILE_LABELS[state.profile ?? "standard"]}${state.type ? `，类型：${REQUIREMENT_TYPE_LABELS[state.type]}` : ""}${state.flow ? `，流程：${state.flow.name}` : ""}${chatMode ? "，编排：对话（模式 B）" : ""}）`,
     `状态：${running && state.queuedSince ? `排队中（本机同时运行的流水线已达上限，自 ${new Date(state.queuedSince).toLocaleString("zh-CN", { hour12: false })} 起等待，轮到时自动开始）` : statusText}`,
     ...(state.phases && state.phases.mode !== "continuous"
       ? [`执行方式：${PHASE_MODE_LABELS[state.phases.mode]}（当前阶段：${state.phase === "verify" ? "测试验证" : "研发"}${state.handbacks ? `，测试已退回 ${state.handbacks} 次` : ""}）`]
@@ -167,7 +170,8 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
     };
   }
 
-  const wasAlive = isAlive(state.pid);
+  const chatMode = state.mode === "chat";
+  const wasAlive = !chatMode && isAlive(state.pid);
   if (wasAlive) {
     try {
       process.kill(state.pid, "SIGTERM");
@@ -193,8 +197,9 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
     record.error = "被手动停止";
   }
   latest.status = "failed";
-  latest.stopReason = wasAlive ? "已被手动停止" : "后台进程已意外退出";
-  latest.stopKind = wasAlive ? "stopped" : "process_exit";
+  latest.stopReason = chatMode || wasAlive ? "已被手动停止" : "后台进程已意外退出";
+  latest.stopKind = chatMode || wasAlive ? "stopped" : "process_exit";
+  latest.stepRequests = null;
   writeState(input.statePath, latest);
   // On Windows a stopped process gets no chance to remove the repository lock itself; this
   // removes a lock whose holder is gone (anywhere, harmless when it was already removed).
@@ -205,11 +210,11 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
   }
 
   // The step agent keeps working unless told otherwise; stop it so it changes nothing more.
-  if (interrupted.some((r) => r.agentId)) {
+  if (interrupted.some((r) => r.agentId && !r.agentId.startsWith("chat:"))) {
     try {
       const runtime = await input.createRuntime({ config: input.config, log: input.log });
       for (const record of interrupted) {
-        if (!record.agentId) continue;
+        if (!record.agentId || record.agentId.startsWith("chat:")) continue;
         await runtime
           .interruptAgent(
             record.agentId,
@@ -226,8 +231,8 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
   const where = interrupted.length > 0 ? `，停在「${stepName(interrupted[0], latest)}」` : "";
   return {
     stopped: true,
-    message: wasAlive
-      ? `流水线已停止${where}。已完成的步骤会保留，之后可以用 --resume 从这里继续。`
+    message: chatMode || wasAlive
+      ? `流水线已停止${where}。已完成的步骤会保留，之后可以用 --resume（或 laoshi run next）从这里继续。`
       : `流水线的后台进程已经意外退出${where}，状态已更新。可以用 --resume 继续。`,
   };
 }

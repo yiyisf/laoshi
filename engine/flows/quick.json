@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "title": "精简开发流程",
+  "description": "省去独立的方案审核和提测说明，保留方案设计、代码实现、代码评审与修复、功能验证和完成报告。",
+  "flow": [
+    { "step": "design" },
+    { "checkpoint": "approval", "mode": "config" },
+    { "step": "implement" },
+    {
+      "loop": {
+        "check": "code_review",
+        "fix": "review_fix",
+        "rounds": "codeReview",
+        "until": { "verdict": ["pass"] },
+        "order": "check-first"
+      }
+    },
+    { "checkpoint": "phase" },
+    { "step": "verify" },
+    {
+      "loop": {
+        "check": "reverify",
+        "fix": "defect_fix",
+        "rounds": "defectFix",
+        "until": { "result": ["pass"] },
+        "order": "fix-first"
+      },
+      "when": {
+        "result": "verify.result",
+        "equals": "defects_found"
+      }
+    },
+    { "step": "report" }
+  ]
+}

@@ -106,6 +106,14 @@ const CATALOG: Array<{ id: string; title: string; description: string; keys: Rec
     title: "流程",
     description: "需求按什么顺序走、在哪里停下等人。",
     keys: {
+      orchestration: {
+        label: "编排模式与流程",
+        description: "由后台进程自动驱动步骤 agent（模式 A），还是由当前对话自己按步骤推进（模式 B）；以及默认走哪个编排流程。",
+        display: (v) => {
+          const o = v as PipelineConfig["orchestration"];
+          return `模式：${o.mode === "chat" ? "会话内编排（模式 B）" : "后台引擎（模式 A）"}；默认流程：${o.flow === "default" ? "内置自适应流程（default）" : o.flow}`;
+        },
+      },
       phases: {
         label: "执行方式",
         description: "研发完成后接着测试验证，还是停下等测试，或只做研发。",
