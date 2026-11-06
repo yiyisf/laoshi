@@ -14,7 +14,7 @@
 | 跨对话、跨回合的后台进程 | **不行**。"后台常驻 + 之后再查状态"走不通 |
 | 平台命令行 | `aimax`（有 `run` 子命令），用法待第二轮确认 |
 | 平台环境变量（只记名字） | `AIMAX_SESSION_ID`、`AIMAX_USER_NAME`、`AIMAX_MODEL`、`AIMAX_VL_MODEL`、`AIMAX_LLM_API_KEY` |
-| 工具链 | Node.js 23.11、npm 10.9、git 2.43、Python 3.12、Java、docker 19.03、curl、zip/unzip/tar；沙箱自带的工具较少，没有 mvn、gradle。**缺的工具可以装到 `/data/workspace` 下，不随沙箱销毁而丢失**（已确认 mvn 装在工作区可用） |
+| 工具链 | Node.js 23.11、npm 10.9、git 2.43、Python 3.12、Java、docker 19.03、curl、zip/unzip/tar；沙箱自带的工具较少，没有 mvn、gradle。**缺的工具可以装到 `/data/workspace` 下，不随沙箱销毁而丢失**（已确认 mvn 装在工作区可用；工作区在 NAS 卷上，空间足够） |
 | 网络 | npm 走内网镜像，装包可行（`tsx@4` 2.6 秒、12 MB，可执行，结果持久在工作区）；公网全部不通（npm 官方源、GitHub、模型服务） |
 | skill 的格式 | 业界通用的 `SKILL.md` 结构，只是目录是平台定制的 |
 | skill 在哪里 | `/aimax/extensions/*/skills`（如 workflow-script、goals）；`/scenes/dev/…`、`/scenes/product/…`、`/scenes/test/…` 下有大量 `SKILL.md`（SDD 系列、BRD/PRD、测试用例与执行等）；内置 skill 在 `/aimax_pvc/skills/built-in/*`；`$HOME` 下没有 `.claude`、`.agents` 等目录 |
