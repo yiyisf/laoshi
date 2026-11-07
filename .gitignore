@@ -11,3 +11,4 @@ dist-intranet/
 site-dist/
 *.tgz
 mogao-probe*.zip
+dist-expert/

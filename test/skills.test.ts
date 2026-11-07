@@ -31,7 +31,7 @@ test("每个 skill 的 frontmatter：name 与目录名一致，有 description�
 
 // laoshi M2e: skill text also names the platform's words and sections (engine/src/skills-render.ts).
 const WORDS = new Set(Object.keys(NEUTRAL_WORDS));
-const FRAGMENT_FILES = [BUILTIN_SETUP, path.join(ROOT, "adapters", "paseo", "skill", "setup.md")];
+const FRAGMENT_FILES = [BUILTIN_SETUP, path.join(ROOT, "adapters", "paseo", "skill", "setup.md"), path.join(ROOT, "adapters", "mogao", "skill", "setup.md")];
 const FRAGMENTS = new Set(FRAGMENT_FILES.flatMap((f) => Object.keys(parseFragments(fs.readFileSync(f, "utf8")))));
 
 test("skill 中只用已知的占位符，引用的安装目录内文件都存在", () => {

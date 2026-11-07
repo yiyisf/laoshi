@@ -90,7 +90,7 @@ npm 包名：**`laoshi`（已确认可用）**。
 | R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 已完成：`site/`（GitHub Pages，`/laoshi/`），指南改写，`CHANGELOG.md`、ADR 索引；内网用 `laoshi docs`（R3 把站点构建进 npm 包） |
 | R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 已完成：0.1.1 以 `@yiyi_zhang/laoshi` 发布到 npm（`laoshi` 这个名字 npm 不允许发布，0.1.0 只在 GitHub Release 上）；`release.yml`、`scripts/check-package.mjs`、站点构建进包、Release 附离线安装包；公共 npm 源上实装验证通过。之后的开发版本是 0.2.0-dev |
 | 0.1.0 之后 | `laoshi migrate`、paseo-req-kit 2.0 薄分发包、Paseo 插件界面迁入；以 1.0 达到对等为目标（M7） | — |
-| 摸高专家 | 为摸高数字工程师挑战赛把 laoshi 做成平台上的专家。沙箱摸底三轮已完成，形态定为 B1：laoshi 引擎加摸高适配器，步骤 agent 用 `aimax run` 起，审批走平台的 HITL，进度来自平台回调；设计与要做的事见 [mogao-expert](../design/mogao-expert.md) | 进行中：摸高适配器（`aimax run`、审批、进度回调、引擎在对话的命令里运行、`laoshi permission`）已完成，假 `aimax` 上端到端通过；下一步是专家的入口 skill 和沙箱里的真实运行 |
+| 摸高专家 | 为摸高数字工程师挑战赛把 laoshi 做成平台上的专家。沙箱摸底三轮已完成，形态定为 B1：laoshi 引擎加摸高适配器，步骤 agent 用 `aimax run` 起，审批走平台的 HITL，进度来自平台回调；设计与要做的事见 [mogao-expert](../design/mogao-expert.md) | 进行中：摸高适配器和专家包（`make-expert.mjs`）已完成，假 `aimax` 上端到端通过；下一步：发布带摸高支持的版本（0.2.0 预发布），在沙箱里跑一个真实需求，准备参赛材料 |
 
 ## 风险登记
 

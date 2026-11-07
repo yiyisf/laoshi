@@ -1,6 +1,6 @@
 # laoshi 作为摸高上的"专家"
 
-- 状态：已定形态（B1）；第 5 节第 1～3 项已实现（[adapters/mogao](../../adapters/mogao/README.md)，假 `aimax` 上的端到端检查通过），第 4～6 项待做。依据是[摸高沙箱摸底](../discovery/mogao/report.md)第一、二、三轮。
+- 状态：已定形态（B1）；第 5 节第 1～4 项已实现（[adapters/mogao](../../adapters/mogao/README.md)：适配器、专家包 `make-expert.mjs`；假 `aimax` 上的端到端检查通过），第 5、6 项（沙箱里的真实运行、参赛材料）待做。
 - 背景：摸高的数字工程师挑战赛，赛题是在平台中提交 skill 或专家（多个 skill 的组合）。laoshi 本身就是一组 skill（`/laoshi` 入口、手册、方法、原则）加一个确定性的流水线引擎，天然是一个专家。
 
 ## 1. 约束（来自摸底）

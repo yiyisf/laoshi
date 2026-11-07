@@ -55,7 +55,13 @@ dsh 的选项：--dsh-home <DSH_HOME> --profile <名称> --dsh-bin <dsh 的 bin.
   process.exit(0);
 }
 const dry = args["dry-run"] || args.check;
-const home = path.resolve(args.home ?? process.env.LAOSHI_HOME ?? path.join(os.homedir(), ".laoshi"));
+// Without --home or LAOSHI_HOME: the install root this program was installed into with npm
+// (<root>/npm/…/node_modules, as engine/src/locations.ts programHome finds it), else ~/.laoshi.
+const programHome = (() => {
+  const m = /^(.*)[\\/]npm[\\/](?:lib[\\/])?node_modules[\\/]/.exec(kit);
+  return m && fs.existsSync(path.join(m[1], "config.json")) ? m[1] : null;
+})();
+const home = path.resolve(args.home ?? process.env.LAOSHI_HOME ?? programHome ?? path.join(os.homedir(), ".laoshi"));
 const configPath = path.join(home, "config.json");
 const recordPath = path.join(home, "install.json");
 

@@ -6,7 +6,7 @@
 //                                                                  (PlatformAdapter.skillSetup), or laoshi's
 // A line whose word is null, or whose fragment the platform does not have, is left out.
 //
-//   tsx engine/src/skills-render.ts --out <dir> [--config <install-level config>]
+//   tsx engine/src/skills-render.ts --out <dir> [--config <install-level config>] [--root <where the program will be>]
 
 import fs from "node:fs";
 import path from "node:path";
@@ -50,13 +50,16 @@ export function parseFragments(text: string): Record<string, string> {
 /** The skills' values for a configuration's platform (the install-level configuration's when not given). */
 export function skillValues(config?: unknown, root: string = KIT_ROOT): SkillValues {
   const adapter = config === undefined ? adapterForFile(defaultConfigPath()) : adapterFor(config);
-  const file = adapter.skillSetup ?? (adapter.capabilities.services === "builtin" ? BUILTIN_SETUP : null);
+  // The platform's sections; on a platform that uses laoshi's builtin services, laoshi's sections for
+  // those, with the platform's own (e.g. how to install on first use) added.
+  const builtin = adapter.capabilities.services === "builtin" ? parseFragments(fs.readFileSync(BUILTIN_SETUP, "utf8")) : {};
+  const own = adapter.skillSetup ? parseFragments(fs.readFileSync(adapter.skillSetup, "utf8")) : {};
   return {
     root,
     launcher: path.join(root, path.relative(KIT_ROOT, LAUNCHER)),
     version: kitVersion(),
     words: wordsFor(config),
-    fragments: file ? parseFragments(fs.readFileSync(file, "utf8")) : {},
+    fragments: { ...builtin, ...own },
   };
 }
 
@@ -93,12 +96,13 @@ export function renderSkills(out: string, v: SkillValues, from: string = SKILLS_
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]).replace(/\.ts$/, "") === path.join(ENGINE_DIR, "src", "skills-render");
 if (isMain) {
-  const { values } = parseArgs({ options: { out: { type: "string" }, config: { type: "string" } } });
+  const { values } = parseArgs({ options: { out: { type: "string" }, config: { type: "string" }, root: { type: "string" } } });
   if (!values.out) {
-    console.error("用法：skills-render --out <目录> [--config <安装级配置>]");
+    console.error("用法：skills-render --out <目录> [--config <安装级配置>] [--root <程序将来所在的目录>]");
     process.exit(2);
   }
   const config = values.config ? JSON.parse(fs.readFileSync(path.resolve(values.config), "utf8")) : undefined;
-  const written = renderSkills(path.resolve(values.out), skillValues(config));
+  // --root: skills for a program installed elsewhere later (e.g. a platform's workspace, laoshi M4).
+  const written = renderSkills(path.resolve(values.out), skillValues(config, values.root ? path.posix.normalize(values.root) : undefined));
   console.log(`已写入 ${written.length} 个文件到 ${path.resolve(values.out)}`);
 }
