@@ -197,6 +197,8 @@ test("摸高：专家包（make-expert）里的 skill 指向工作区里的程�
   assert.match(entry, /\/data\/workspace\/\.laoshi\/npm\/node_modules\/@yiyi_zhang\/laoshi\/bin\/req\.mjs/);
   assert.match(entry, new RegExp(`npm install --prefix /data/workspace/\\.laoshi/npm .*@yiyi_zhang/laoshi@${version.replace(/\./g, "\\.")}`));
   assert.match(entry, /不要结束这一轮对话/);
+  // Installed once per workspace; a newer expert brings its own version.
+  assert.match(entry, new RegExp(`require\\('/data/workspace/\\.laoshi/npm/node_modules/@yiyi_zhang/laoshi/package\\.json'\\)\\.version" 2>/dev/null\\)" = "${version.replace(/\./g, "\\.")}" \\]`));
   for (const skill of ["laoshi-setup", "laoshi-doctor", "laoshi-retro"]) assert.match(fs.readFileSync(path.join(dir, "skills", skill, "SKILL.md"), "utf8"), /摸高上第一次使用/);
   assert.match(fs.readFileSync(path.join(dir, "skills", "laoshi-setup", "SKILL.md"), "utf8"), /\.laoshi\/tools/);
   assert.match(fs.readFileSync(path.join(dir, "EXPERT.md"), "utf8"), /`laoshi`/);

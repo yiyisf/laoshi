@@ -2,10 +2,10 @@
 <!-- fragment: firstUse -->
 ## 摸高上第一次使用
 
-laoshi 装在工作区（`/data/workspace/.laoshi`），每个对话轮次的机器都是新的，但工作区里的东西会保留。执行本 skill 里的任何命令之前，先执行一次（已装好时立即结束）：
+laoshi 装在工作区（`/data/workspace/.laoshi`），每个对话轮次的机器都是新的，但工作区里的东西会保留，所以**一个工作区只需要安装一次**。执行本 skill 里的任何命令之前，先执行下面这条（工作区里已经是这个版本时立即结束；专家换了新版本时会自动换上）：
 
 ```bash
-test -f "{{REQ_KIT_ROOT}}/bin/req.mjs" || { npm install --prefix /data/workspace/.laoshi/npm --no-audit --no-fund @yiyi_zhang/laoshi@{{REQ_KIT_VERSION}} && node "{{REQ_KIT_ROOT}}/bin/req.mjs" install --platform mogao --home /data/workspace/.laoshi; }
+[ "$(node -p "require('{{REQ_KIT_ROOT}}/package.json').version" 2>/dev/null)" = "{{REQ_KIT_VERSION}}" ] || { npm install --prefix /data/workspace/.laoshi/npm --no-audit --no-fund @yiyi_zhang/laoshi@{{REQ_KIT_VERSION}} && node "{{REQ_KIT_ROOT}}/bin/req.mjs" install --platform mogao --home /data/workspace/.laoshi; }
 ```
 
 第一次大约需要一分钟（从内网 npm 镜像安装）。失败时把输出告诉用户，请开发同事看一下，不要自己改安装目录。
