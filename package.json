@@ -1,6 +1,6 @@
 {
   "name": "@yiyi_zhang/laoshi",
-  "version": "0.2.0-dev",
+  "version": "0.2.0-beta.1",
   "description": "laoshi：给测试、产品、项目经理用的需求开发体系。在 agent 平台（Paseo、DeepSeek Harness）的对话中对齐需求，由一组 AI agent 在后台完成设计、实现、评审和验证。",
   "type": "module",
   "license": "MIT",
