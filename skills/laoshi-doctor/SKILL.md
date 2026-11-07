@@ -9,6 +9,8 @@ metadata:
 
 体检只读取信息，不修改任何文件。
 
+{{fragment.firstUse}}
+
 ## 执行
 
 在当前工作目录执行（bash、PowerShell、cmd 写法相同）：

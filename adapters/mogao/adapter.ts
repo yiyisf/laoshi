@@ -4,6 +4,8 @@
 // ones. The platform keeps a chat's machine for one turn, so the engine runs in the chat's command.
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
 import { mogaoSettings } from "./mogao-runtime.js";
 
@@ -20,6 +22,7 @@ export const mogaoAdapter: PlatformAdapter = {
   },
   originEnv: { id: "AIMAX_SESSION_ID" },
   runsInChat: true,
+  skillSetup: path.join(path.dirname(fileURLToPath(import.meta.url)), "skill", "setup.md"),
   words: {
     name: "摸高",
     chat: "摸高的对话",

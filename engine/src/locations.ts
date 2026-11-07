@@ -29,7 +29,19 @@ export function kitHome(env: NodeJS.ProcessEnv = process.env): string {
   return homeOf(env).dir;
 }
 
-export type HomeSource = "LAOSHI_HOME" | "REQ_KIT_HOME" | "default" | "legacy";
+export type HomeSource = "LAOSHI_HOME" | "REQ_KIT_HOME" | "default" | "legacy" | "program";
+
+/**
+ * The install root this program was installed into with npm (`npm install --prefix <root>/npm`,
+ * as the one-step install does when the global directory is not writable): the root, when it has
+ * an install-level config. Platforms whose home directory does not last (a new machine per chat
+ * turn) find the install root this way without LAOSHI_HOME.
+ */
+export function programHome(kitRoot: string = KIT_ROOT): string | null {
+  const m = /^(.*)[\\/]npm[\\/](?:lib[\\/])?node_modules[\\/]/.exec(kitRoot);
+  if (!m) return null;
+  return fs.existsSync(path.join(m[1], "config.json")) ? m[1] : null;
+}
 
 /** The install root and how it was chosen (for doctor). */
 export function homeOf(env: NodeJS.ProcessEnv = process.env, home: string = os.homedir()): { dir: string; source: HomeSource } {
@@ -37,6 +49,8 @@ export function homeOf(env: NodeJS.ProcessEnv = process.env, home: string = os.h
   if (laoshi) return { dir: path.resolve(laoshi), source: "LAOSHI_HOME" };
   const legacyEnv = env.REQ_KIT_HOME?.trim();
   if (legacyEnv) return { dir: path.resolve(legacyEnv), source: "REQ_KIT_HOME" };
+  const installedInto = programHome();
+  if (installedInto) return { dir: installedInto, source: "program" };
   const preferred = path.join(home, ".laoshi");
   const legacy = path.join(home, ".req-kit");
   if (!fs.existsSync(preferred) && fs.existsSync(path.join(legacy, "config.json"))) return { dir: legacy, source: "legacy" };

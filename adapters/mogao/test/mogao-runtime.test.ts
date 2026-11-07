@@ -1,9 +1,11 @@
 // The 摸高 runtime against a fake `aimax` (fake-aimax.mjs, formats from the sandbox probes).
 import assert from "node:assert/strict";
+import { execSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { programHome } from "../../../engine/src/locations.js";
 import { createMogaoRuntime, mogaoSettings, parseRunOutput, redact } from "../mogao-runtime.js";
 
 const FAKE = path.join(import.meta.dirname, "fake-aimax.mjs");
@@ -182,4 +184,35 @@ test("摸高：输出解析和脱敏", () => {
   assert.equal(redact('headers={"authorization": "Bearer abcdefghijklmnop"}').includes("abcdefghijklmnop"), false);
   assert.equal(redact("AIMAX_AUTH_TOKEN=xyz123456 node x").includes("xyz123456"), false);
   assert.equal(redact("echo hello > out.txt"), "echo hello > out.txt");
+});
+
+test("摸高：专家包（make-expert）里的 skill 指向工作区里的程序，第一次使用时自己安装，没有别的平台和占位符", { skip: process.platform === "win32" }, () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-expert-"));
+  const kit = path.resolve(import.meta.dirname, "..", "..", "..");
+  const r = spawnSync(process.execPath, [path.join(kit, "adapters", "mogao", "make-expert.mjs"), "--out", out], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const version = JSON.parse(fs.readFileSync(path.join(kit, "package.json"), "utf8")).version;
+  const dir = path.join(out, `laoshi-expert-${version}`);
+  const entry = fs.readFileSync(path.join(dir, "skills", "laoshi", "SKILL.md"), "utf8");
+  assert.match(entry, /\/data\/workspace\/\.laoshi\/npm\/node_modules\/@yiyi_zhang\/laoshi\/bin\/req\.mjs/);
+  assert.match(entry, new RegExp(`npm install --prefix /data/workspace/\\.laoshi/npm .*@yiyi_zhang/laoshi@${version.replace(/\./g, "\\.")}`));
+  assert.match(entry, /不要结束这一轮对话/);
+  // Installed once per workspace; a newer expert brings its own version.
+  assert.match(entry, new RegExp(`require\\('/data/workspace/\\.laoshi/npm/node_modules/@yiyi_zhang/laoshi/package\\.json'\\)\\.version" 2>/dev/null\\)" = "${version.replace(/\./g, "\\.")}" \\]`));
+  for (const skill of ["laoshi-setup", "laoshi-doctor", "laoshi-retro"]) assert.match(fs.readFileSync(path.join(dir, "skills", skill, "SKILL.md"), "utf8"), /摸高上第一次使用/);
+  assert.match(fs.readFileSync(path.join(dir, "skills", "laoshi-setup", "SKILL.md"), "utf8"), /\.laoshi\/tools/);
+  assert.match(fs.readFileSync(path.join(dir, "EXPERT.md"), "utf8"), /`laoshi`/);
+  const all = execSync(`grep -rlE "\\{\\{|[Pp]aseo|DeepSeek" ${JSON.stringify(path.join(dir, "skills"))} || true`, { encoding: "utf8" }).trim();
+  assert.equal(all, "", `仍有占位符或别的平台：${all}`);
+});
+
+test("安装根：没有 LAOSHI_HOME 时，用程序所在的 <安装根>/npm（有安装级配置时）", () => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-home-")));
+  const kitRoot = path.join(base, ".laoshi", "npm", "node_modules", "@yiyi_zhang", "laoshi");
+  assert.equal(programHome(kitRoot), null);
+  fs.mkdirSync(kitRoot, { recursive: true });
+  fs.writeFileSync(path.join(base, ".laoshi", "config.json"), "{}");
+  assert.equal(programHome(kitRoot), path.join(base, ".laoshi"));
+  assert.equal(programHome(path.join(base, ".laoshi", "npm", "lib", "node_modules", "@yiyi_zhang", "laoshi")), path.join(base, ".laoshi"));
+  assert.equal(programHome("/opt/laoshi"), null);
 });

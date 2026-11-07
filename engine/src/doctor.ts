@@ -326,7 +326,7 @@ function project(repo: string, adapter: PlatformAdapter): void {
 function identity(repo: string | null): void {
   section("安装根与身份");
   const home = homeOf();
-  const how = { LAOSHI_HOME: "环境变量 LAOSHI_HOME", REQ_KIT_HOME: "环境变量 REQ_KIT_HOME（req-kit 的旧名，可以改用 LAOSHI_HOME）", default: "默认位置", legacy: "req-kit 的旧目录（还没有 ~/.laoshi）" }[home.source];
+  const how = { LAOSHI_HOME: "环境变量 LAOSHI_HOME", REQ_KIT_HOME: "环境变量 REQ_KIT_HOME（req-kit 的旧名，可以改用 LAOSHI_HOME）", default: "默认位置", program: "程序安装在它的 npm 目录里", legacy: "req-kit 的旧目录（还没有 ~/.laoshi）" }[home.source];
   report("ok", `安装根：${home.dir}（${how}）`);
   report("ok", `使用者：${userOf()}${process.env.LAOSHI_USER?.trim() ? "（环境变量 LAOSHI_USER）" : ""}`);
   if (repo) {

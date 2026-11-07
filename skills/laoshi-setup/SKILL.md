@@ -19,6 +19,8 @@ metadata:
 
 格式见 `{{REQ_KIT_ROOT}}/contracts/verify.md`。这个入口通常由开发同事或熟悉项目的测试同事运行。
 
+{{fragment.firstUse}}
+
 ## 步骤
 
 1. 确认位置
@@ -68,6 +70,7 @@ metadata:
 
 - 失败的命令不要写成可用。查明原因：是环境问题（缺少服务、缺少配置）就写明准备步骤后重试；是项目本身的问题就写进"已知问题"。
 - 启动的服务、容器在结束前关掉。
+{{fragment.toolsNote}}
 {{fragment.workspaceCheck}}
 - 不连接生产环境，不使用生产凭据，不触发真实的外部动作。
 
