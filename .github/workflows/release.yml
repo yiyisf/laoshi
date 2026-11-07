@@ -22,6 +22,10 @@ on:
       tag:
         description: "Version tag to release, e.g. 0.1.0"
         required: true
+      provenance:
+        description: "Publish with a provenance statement (turn off only when sigstore keeps failing)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write   # the tag, and the GitHub Release with the .tgz and the offline package
@@ -153,15 +157,19 @@ jobs:
         continue-on-error: true   # the Release with the .tgz is still made; the job fails at the end
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # false only from Run workflow; a push always publishes with provenance.
+          PROVENANCE: ${{ github.event_name != 'workflow_dispatch' || inputs.provenance }}
         run: |
           NAME=$(node -p "require('./package.json').name")
           if npm view "$NAME@$TAG" version >/dev/null 2>&1; then
             echo "::notice::$NAME@$TAG is already on npm; skipping publish."
             exit 0
           fi
+          FLAGS="--provenance=$PROVENANCE"
+          [ "$PROVENANCE" = "true" ] || echo "::warning::Publishing $NAME@$TAG without a provenance statement."
           case "$TAG" in
-            *-*) npm publish package.tgz --tag beta ;;
-            *)   npm publish package.tgz ;;
+            *-*) npm publish package.tgz --tag beta $FLAGS ;;
+            *)   npm publish package.tgz $FLAGS ;;
           esac
       - name: Name the package for the Release
         run: mv package.tgz "laoshi-$TAG.tgz"
