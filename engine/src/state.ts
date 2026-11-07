@@ -134,6 +134,8 @@ export interface PipelineState {
    */
   originSessionId: string | null;
   pid: number;
+  /** The machine the engine process runs on (laoshi: platforms that give each chat turn a new machine). */
+  host?: string;
   startedAt: string;
   updatedAt: string;
   /** Completed step results by step key. A resumed run reuses these instead of re-running the step. */
@@ -441,12 +443,32 @@ export function lockPath(repo: string): string {
   return path.join(os.tmpdir(), `requirement-pipeline-${id}.lock`);
 }
 
+/**
+ * Whether the run's engine process is alive: its process on this machine. A run recorded on another
+ * machine (a platform that gives each chat turn a new one) is not, whatever process has its ID here.
+ */
+export function engineAlive(state: { pid: number; host?: string }): boolean {
+  if (state.host && state.host !== os.hostname()) return false;
+  return isAlive(state.pid);
+}
+
 export function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+  return !isZombie(pid);
+}
+
+/** A process that has exited but was not reaped (its parent died first) still answers kill(pid, 0). */
+export function isZombie(pid: number): boolean {
+  if (process.platform !== "linux") return false;
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z");
+  } catch {
+    return false;
   }
 }
 

@@ -23,7 +23,7 @@ import {
   syncIntegration,
 } from "./integrations.js";
 import { defaultConfigPath } from "./locations.js";
-import { acquireLock, isAlive, type PipelineState, readState, statePath, writeState } from "./state.js";
+import { acquireLock, engineAlive, readState, statePath, type PipelineState, writeState } from "./state.js";
 
 /** The event that describes where a requirement is now. */
 export function eventForState(state: Pick<PipelineState, "status" | "phase" | "pid">): IntegrationEvent {
@@ -116,7 +116,7 @@ async function main(argv: string[]): Promise<number> {
       console.log(`${featureDir} 还没有启动过开发流水线，没有要同步的。`);
       return 0;
     }
-    if (state.status === "running" && isAlive(state.pid)) {
+    if (state.status === "running" && engineAlive(state)) {
       console.log("流水线正在运行：它会在下一个阶段变化时自动补发。现在不需要 req sync。");
       return 0;
     }

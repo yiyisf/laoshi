@@ -4,6 +4,7 @@
 import { pendingHumanReview, writeHumanReview } from "./code-review.js";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { approveCommand, LAUNCHER, parseLaunchArgs, resumeCommand, statusCommand, verifyCommand } from "./cli-args.js";
 import { dequeuedMessage, queuedMessage, watchdogPrompt } from "./messages.js";
@@ -137,6 +138,7 @@ async function main(): Promise<number> {
       // laoshi M2d: which adapter ran it, for troubleshooting.
       adapter: { id: config.platform.adapter },
       pid: process.pid,
+      host: os.hostname(),
       startedAt: now,
       updatedAt: now,
       results: {},
@@ -171,6 +173,7 @@ async function main(): Promise<number> {
       // laoshi M2d: which adapter ran it, for troubleshooting.
       adapter: { id: config.platform.adapter },
       pid: process.pid,
+      host: os.hostname(),
       results: startOver ? {} : mode.previous.results,
       stopReason: null,
       outcome: null,

@@ -10,7 +10,7 @@ import { section } from "./checklist.js";
 import { ownersFor, readCodeowners } from "./codeowners.js";
 import { KIT_ROOT } from "./locations.js";
 import { appendEvent, requirementRef } from "./records.js";
-import { isAlive, readState, statePath } from "./state.js";
+import { engineAlive, readState, statePath } from "./state.js";
 import { readWorktreeRecord } from "./worktree.js";
 import { scrubOriginEnv } from "./runtime-loader.js";
 
@@ -315,7 +315,7 @@ export function buildCodeReview(repo: string, featureDir: string): CodeReviewDat
     reviewers: { suggested: o.all, byFile: o.byFile, source: owners?.file ?? null },
     human: human ? { ...human, stale: human.status === "approved" && !!head && human.head !== head } : null,
     status: state?.status ?? null,
-    running: !!state && state.status === "running" && isAlive(state.pid),
+    running: !!state && state.status === "running" && engineAlive(state),
   };
 }
 

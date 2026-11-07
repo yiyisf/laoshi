@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import type { FakeScenario } from "./fake-runtime.js";
-import { isAlive, lockPath } from "../src/state.js";
+import { isAlive, lockPath, isZombie } from "../src/state.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 // tsx's own entry, run with this Node.js: node_modules/.bin/tsx is a shell script that Windows cannot start.
@@ -821,7 +821,8 @@ test("停止：结束后台进程、打断当前步骤的 agent、可以续跑",
   assert.match(stopped.stdout, /流水线已停止，停在「代码实现」/);
   assert.match(stopped.stdout, /--resume/);
 
-  assert.ok(!fs.existsSync(`/proc/${pid}`), "后台进程仍在运行");
+  // Ended: gone, or exited and waiting to be reaped by its new parent.
+  assert.ok(!fs.existsSync(`/proc/${pid}`) || isZombie(pid), "后台进程仍在运行");
   const s = state(env);
   assert.equal(s.status, "failed");
   assert.equal(s.stopReason, "已被手动停止");

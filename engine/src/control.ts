@@ -5,7 +5,7 @@ import { describeActivity } from "./activity.js";
 import { describeExternal } from "./integrations.js";
 import { PHASE_MODE_LABELS, PROFILE_LABELS, type PipelineConfig, REQUIREMENT_TYPE_LABELS } from "./config.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
-import { currentLockHolder, isAlive, type PipelineState, readState, type StepRecord, writeState } from "./state.js";
+import { currentLockHolder, engineAlive, readState, type PipelineState, type StepRecord, writeState } from "./state.js";
 import { stepTitle } from "./playbooks.js";
 import { describeTotals, totals } from "./usage.js";
 import { wordsFor } from "./runtime-loader.js";
@@ -55,7 +55,7 @@ export function stepName(record: StepRecord, state: Pick<PipelineState, "type" |
 
 export function describeStatus(state: PipelineState | null, featureDir: string, now = new Date()): string {
   if (!state) return `需求 ${featureDir} 还没有启动过开发流水线。`;
-  const running = state.status === "running" && isAlive(state.pid);
+  const running = state.status === "running" && engineAlive(state);
   const statusText = running
     ? "运行中"
     : state.status === "running"
@@ -167,15 +167,15 @@ export async function stopPipeline(input: StopInput): Promise<{ stopped: boolean
     };
   }
 
-  const wasAlive = isAlive(state.pid);
+  const wasAlive = engineAlive(state);
   if (wasAlive) {
     try {
       process.kill(state.pid, "SIGTERM");
     } catch {
       // Already gone.
     }
-    for (let i = 0; i < 20 && isAlive(state.pid); i++) await input.sleep(250);
-    if (isAlive(state.pid)) {
+    for (let i = 0; i < 20 && engineAlive(state); i++) await input.sleep(250);
+    if (engineAlive(state)) {
       try {
         process.kill(state.pid, "SIGKILL");
       } catch {
@@ -242,7 +242,7 @@ export async function describeLiveActivity(
   timeoutMs = 8000,
   now = new Date(),
 ): Promise<string[]> {
-  if (!state || state.status !== "running" || !isAlive(state.pid)) return [];
+  if (!state || state.status !== "running" || !engineAlive(state)) return [];
   const running = state.history.filter((h) => h.attempt === state.attempt && h.outcome === "running" && h.agentId).slice(0, 3);
   const lines: string[] = [];
   for (const record of running) {

@@ -68,14 +68,15 @@ test("/laoshi 的每本手册都有\"步骤\"一节，且都在入口的路由�
 });
 
 test("skill 按平台渲染（laoshi M2e）：占位符都替换掉；dsh 用 laoshi 内置的工作区设置，看不到别的平台", () => {
-  for (const [adapter, config] of [["paseo", { platform: { adapter: "paseo" } }], ["dsh", { platform: { adapter: "dsh" } }]] as const) {
+  for (const [adapter, config] of [["paseo", { platform: { adapter: "paseo" } }], ["dsh", { platform: { adapter: "dsh" } }], ["mogao", { platform: { adapter: "mogao" } }]] as const) {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), `laoshi-skills-${adapter}-`));
     const written = renderSkills(out, skillValues(config, "/opt/laoshi"));
     assert.ok(written.includes(path.join("laoshi", "SKILL.md")) && written.includes(path.join("laoshi-setup", "SKILL.md")));
     for (const file of markdownFiles(out)) {
       const text = fs.readFileSync(file, "utf8");
       assert.doesNotMatch(text, /\{\{/, `${adapter}：${file} 还有占位符`);
-      if (adapter === "dsh") assert.doesNotMatch(text, /paseo/i, `${adapter}：${file} 提到了 Paseo`);
+      if (adapter !== "paseo") assert.doesNotMatch(text, /paseo/i, `${adapter}：${file} 提到了 Paseo`);
+      if (adapter === "mogao") assert.doesNotMatch(text, /\bdsh\b|DeepSeek/i, `${adapter}：${file} 提到了 dsh`);
     }
     const setup = fs.readFileSync(path.join(out, "laoshi-setup", "SKILL.md"), "utf8");
     assert.match(setup, adapter === "paseo" ? /paseo\.json/ : /\.laoshi\/services\.json/);

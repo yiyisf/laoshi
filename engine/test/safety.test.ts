@@ -14,6 +14,15 @@ const repo = "/work/app";
 const home = "/home/dev";
 const label = (cmd: string) => dangerOf(cmd, S, { repo, home })?.label ?? null;
 
+test("危险命令：读出凭据环境变量（平台把凭据放在步骤 agent 的环境里）", () => {
+  assert.equal(label("echo $AIMAX_AUTH_TOKEN"), "读出凭据环境变量（AIMAX_AUTH_TOKEN）");
+  assert.equal(label('curl -H "Authorization: Bearer ${LLM_API_KEY}" http://x'), "读出凭据环境变量（LLM_API_KEY）");
+  assert.equal(label("printenv"), "列出环境变量（含凭据）");
+  assert.equal(label("printenv GITHUB_TOKEN"), "列出环境变量（含凭据）");
+  assert.equal(label("printenv PATH"), null);
+  assert.equal(label("echo $PATH && npm test"), null);
+});
+
 test("危险命令：推送、发布、集群、远程数据库和主机、删除仓库以外、下载执行、生产地址", () => {
   assert.equal(label("git push origin HEAD"), "推送到远程仓库");
   assert.equal(label('bash -lc "git push"'), "推送到远程仓库");

@@ -19,7 +19,7 @@ import { describeLiveActivity, describeStatus, stopPipeline } from "./control.js
 import { trackRequirement } from "./records.js";
 import { describeFeatures, featuresWithRuns, findWorktreeRun, listFeatures, resolveFeatureArg } from "./features.js";
 import { checkChatCwd, normalizeFeatureDir, preflight, type PreflightResult, specProfile, verifyPhaseProblem } from "./preflight.js";
-import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
+import { adapterFor, loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
 import { remainingLine, typical, typicalLine } from "./estimate.js";
 import { ensurePipelineDir, hashFile, isAlive, pipelineDir, readState, statePath } from "./state.js";
@@ -382,16 +382,21 @@ if (args.worktree) {
 ensurePipelineDir(checked.repo, checked.featureDir);
 const logPath = path.join(pipelineDir(checked.repo, checked.featureDir), "pipeline.log");
 const out = fs.openSync(logPath, "a");
+// A platform that keeps the chat's machine only for one turn (PlatformAdapter.runsInChat): the
+// engine runs in this command, and what it tells the chat is written here, in chat.log.
+const inChat = adapterFor(loaded.config).runsInChat === true;
+const chatOut = path.join(pipelineDir(checked.repo, checked.featureDir), "chat.log");
+if (inChat) fs.writeFileSync(chatOut, "");
 
 // Re-use this process's loader flags (tsx registers itself through execArgv).
 const child = spawn(process.execPath, [...process.execArgv, path.join(ENGINE_DIR, "src", "main.ts"), ...launchArgv(args)], {
   cwd: checked.repo,
-  detached: true,
+  detached: !inChat,
   windowsHide: true,
   stdio: ["ignore", out, out],
-  env: process.env,
+  env: inChat ? { ...process.env, LAOSHI_CHAT_OUT: chatOut } : process.env,
 });
-child.unref();
+if (!inChat) child.unref();
 
 const modeText: Record<string, string> = {
   fresh: "新启动",
@@ -414,8 +419,8 @@ const profile =
 console.log(
   [
     checked.entersVerify
-      ? `已在后台开始测试验证阶段（${PROFILE_LABELS[profile]}档），进程 ${child.pid}。提测说明：${checked.featureDir}/handoff.md`
-      : `已在后台启动（${args.approve && checked.mode.kind === "resume-reuse" ? "已确认方案，开始写代码" : modeText[checked.mode.kind]}，${PROFILE_LABELS[profile]}档${phaseMode === "continuous" ? "" : `，执行方式：${PHASE_MODE_LABELS[phaseMode]}`}），进程 ${child.pid}。`,
+      ? `已${inChat ? "" : "在后台"}开始测试验证阶段（${PROFILE_LABELS[profile]}档），进程 ${child.pid}。提测说明：${checked.featureDir}/handoff.md`
+      : `已${inChat ? "" : "在后台"}启动（${args.approve && checked.mode.kind === "resume-reuse" ? "已确认方案，开始写代码" : modeText[checked.mode.kind]}，${PROFILE_LABELS[profile]}档${phaseMode === "continuous" ? "" : `，执行方式：${PHASE_MODE_LABELS[phaseMode]}`}），进程 ${child.pid}。`,
     !checked.entersVerify && phaseMode === "gated"
       ? `研发完成（写好提测说明）后会停下来通知这个对话，等待测试验证${args.verifyAt ? `；已安排在 ${describeTime(new Date(args.verifyAt))} 之后自动开始测试验证` : ""}。`
       : !checked.entersVerify && phaseMode === "develop-only"
@@ -441,3 +446,36 @@ console.log(
     .filter(Boolean)
     .join("\n"),
 );
+
+if (inChat) process.exit(await followInChat(child, chatOut));
+
+/**
+ * Shows what the engine tells the chat while it runs in this command, until it stops (finished,
+ * or waiting for people). The chat reads this command's output; the platform ends the machine
+ * with the chat's turn, so the chat keeps waiting for this command rather than ending its turn.
+ */
+async function followInChat(engine: import("node:child_process").ChildProcess, file: string): Promise<number> {
+  console.log("流水线在这条命令里运行，进展会显示在下面；命令结束前请不要结束这一轮对话（对话结束时运行会中断，之后用继续命令接着做）。");
+  let shown = 0;
+  const show = () => {
+    try {
+      const text = fs.readFileSync(file, "utf8");
+      if (text.length > shown) {
+        process.stdout.write(text.slice(shown));
+        shown = text.length;
+      }
+    } catch {
+      // Not written yet.
+    }
+  };
+  const code = await new Promise<number>((resolve) => {
+    const timer = setInterval(show, 1000);
+    engine.on("exit", (c) => {
+      clearInterval(timer);
+      resolve(c ?? 1);
+    });
+  });
+  show();
+  console.log(code === 0 ? "流水线已停下（上面是最后的消息）。" : `流水线进程以退出码 ${code} 结束，详情见运行日志：${logPath}`);
+  return code;
+}

@@ -15,7 +15,7 @@ import {
 } from "./config.js";
 import { gitInfo } from "./git.js";
 import { samePath } from "./paths.js";
-import { currentLockHolder, isAlive, type PipelineState, readState, statePath } from "./state.js";
+import { currentLockHolder, engineAlive, readState, statePath, type PipelineState } from "./state.js";
 import { originFromEnv, wordsFor } from "./runtime-loader.js";
 
 export interface LaunchArgs {
@@ -261,7 +261,7 @@ export function preflight(
     throw new PreflightError(hint);
   } else if (args.reviewFix) {
     // 1.14: the person's code review (plugin) asked for changes; the spec itself did not change.
-    if (previous.status === "running" && isAlive(previous.pid)) throw new PreflightError("流水线正在运行，等它结束后再处理人工评审意见。");
+    if (previous.status === "running" && engineAlive(previous)) throw new PreflightError("流水线正在运行，等它结束后再处理人工评审意见。");
     const pending = pendingHumanReview(path.join(repo, featureDir));
     if (!pending) throw new PreflightError("没有待处理的人工代码评审意见（在插件的代码审查页上提交\"退回修改\"后才有）。");
     mode = { kind: "resume-from-design", previous, reason: `人工代码评审提出了 ${pending.items.length} 条修改意见（见 code-review.md 的"人工评审"一节和 changes.md），需求说明不变，从方案设计开始只处理这些意见` };

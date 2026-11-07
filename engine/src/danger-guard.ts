@@ -84,6 +84,13 @@ function judgeSegment(words: string[], repo: string | null, home: string): Dange
   const sub = rest.find((w) => !w.startsWith("-"))?.toLowerCase() ?? "";
   const has = (re: RegExp) => rest.some((w) => re.test(w));
 
+  // Credentials the platform puts in the environment of step agents (tokens, keys): reading them out
+  // puts them in the output, in files or in requests.
+  const secretVar = words.map((w) => /(?:\$\{?|%|\$env:)([A-Za-z_][A-Za-z0-9_]*(?:TOKEN|SECRET|API_?KEY|PASSWORD|PASSWD|CREDENTIAL)[A-Za-z0-9_]*)/i.exec(w)?.[1]).find(Boolean);
+  if (secretVar) return { label: `读出凭据环境变量（${secretVar}）`, why: "平台的凭据不能出现在输出、文件或网络请求里" };
+  if (cmd === "printenv" && (rest.length === 0 || rest.some((w) => /(TOKEN|SECRET|API_?KEY|PASSWORD|PASSWD|CREDENTIAL)/i.test(w))))
+    return { label: "列出环境变量（含凭据）", why: "平台的凭据不能出现在输出、文件或网络请求里" };
+
   if (cmd === "git") {
     // Skip global options (-C dir, -c k=v) to find the git command.
     let i = 0;

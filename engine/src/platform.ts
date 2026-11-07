@@ -61,6 +61,11 @@ export interface PlatformAdapter {
    * when the platform uses laoshi's builtin services.
    */
   skillSetup?: string;
+  /**
+   * The platform keeps a chat's machine only while the chat's turn lasts, so the engine cannot run
+   * in the background: it runs in the chat's command, which shows what it tells the chat.
+   */
+  runsInChat?: boolean;
   /** Heading of the platform section in `doctor`. */
   doctorTitle: string;
   /** The platform section of `doctor` (connection, versions, profiles), when not --offline. */
