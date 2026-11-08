@@ -12,6 +12,7 @@ import { slotHolders, slotsDir, tryAcquireSlot } from "./queue.js";
 import { cronEvery, parseStartTime } from "./schedule-time.js";
 import { loadConfig, PHASE_MODE_LABELS, PROFILE_LABELS, REQUIREMENT_TYPE_LABELS } from "./config.js";
 import { defaultConfigPath, kitVersion, localPromptsDir, PRINCIPLES_INDEX, PROMPTS_DIR } from "./locations.js";
+import { userOf } from "./identity.js";
 import { describeProfile, loadRuntimeFactory, resolveProfiles, wordsFor } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
 import { jointProblem } from "./joint.js";
@@ -139,6 +140,7 @@ async function main(): Promise<number> {
       adapter: { id: config.platform.adapter },
       pid: process.pid,
       host: os.hostname(),
+      startedBy: userOf(),
       startedAt: now,
       updatedAt: now,
       results: {},

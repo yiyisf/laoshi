@@ -4,7 +4,7 @@
 
 ## 需求索引 `index/<key>.json`
 
-每个在本机运行过的需求一个文件，记录它在哪里，供 `req api list --all` 和 Paseo 插件找到本机所有的需求。需求的阶段、进度仍然现场从功能目录读取（ADR 0010）。
+每个在本机运行过的需求一个文件，记录它在哪里，供 `req api list --all` 和平台插件（如 Paseo 插件）找到本机所有的需求。需求的阶段、进度仍然现场从功能目录读取（ADR 0010）。
 
 ```json
 {
@@ -33,9 +33,9 @@
 | --- | --- |
 | `schema` / `kind` | `1` / `"run"` |
 | `machine` / `kitVersion` | 主机名、req-kit 版本 |
-| `user` | laoshi M2c 起。这次运行是为谁：环境变量 `LAOSHI_USER`，其次安装级配置的 `user`，再次系统用户名。更早的记录没有 |
+| `user` | laoshi M2c 起。这次运行是为谁：环境变量 `LAOSHI_USER`，其次平台提供的使用者（适配器声明的环境变量，如摸高的 `AIMAX_USER_NAME`），再次安装级配置的 `user`，最后系统用户名。更早的记录没有 |
 | `requirement` | `{ key, project, name, title, type, profile }`；laoshi M2c 起另有 `codebase`（`{ root, remote }`，见 [cli-json.md](cli-json.md) 的同名字段）；从卡片开始的需求（1.10 起）另有 `requester`（卡片的提出人）和 `source`（`{ system, id }`） |
-| `steps[].cachedInputTokens` / `steps[].agent` | 1.13 起。输入中来自提示缓存的 tokens（agent 报告时）；这一步用的 agent（Paseo profile 名，或 "provider/model"）。更早的记录没有 |
+| `steps[].cachedInputTokens` / `steps[].agent` | 1.13 起。输入中来自提示缓存的 tokens（agent 报告时）；这一步用的 agent（平台档案名，如 Paseo 的 profile 名，或 "provider/model"）。更早的记录没有 |
 | `run` | `{ startedAt, endedAt, attempt, phase, phaseMode, status, outcome, stopReason, stopKind, recoveries }`；`status` 是运行结束时的状态，`outcome` 是完成时报告的结论；`stopKind`（1.12 起）是停下等人的原因代码（见 [state.md](state.md)），`recoveries`（1.12 起）是这次运行中自动处理的次数，按种类，如 `{ "retry": 2 }`。更早的记录没有这两项 |
 | `agents` | `{ builder, reviewer }`：当时配置的 agent（如 `claude/opus（bypassPermissions）`） |
 | `steps` | 这次运行中开始的步骤：`{ key, stepId, phase, attempt, round, startedAt, endedAt, minutes, outcome, inputTokens, outputTokens, costUsd }`；agent 没有报告的用量为 null |

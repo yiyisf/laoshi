@@ -21,6 +21,7 @@ export const mogaoAdapter: PlatformAdapter = {
     toolCalls: "platform",
   },
   originEnv: { id: "AIMAX_SESSION_ID" },
+  userEnv: "AIMAX_USER_NAME",
   runsInChat: true,
   skillSetup: path.join(path.dirname(fileURLToPath(import.meta.url)), "skill", "setup.md"),
   words: {

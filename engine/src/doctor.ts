@@ -16,7 +16,7 @@ import { defaultConfigPath, homeOf, KIT_ROOT, kitPackageName, kitVersion } from 
 import { PROJECT_DIR } from "./prompts.js";
 import { readProjectServices, SERVICES_FILE } from "./builtin/project-services.js";
 import { CAPABILITIES, type CapabilityName, type DoctorTools, type PlatformAdapter, SOURCE_LABELS, sourceOf } from "./platform.js";
-import { adapterForFile, describeProfile, originFromEnv, wordsFor } from "./runtime-loader.js";
+import { adapterForFile, describeProfile, originFromEnv, userFromEnv, wordsFor } from "./runtime-loader.js";
 import { satisfies } from "./semver.js";
 import { isAlive, STATE_VERSION } from "./state.js";
 import { readRuns, runsFile } from "./records.js";
@@ -328,7 +328,8 @@ function identity(repo: string | null): void {
   const home = homeOf();
   const how = { LAOSHI_HOME: "环境变量 LAOSHI_HOME", REQ_KIT_HOME: "环境变量 REQ_KIT_HOME（req-kit 的旧名，可以改用 LAOSHI_HOME）", default: "默认位置", program: "程序安装在它的 npm 目录里", legacy: "req-kit 的旧目录（还没有 ~/.laoshi）" }[home.source];
   report("ok", `安装根：${home.dir}（${how}）`);
-  report("ok", `使用者：${userOf()}${process.env.LAOSHI_USER?.trim() ? "（环境变量 LAOSHI_USER）" : ""}`);
+  const platformUser = userFromEnv();
+  report("ok", `使用者：${userOf()}${process.env.LAOSHI_USER?.trim() ? "（环境变量 LAOSHI_USER）" : platformUser ? `（平台提供：${platformUser.env}）` : ""}`);
   if (repo) {
     const c = codebaseOf(repo);
     report("ok", `代码库：${c.root}${c.remote ? `（${c.remote}）` : "（没有 origin 远程地址）"}`);

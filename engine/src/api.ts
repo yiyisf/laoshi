@@ -113,6 +113,8 @@ export interface ListItem {
   project: string;
   /** laoshi M2c: the codebase the requirement belongs to (ADR 0007). */
   codebase: Codebase;
+  /** Who started its pipeline (the state file's startedBy); null before it ran or in older state files. */
+  startedBy: string | null;
   repo: string;
   sourceRepo: string | null;
   workspaceId: string | null;
@@ -202,6 +204,7 @@ function item(repo: string, branch: string | null, featureDir: string, extra: { 
     key: requirementKey(extra.sourceRepo ?? repo, featureDir),
     project: extra.project,
     codebase: codebaseOf(extra.sourceRepo ?? repo),
+    startedBy: state?.startedBy ?? null,
     repo,
     sourceRepo: extra.sourceRepo,
     workspaceId: extra.workspaceId ?? state?.worktree?.workspaceRef ?? null,
@@ -267,6 +270,7 @@ export function apiList(input: { repo: string; all: boolean }): ListItem[] {
         key: e.key,
         project: e.project,
         codebase: codebaseOf(e.sourceRepo ?? e.repo),
+        startedBy: null,
         repo: e.repo,
         sourceRepo: e.sourceRepo,
         workspaceId: e.workspaceId,
