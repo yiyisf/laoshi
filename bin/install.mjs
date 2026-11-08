@@ -57,10 +57,8 @@ dsh 的选项：--dsh-home <DSH_HOME> --profile <名称> --dsh-bin <dsh 的 bin.
 const dry = args["dry-run"] || args.check;
 // Without --home or LAOSHI_HOME: the install root this program was installed into with npm
 // (<root>/npm/…/node_modules, as engine/src/locations.ts programHome finds it), else ~/.laoshi.
-const programHome = (() => {
-  const m = /^(.*)[\\/]npm[\\/](?:lib[\\/])?node_modules[\\/]/.exec(kit);
-  return m && fs.existsSync(path.join(m[1], "config.json")) ? m[1] : null;
-})();
+const programRoot = /^(.*)[\\/]npm[\\/](?:lib[\\/])?node_modules[\\/]/.exec(kit)?.[1] ?? null;
+const programHome = programRoot && fs.existsSync(path.join(programRoot, "config.json")) ? programRoot : null;
 const home = path.resolve(args.home ?? process.env.LAOSHI_HOME ?? programHome ?? path.join(os.homedir(), ".laoshi"));
 const configPath = path.join(home, "config.json");
 const recordPath = path.join(home, "install.json");
@@ -238,7 +236,10 @@ if (!dry) {
 }
 const onPath = (process.env.PATH ?? "").split(path.delimiter).some((p) => p && path.resolve(p) === bin);
 report("ok", `laoshi、req 命令在 ${bin}${onPath ? "" : `（不在 PATH 中：用 npm 全局安装时可以忽略；否则把它加进 PATH${process.platform === "win32" ? `，例如在 cmd 中执行 setx PATH "%PATH%;${bin}"` : ""}）`}`);
-if (path.resolve(process.env.LAOSHI_HOME ?? path.join(os.homedir(), ".laoshi")) !== home) {
+// Where the commands will look without --home: LAOSHI_HOME, else the root this program is installed
+// in (its config.json is written above), else ~/.laoshi.
+const foundAt = process.env.LAOSHI_HOME ?? (programRoot && path.resolve(programRoot) === home ? programRoot : path.join(os.homedir(), ".laoshi"));
+if (path.resolve(foundAt) !== home) {
   report("warn", `安装根不是默认位置，需要设置环境变量 LAOSHI_HOME=${home}（之后新开的终端和平台都要能读到它）`);
 }
 
