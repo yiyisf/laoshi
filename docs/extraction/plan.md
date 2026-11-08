@@ -18,8 +18,8 @@ npm 包名：**`@yiyi_zhang/laoshi`**（`laoshi` 这个名字 npm 不允许发�
 
 ## 里程碑
 
-### M0 契约与文档（进行中）
-契约导入完成；设计与 ADR 完成。剩余：契约里的 Paseo 字样逐份中性化（文件格式契约不涉及流程语义，改动小）；按 ADR 0007 在使用记录、通知事件、`laoshi api` 契约中新增 `repo`、`user` 字段，状态契约增加发起人。
+### M0 契约与文档（已完成，2026-11-08）
+契约导入完成；设计与 ADR 完成。契约里的 Paseo 字样已中性化（保留的只有 Paseo 自己的例子和沿用 1.x 的字段名）；按 ADR 0007，使用记录、通知事件、`laoshi api` 带代码库（`codebase`）和使用者（`user`）（M2c），状态文件和 `laoshi api list` 带发起人（`startedBy`）；使用者优先取平台提供的身份（适配器的 `userEnv`，如摸高的 `AIMAX_USER_NAME`）。
 
 ### M1 搬运核心，行为不变（已完成，2026-11-01，见[移植记录](../porting-log.md)）
 - 搬：方法类 skill 与原则、步骤提示词、`engine/src` 的核心文件、`engine/test`、`evals/`。**文件路径和名字保持不变**（见 [architecture §5](../design/architecture.md)）。

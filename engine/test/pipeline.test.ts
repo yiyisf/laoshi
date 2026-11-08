@@ -171,6 +171,27 @@ test("全部一次通过：按顺序执行，跳过不需要的步骤，结果�
   assert.ok(!fs.existsSync(lockPath(env.repo)), "锁没有释放");
 });
 
+test("发起人：第一次运行时记下为谁运行（平台提供的使用者优先于系统用户名），之后的运行不改；需求列表带上它", async () => {
+  const saved = { LAOSHI_USER: process.env.LAOSHI_USER, AIMAX_USER_NAME: process.env.AIMAX_USER_NAME };
+  try {
+    delete process.env.LAOSHI_USER;
+    process.env.AIMAX_USER_NAME = "赵六";
+    const env = setup();
+    assert.equal(runMain(env, { steps: { implement: { error: "provider process exited" } } }).code, 1);
+    assert.equal(state(env).startedBy, "赵六");
+    process.env.AIMAX_USER_NAME = "钱七";
+    assert.equal(runMain(env, {}, ["--resume"]).code, 0);
+    assert.equal(state(env).startedBy, "赵六", "继续运行不改发起人");
+    const { apiList } = await import("../src/api.js");
+    assert.equal(apiList({ repo: env.repo, all: false }).find((i) => i.featureDir === FEATURE)?.startedBy, "赵六");
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+});
+
 test("返工路径：审核、评审、验证各自循环，直到通过", () => {
   const env = setup();
   const { code, out } = runMain(env, {

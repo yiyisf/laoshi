@@ -94,10 +94,13 @@ test("代码库标识：worktree 归属原仓库；远程地址去掉凭据；�
   assert.equal(withoutCredentials("git@git.example.com:team/shop.git"), "git@git.example.com:team/shop.git");
 });
 
-test("使用者：LAOSHI_USER，其次安装级配置的 user，再次系统用户名", () => {
+test("使用者：LAOSHI_USER，其次平台提供的使用者，再次安装级配置的 user，最后系统用户名", () => {
   const home = path.dirname(machine({ user: "张三" }));
   assert.equal(userOf({ REQ_KIT_HOME: home, LAOSHI_USER: "李四" }), "李四");
   assert.equal(userOf({ REQ_KIT_HOME: home }), "张三");
+  // The platform says who is using the chat (摸高: AIMAX_USER_NAME); LAOSHI_USER still wins.
+  assert.equal(userOf({ REQ_KIT_HOME: home, AIMAX_USER_NAME: "孙八" }), "孙八");
+  assert.equal(userOf({ REQ_KIT_HOME: home, AIMAX_USER_NAME: "孙八", LAOSHI_USER: "李四" }), "李四");
   assert.equal(userOf({ REQ_KIT_HOME: tmp("laoshi-m2c-empty-") }), os.userInfo().username);
 });
 

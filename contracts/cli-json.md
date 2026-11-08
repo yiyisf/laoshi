@@ -1,6 +1,6 @@
 # 给程序用的 JSON 输出：`req api`
 
-1.9.0 起。Paseo 插件和其他程序通过 `req api` 读取需求、执行管理操作，不直接读写状态文件。每个命令输出一行 JSON：
+1.9.0 起。平台插件（如 Paseo 插件）和其他程序通过 `req api` 读取需求、执行管理操作，不直接读写状态文件。每个命令输出一行 JSON：
 
 ```json
 { "schema": 1, "kitVersion": "1.9.0", "data": … }
@@ -20,7 +20,7 @@
 
 | 命令 | `data` |
 | --- | --- |
-| `req api version` | `{ kitVersion, kitRoot, apiSchema, paseo, featuresDir }`：`paseo` 是这个版本支持的 Paseo 范围 |
+| `req api version` | `{ kitVersion, kitRoot, apiSchema, paseo, featuresDir }`：`paseo` 是这个版本支持的 Paseo 范围（字段名沿用 1.x，只对 Paseo 有意义，其他平台为 null 或忽略） |
 | `req api list [--repo <目录>]` | 这个仓库所有工作区中的需求，数组，每项见下面的"需求" |
 | `req api list --all` | 本机记录过的所有需求（[需求索引](usage-record.md)），同上；目录已不在的 `present: false`。1.14 起还包括：用 `--track` 登记、还在对齐中的需求（`stage` 为"对齐中"，没有 `spec.md` 时 `title` 取自 `alignment.md`），以及索引里出现过的项目中没登记的需求 |
 | `req api status <需求> [--repo <目录>]` | 一个需求的详情，见下面的"详情" |
@@ -45,8 +45,9 @@
 | `key` | 需求在本机的标识（对话所在目录 + 功能目录） |
 | `project` | 项目名：对话所在目录的目录名 |
 | `codebase` | laoshi M2c 起。需求所属的代码库：`{ root, remote }`，`root` 是主检出目录（需求自己的 worktree 归属它的原仓库），`remote` 是 origin 的地址（去掉凭据），没有时为 null（ADR 0007） |
+| `startedBy` | laoshi 起。发起人：状态文件的 `startedBy`；还没运行过、或状态文件是更早的版本时为 null |
 | `repo` | 需求所在的目录（有自己的工作区时是那个工作区） |
-| `sourceRepo` / `workspaceId` | 有自己的工作区时：对话所在的目录、Paseo 工作区 ID；否则 null |
+| `sourceRepo` / `workspaceId` | 有自己的工作区时：对话所在的目录、平台对这个工作区的引用（Paseo 上是工作区 ID）；否则 null |
 | `featureDir` / `name` / `title` | 功能目录、目录名、需求标题 |
 | `type` / `profile` / `branch` | 需求类型（`defect`、`refactor`、`assessment` 或 null）、档位、分支 |
 | `stage` | 与 `req list` 相同的阶段说明，如"开发中""等待确认方案""待验收" |

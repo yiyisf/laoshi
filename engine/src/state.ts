@@ -136,6 +136,8 @@ export interface PipelineState {
   pid: number;
   /** The machine the engine process runs on (laoshi: platforms that give each chat turn a new machine). */
   host?: string;
+  /** Who started the requirement's pipeline (ADR 0007: identity.ts userOf); kept by later runs. Older state files have none. */
+  startedBy?: string;
   startedAt: string;
   updatedAt: string;
   /** Completed step results by step key. A resumed run reuses these instead of re-running the step. */

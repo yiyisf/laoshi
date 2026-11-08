@@ -1,6 +1,6 @@
 # AgentRuntime：引擎对 agent 平台的要求
 
-引擎（`engine/src`）只通过 `AgentRuntime`（`engine/src/runtime.ts`）与 agent 平台打交道。Paseo 是目前唯一的实现（`engine/src/paseo-runtime.ts`），测试用 `REQ_PIPELINE_FAKE_RUNTIME` 指向的假实现（`engine/test/fake-runtime.ts`）。要让 req-kit（以及之后的 laoshi）运行在别的 agent 平台上，就是为那个平台写一个 `AgentRuntime`。
+引擎（`engine/src`）只通过 `AgentRuntime`（`engine/src/runtime.ts`）与 agent 平台打交道。现有的实现在各平台的适配器里：Paseo（`adapters/paseo/paseo-runtime.ts`）、DeepSeek Harness（`adapters/dsh/dsh-runtime.ts`）、摸高（`adapters/mogao/mogao-runtime.ts`）；测试用 `REQ_PIPELINE_FAKE_RUNTIME` 指向的假实现（`engine/test/fake-runtime.ts`）。要让 laoshi 运行在别的 agent 平台上，就是为那个平台写一个适配器和它的 `AgentRuntime`（见 [adapter-guide](../docs/design/adapter-guide.md)）。
 
 本文说明：每个方法属于哪一级、没有它时现在的行为、以及适配器应该怎么做。`runtime.ts` 里的类型和注释是字段定义的准确来源，本文不重复。
 
@@ -80,7 +80,7 @@ req-kit 1.x 里带 Paseo 字样的地方，laoshi 中已改为中性的名称：
 - 方法与字段：`listPaseoProfiles` → `listProfiles`（M2a），`capabilities().paseoTools` → `platformTools`（M2e）。`ServiceTarget`、`ManagedService` 本来就是中性的名字，只改了注释。
 - 状态文件字段：`originAgentId`、`worktree.workspaceId`、`schedules[]` 在第 2 版中改名（M2d，见 `state.md`）；对外契约不变。
 - 面向使用者的文案和提示词：改用适配器的词汇表（M2e，`engine/src/words.ts`，见 [platform-vocabulary](../docs/design/platform-vocabulary.md)）；`engine/prompts/paseo-services.md` 改名为 `managed-services.md`。
-- 会话识别：由适配器声明环境变量（`originEnv`，M2a）。
+- 会话识别：由适配器声明环境变量（`originEnv`，M2a）；使用者识别同样由适配器声明（`userEnv`，如摸高的 `AIMAX_USER_NAME`，ADR 0007）。
 - 配置：`AgentProfile.paseoProfile` → `platformProfile`，`paseoServices` → `platformServices`，旧名继续读取（M2e）；daemon 地址可写在 `platform.paseo` 中（M2c）。
 
 `engine/test/platform.test.ts` 检查核心代码和提示词里不出现平台名（有意保留的旧字段名、对外契约字段，在那一行或上一行写明 `platform-name:` 和原因）。

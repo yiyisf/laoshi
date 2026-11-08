@@ -10,7 +10,7 @@
 | `decisions.tsv`、`changes.md`、`acceptance.md` 与需求总览 | [feature-files.md](feature-files.md) | 见各文件说明 |
 | `.requirement-pipeline/verify.md` | [verify.md](verify.md) | 自由格式，建议结构见文件 |
 | 外部通知（企业 IM 等）收到的事件 | [notifier-event.md](notifier-event.md) | `schema: 1` |
-| `req api` 的输出（Paseo 插件等程序读取） | [cli-json.md](cli-json.md) | `schema: 1` |
+| `req api` 的输出（平台插件等程序读取） | [cli-json.md](cli-json.md) | `schema: 1` |
 | `~/.req-kit/index/`、`~/.req-kit/usage/runs.jsonl` | [usage-record.md](usage-record.md) | `schema: 1` |
 | 引擎对 agent 平台的要求（`AgentRuntime`，`engine/src/runtime.ts`） | [agent-runtime.md](agent-runtime.md) | 以 `runtime.ts` 的类型为准 |
 

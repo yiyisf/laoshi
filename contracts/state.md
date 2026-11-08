@@ -14,6 +14,8 @@
 | `specHash` | string | 启动时 spec.md 的 sha256 |
 | `originSessionId` | string \| null | 发起流水线的对话（会话），通知发往这里。第 1 版叫 `originAgentId` |
 | `pid` | number | 流水线进程 |
+| `host` | string | 可选，laoshi 起。运行流水线进程的机器名：每个对话轮次换一台机器的平台（如摸高）上，用它判断 `pid` 是不是本机的进程 |
+| `startedBy` | string | 可选，laoshi 起（ADR 0007）。发起人：第一次运行流水线时为谁运行（取法同使用记录的 `user`，见 [usage-record.md](usage-record.md)），之后的运行不改。更早的状态文件没有 |
 | `startedAt` / `updatedAt` | ISO 时间 | |
 | `results` | object | 已完成步骤的结果，键为步骤键（如 `code_review-r2`） |
 | `history` | array | 每次步骤执行的记录：agent、起止时间、结果、错误；`usage`（可选，1.3.0 起）为 agent 报告的用量：`inputTokens`、`cachedInputTokens`、`outputTokens`、`totalCostUsd`，agent 没有报告时为 null 或缺少；`leftRunning`（可选，1.11 起）为 true 表示失败时 agent 可能还在运行，下一次运行这一步时先看它；`reattached`（可选，1.11 起）为接着等上一次 agent 的次数 |

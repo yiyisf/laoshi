@@ -49,6 +49,8 @@ export interface PlatformAdapter {
    * its working directory when the platform says. Child processes started outside a chat drop them.
    */
   originEnv: { id: string; cwd?: string };
+  /** Environment variable naming the person using the chat (ADR 0007: the platform says who it is). */
+  userEnv?: string;
   /** Resolve the platform's agent profiles that the config refers to, before a run. */
   resolveProfiles?(config: PipelineConfig, runtime: AgentRuntime): Promise<PipelineConfig>;
   /** One line for an agent's settings, e.g. "claude/opus（模式 bypassPermissions）". */

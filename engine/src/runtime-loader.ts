@@ -63,6 +63,15 @@ export function originFromEnv(env: NodeJS.ProcessEnv = process.env, prefer?: Pla
   return null;
 }
 
+/** The person using the chat, from whichever platform's user variable is set (ADR 0007). */
+export function userFromEnv(env: NodeJS.ProcessEnv = process.env): { adapter: string; user: string; env: string } | null {
+  for (const a of Object.values(ADAPTERS)) {
+    const user = a.userEnv ? env[a.userEnv]?.trim() : undefined;
+    if (user) return { adapter: a.id, user, env: a.userEnv! };
+  }
+  return null;
+}
+
 /** A copy of the environment without any platform's chat variables. */
 export function scrubOriginEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const out = { ...env };

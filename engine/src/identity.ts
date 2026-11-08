@@ -4,7 +4,8 @@
 // - Codebase: the repository a requirement belongs to. A worktree created for a requirement
 //   belongs to the repository it was cut from, so the root is the main checkout (git's common
 //   directory), and the remote is origin's address without credentials.
-// - User: LAOSHI_USER, else the install-level config's "user", else the system user name.
+// - User: LAOSHI_USER, else the platform's user variable (an adapter's userEnv, e.g. 摸高's),
+//   else the install-level config's "user", else the system user name.
 //   Credentials never come from here: they stay in each person's own environment.
 
 import { execFileSync } from "node:child_process";
@@ -12,6 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { defaultConfigPath } from "./locations.js";
+import { userFromEnv } from "./runtime-loader.js";
 
 export interface Codebase {
   /** The main checkout's directory (a worktree's own repository, not the worktree). */
@@ -58,6 +60,8 @@ export function codebaseOf(dir: string): Codebase {
 export function userOf(env: NodeJS.ProcessEnv = process.env): string {
   const named = env.LAOSHI_USER?.trim();
   if (named) return named;
+  const platform = userFromEnv(env);
+  if (platform) return platform.user;
   try {
     const raw = JSON.parse(fs.readFileSync(defaultConfigPath(env), "utf8")) as { user?: unknown };
     if (typeof raw.user === "string" && raw.user.trim()) return raw.user.trim();
