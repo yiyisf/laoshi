@@ -24,22 +24,7 @@ node adapters/mogao/make-expert.mjs [--out <目录>]     # 默认 dist-expert/
 
 ## 在摸高上使用
 
-```bash
-export LAOSHI_HOME=/data/workspace/.laoshi
-npm install --prefix /data/workspace/.laoshi/npm @yiyi_zhang/laoshi@latest
-node /data/workspace/.laoshi/npm/node_modules/@yiyi_zhang/laoshi/bin/req.mjs install --platform mogao
-```
-
-装好后在项目目录的对话里：`laoshi start <需求>`（或 `/laoshi`）。命令会一直运行到需要人决定的地方（方案确认、业务问题、等待批准）或做完；这期间不要结束这一轮对话。被打断后用 `laoshi resume <需求>` 接着做；步骤等待批准时，问人之后运行 `laoshi permission <需求> approve`（或 `deny`）。
-
-安装级配置中 `platform.mogao` 可以写：
-
-| 字段 | 默认 | 说明 |
-| --- | --- | --- |
-| `command` | `aimax` | 平台命令行（不在 `PATH` 中时写完整路径） |
-| `dataDir` | `/data` | 平台的数据目录（`aimax -d`） |
-| `runTimeoutMinutes` | 240 | 一次 `aimax run` 的上限（引擎另有每一步的时限） |
-| `pluginsConfig` | 无 | 给步骤 agent 的 `--plugins-config`（平台插件，如知识库） |
+提交专家、第一次使用、项目接入、日常使用和配置见[在摸高上使用](../../docs/guide/在摸高上使用.md)。
 
 ## 端到端检查
 

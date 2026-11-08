@@ -90,6 +90,7 @@ export default defineConfig({
           items: [
             { text: "安装与升级", link: "/guide/install" },
             { text: "在 DeepSeek Harness 上使用", link: "/guide/dsh" },
+            { text: "在摸高上使用", link: "/guide/mogao" },
             { text: "内网安装与验证", link: "/guide/intranet" },
             { text: "项目定制与运行规则", link: "/guide/project" },
             { text: "维护者指南", link: "/guide/maintainer" },
