@@ -22,6 +22,8 @@ export const PAGES = [
   ["docs/intranet/install-verify.md", "guide/intranet"],
   ["adapters/dsh/README.md", "guide/dsh"],
   ["docs/guide/在摸高上使用.md", "guide/mogao"],
+  ["adapters/cli/README.md", "guide/cli"],
+  ["docs/design/cli-adapter.md", "reference/design/cli-adapter"],
   ["docs/design/adapter-guide.md", "reference/design/adapter-guide"],
   ["docs/design/architecture.md", "reference/design/architecture"],
   ["docs/design/builtin-capabilities.md", "reference/design/builtin-capabilities"],

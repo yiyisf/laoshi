@@ -120,6 +120,22 @@ test("安装到摸高：程序装在安装根的 npm 目录里时，命令自己
   assert.ok(fs.existsSync(path.join(root, "config.json")));
 });
 
+test("安装到命令行 agent：安装级配置用 claude 和 codex，skill 装到通用目录和 Claude Code 的目录", () => {
+  const { base, home } = machine();
+  fs.mkdirSync(path.join(home, ".claude"));
+  const root = path.join(base, "laoshi-home");
+  const r = install(home, ["--platform", "cli", "--home", root]);
+  assert.equal(r.code, 0, r.out);
+  const config = JSON.parse(fs.readFileSync(path.join(root, "config.json"), "utf8"));
+  assert.equal(config.platform.adapter, "cli");
+  assert.equal(config.agents.builder.provider, "claude/default");
+  assert.equal(config.agents.reviewer.provider, "codex/default");
+  for (const dir of [path.join(home, ".agents", "skills"), path.join(home, ".claude", "skills")]) {
+    const skill = fs.readFileSync(path.join(dir, "laoshi", "SKILL.md"), "utf8");
+    assert.doesNotMatch(skill, /\{\{|paseo|摸高/i);
+  }
+});
+
 // A stand-in for npm (LAOSHI_NPM): "installs" this checkout into the prefix and logs each call.
 const FAKE_NPM = `
 import fs from "node:fs";

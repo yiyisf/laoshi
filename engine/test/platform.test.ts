@@ -109,7 +109,8 @@ test("profile：没有 profile 的平台原样返回配置，描述用通用格�
 
 test("核心与提示词里不写平台名（laoshi M2e）：平台的说法来自适配器的词汇表", () => {
   const root = path.join(ENGINE_SRC, "..");
-  const names = [...ADAPTER_IDS, "DeepSeek"];
+  // "cli" (the command-line adapter) is a plain word, not a platform's name: the core may say it.
+  const names = [...ADAPTER_IDS.filter((id) => id !== "cli"), "DeepSeek"];
   const pattern = new RegExp(`\\b(${names.join("|")})(?!-req-kit)`, "i");
   const offenders: string[] = [];
   // The core: engine/src, the prompts, laoshi's skill sections, and the skills (laoshi M2e).
