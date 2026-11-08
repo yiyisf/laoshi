@@ -2,7 +2,7 @@
 
 依据：[资产清单](asset-inventory.md)（基于 req-kit 1.13.0，commit `4bdb338`）与 [设计文档](../design/)。每个里程碑的完成标准都是：**行为与 req-kit 1.13 等价，回归通过**，不是"代码搬完"。
 
-npm 包名：**`laoshi`（已确认可用）**。
+npm 包名：**`@yiyi_zhang/laoshi`**（`laoshi` 这个名字 npm 不允许发布，见下文 R3）。
 
 ## 实施前的准备（本文档集之后、写代码之前）
 
@@ -86,13 +86,20 @@ npm 包名：**`laoshi`（已确认可用）**。
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| R1 | 与 paseo-req-kit 一样从 npm 分发：一步安装 `npx -y [--registry=<镜像>] @yiyi_zhang/laoshi@latest install`（先 npm 全局安装，再运行装好的那份）、`laoshi upgrade [版本]`。`laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 进行中 |
-| R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 已完成：`site/`（GitHub Pages，`/laoshi/`），指南改写，`CHANGELOG.md`、ADR 索引；内网用 `laoshi docs`（R3 把站点构建进 npm 包） |
+| R1 | 与 paseo-req-kit 一样从 npm 分发：一步安装 `npx -y [--registry=<镜像>] @yiyi_zhang/laoshi@latest install`（先 npm 全局安装，再运行装好的那份）、`laoshi upgrade [版本]`。`laoshi` 命令（别名 `req`）与安装器 `laoshi install`：按平台渲染 skill 并装进平台的 skill 目录，用标记文件区分是否由 laoshi 安装，不覆盖别人的；平台各自的设置（dsh：插件与挂载）；`--check`、`--uninstall`；升级走 npm。面向使用者的文字从 req-kit 改为 laoshi（兼容用的名字保留） | 已完成（0.1.0） |
+| R2 | 文档站点（参照 paseo-req-kit 的 VitePress 站点与指南，改写为 laoshi，覆盖 Paseo 和 dsh）、`laoshi docs` 在本机打开 | 已完成：`site/`（GitHub Pages，`/laoshi/`，2026-11-08 已开启），指南改写，`CHANGELOG.md`、ADR 索引；内网用 `laoshi docs`（R3 把站点构建进 npm 包） |
 | R3 | 发布工程：`package.json` 的发布内容、CHANGELOG、发布流程（打标签后测试并发布到 npm）、站点部署；版本 0.1.0 | 已完成：0.1.1 以 `@yiyi_zhang/laoshi` 发布到 npm（`laoshi` 这个名字 npm 不允许发布，0.1.0 只在 GitHub Release 上）；`release.yml`、`scripts/check-package.mjs`、站点构建进包、Release 附离线安装包；公共 npm 源上实装验证通过。之后的开发版本是 0.2.0-dev |
 | 0.1.0 之后 | `laoshi migrate`、paseo-req-kit 2.0 薄分发包、Paseo 插件界面迁入；以 1.0 达到对等为目标（M7） | — |
-| 摸高专家 | 为摸高数字工程师挑战赛把 laoshi 做成平台上的专家。沙箱摸底三轮已完成，形态定为 B1：laoshi 引擎加摸高适配器，步骤 agent 用 `aimax run` 起，审批走平台的 HITL，进度来自平台回调；设计与要做的事见 [mogao-expert](../design/mogao-expert.md) | 进行中：摸高适配器和专家包（`make-expert.mjs`）已完成，假 `aimax` 上端到端通过；下一步：发布带摸高支持的版本（0.2.0 预发布），在沙箱里跑一个真实需求，准备参赛材料 |
+| 摸高专家 | 为摸高数字工程师挑战赛把 laoshi 做成平台上的专家。沙箱摸底三轮已完成，形态定为 B1：laoshi 引擎加摸高适配器，步骤 agent 用 `aimax run` 起，审批走平台的 HITL，进度来自平台回调；设计与要做的事见 [mogao-expert](../design/mogao-expert.md) | 进行中：摸高适配器和专家包（`make-expert.mjs`）已完成，假 `aimax` 上端到端通过；0.2.0-beta.1 已发布（npm 的 `beta` 标签，sigstore 故障时这一版不带来源证明）。下一步：在沙箱里跑一个真实需求（含一次审批、一次轮次中断后续跑、一个 Java 项目），修掉发现的问题后发 0.2.0-beta.2；准备参赛材料（演示、带隐藏验收的评估结果、说明文档） |
 
-## 风险登记
+## 摸高之后的重点（2026-11-08 定）
+
+完成摸高专家的计划内容（沙箱实测、参赛材料）后，重点回到两件事：
+
+1. **类 Paseo / dsh 的平台**：编码 agent 平台上由引擎编排步骤 agent，是 laoshi 的主要形态。继续 M4b 的收尾（内网用真实模型跑 `evals/`、Windows 上的 shell 方案）、M3 无头命令行运行时，以及 M7（`laoshi migrate`、paseo-req-kit 2.0 薄分发包）。
+2. **组织管理能力**：让团队负责人看得到需求是不是按流程做完的。例如：某个人的需求是否走完了规定的阶段；有没有跳过阶段、人工要求跳过评审或质量门、强行通过、绕过审批等不合规操作；谁在什么时候做了这些决定、理由是什么。引擎本来就记录每一步和每个人工决定（`state.json`、使用记录、通知事件），要做的是把"偏离流程"定义成可检查的规则、在发生时记下来（不能事后改）、按人和代码库汇总报告，并决定是只报告还是可以按组织策略禁止。先写设计文档（要记录的事件、合规规则、报告的样子、和 ADR 0007 团队版的关系），评审后再实现。
+
+
 
 | 风险 | 影响 | 应对 |
 | --- | --- | --- |

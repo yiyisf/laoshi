@@ -24,7 +24,7 @@ export function skillTargets(args, config, env = process.env, home) {
 }
 
 export function setup({ report }) {
-  report("info", "步骤 agent 用摸高的 aimax 命令运行；在摸高上请把安装根放在工作区（LAOSHI_HOME=/data/workspace/.laoshi）");
+  report("info", "步骤 agent 用摸高的 aimax 命令运行；在摸高上安装根放在工作区 /data/workspace/.laoshi，程序装在它的 npm 目录里，命令据此找到安装根（专家第一次使用时就这样安装）");
   return ["把上面专家的 skill 目录提交为摸高的专家（或在对话里加载它）", "体检：laoshi doctor --no-project"];
 }
 

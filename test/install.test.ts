@@ -101,6 +101,23 @@ test("安装到摸高：安装根在工作区，按摸高渲染的 skill 放在�
   assert.match(skill, /摸高提供的 `AIMAX_SESSION_ID`/);
   assert.doesNotMatch(skill, /\{\{|paseo/i);
   assert.match(r.out, /专家的 skill 目录/);
+  // This checkout is not inside the root, so the commands need LAOSHI_HOME to find it.
+  assert.match(r.out, /需要设置环境变量 LAOSHI_HOME/);
+});
+
+test("安装到摸高：程序装在安装根的 npm 目录里时，命令自己找得到安装根，不提示设置 LAOSHI_HOME", () => {
+  const { base, home } = machine();
+  const root = path.join(base, "workspace", ".laoshi");
+  const kit = path.join(root, "npm", "node_modules", ...NAME.split("/"));
+  fs.cpSync(ROOT, kit, { recursive: true, filter: (src) => !/[\\/](\.git|node_modules|evals[\\/]results|site|site-dist|dist-expert)$/.test(src) });
+  fs.symlinkSync(path.join(ROOT, "node_modules"), path.join(kit, "node_modules"), "junction");
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home };
+  delete env.LAOSHI_HOME;
+  const r = spawnSync(process.execPath, [path.join(kit, "bin", "install.mjs"), "--platform", "mogao", "--home", root], { env, encoding: "utf8", timeout: 120_000 });
+  const out = `${r.stdout}${r.stderr}`;
+  assert.equal(r.status, 0, out);
+  assert.doesNotMatch(out, /LAOSHI_HOME=/);
+  assert.ok(fs.existsSync(path.join(root, "config.json")));
 });
 
 // A stand-in for npm (LAOSHI_NPM): "installs" this checkout into the prefix and logs each call.
