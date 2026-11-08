@@ -43,6 +43,7 @@ fs.writeFileSync(
     "- 入口：`/laoshi`（需求开发）、`/laoshi-setup`（项目接入，每个项目一次）、`/laoshi-doctor`（体检）、`/laoshi-retro`（复盘）",
     `- 第一次使用时，入口 skill 会从内网 npm 镜像把 \`${pkg.name}@${pkg.version}\` 装到 \`${WORKSPACE_HOME}\`（约一分钟），之后每个对话直接使用`,
     "- 每一步是摸高的一个独立 agent（`aimax run`）；需要批准的操作走摸高的人工审批；进度和用量来自摸高的回调",
+    "- 使用说明（第一次使用、项目接入、运行期间不要结束对话、等待批准怎么回答、常见问题）：https://yiyisf.github.io/laoshi/guide/mogao",
     "",
     "## 包含的 skill",
     "",
