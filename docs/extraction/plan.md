@@ -80,6 +80,7 @@ npm 包名：**`@yiyi_zhang/laoshi`**（`laoshi` 这个名字 npm 不允许发�
 ### M7 兼容与发布
 - `laoshi migrate`（预览 / 应用 / 回滚演练），`paseo-req-kit` 2.0 薄分发包，发布到公网 npm 供内网镜像同步，站点与内网 Git Pages 同步。
 - 完成标准：[compat-migration §4](../design/compat-migration.md) 的"对等"五条全部满足。
+- 进展（2026-11-09）：`laoshi migrate` 已实现（`adapters/paseo/migrate.ts`）：预览、`--apply`、`--rollback`；配置改名、复制使用记录和索引、旧格式状态改为第 2 版并留备份；有流水线在运行、目标已有配置时拒绝；旧目录不动。待做：在真实的 1.x 安装上演练（含回滚），paseo-req-kit 2.0 薄分发包（需要 paseo-req-kit 仓库），Paseo 插件迁入。
 
 ## 发布 laoshi（2026-11-05 起）
 
