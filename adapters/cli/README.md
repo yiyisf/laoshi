@@ -34,4 +34,4 @@ laoshi doctor --no-project      # 确认 claude、codex 能运行
 ## 还没有做 / 待确认
 
 - 在真实的 Claude Code、Codex 上运行一个 `evals/` 用例（M3 的完成标准）；事件流字段按公开格式解析，可能要按实际输出调整（尤其是 `codex exec … resume` 的参数位置）。
-- OpenCode、Pi 的驱动；一致性测试 `runConformance(adapter)`；定时（等内置调度）。
+- OpenCode、Pi 的驱动；定时（等内置调度）。

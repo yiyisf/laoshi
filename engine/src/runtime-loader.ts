@@ -10,6 +10,7 @@ import type { AgentProfile, PipelineConfig } from "./config.js";
 import { describeProfileDefault, type PlatformAdapter, withCapabilities } from "./platform.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
 import { BUILTIN_SERVICE_WORDS, NEUTRAL_WORDS, type PlatformWords } from "./words.js";
+import { registerUserEnvs } from "./identity.js";
 import { defaultConfigPath } from "./locations.js";
 
 // laoshi: each agent platform has an adapter under adapters/<id>/ (engine/src/platform.ts); the
@@ -20,6 +21,8 @@ const ADAPTERS: Record<string, PlatformAdapter> = {
   mogao: mogaoAdapter,
   cli: cliAdapter,
 };
+
+registerUserEnvs(Object.values(ADAPTERS).flatMap((a) => (a.userEnv ? [a.userEnv] : [])));
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);
 export const DEFAULT_ADAPTER = "paseo";

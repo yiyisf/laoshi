@@ -13,7 +13,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { defaultConfigPath } from "./locations.js";
-import { userFromEnv } from "./runtime-loader.js";
 
 export interface Codebase {
   /** The main checkout's directory (a worktree's own repository, not the worktree). */
@@ -56,12 +55,24 @@ export function codebaseOf(dir: string): Codebase {
   return result;
 }
 
+/**
+ * The adapters' user variables (PlatformAdapter.userEnv), registered by runtime-loader.ts when it
+ * loads: this file must not import the adapters (they import modules that import this one).
+ */
+const platformUserEnvs: string[] = [];
+
+export function registerUserEnvs(names: string[]): void {
+  for (const name of names) if (!platformUserEnvs.includes(name)) platformUserEnvs.push(name);
+}
+
 /** Who this run is for. */
 export function userOf(env: NodeJS.ProcessEnv = process.env): string {
   const named = env.LAOSHI_USER?.trim();
   if (named) return named;
-  const platform = userFromEnv(env);
-  if (platform) return platform.user;
+  for (const name of platformUserEnvs) {
+    const user = env[name]?.trim();
+    if (user) return user;
+  }
   try {
     const raw = JSON.parse(fs.readFileSync(defaultConfigPath(env), "utf8")) as { user?: unknown };
     if (typeof raw.user === "string" && raw.user.trim()) return raw.user.trim();
