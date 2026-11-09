@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { programHome } from "../../../engine/src/locations.js";
+import { isAlive } from "../../../engine/src/state.js";
 import { createMogaoRuntime, mogaoSettings, parseRunOutput, redact } from "../mogao-runtime.js";
 
 const FAKE = path.join(import.meta.dirname, "fake-aimax.mjs");
@@ -216,3 +217,44 @@ test("安装根：没有 LAOSHI_HOME 时，用程序所在的 <安装根>/npm（
   assert.equal(programHome(path.join(base, ".laoshi", "npm", "lib", "node_modules", "@yiyi_zhang", "laoshi")), path.join(base, ".laoshi"));
   assert.equal(programHome("/opt/laoshi"), null);
 });
+
+// Seen in the sandbox: the agent is done but `aimax run` does not exit; the engine waited until the
+// platform ended its command. Its complete output, or the "done" callback, now ends the step.
+for (const [label, hold] of [["输出里已经有完整结果", false], ["只有平台回调的 done（输出要等进程退出才写）", true]] as const) {
+  test(`摸高：agent 做完但 aimax run 进程不退出时，${label}就算这一步结束，并结束残留的进程`, { skip: process.platform === "win32" }, async () => {
+    const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-mogao-linger-")));
+    const repo = path.join(base, "repo");
+    const fake = path.join(base, "aimax");
+    fs.mkdirSync(repo);
+    fs.mkdirSync(fake);
+    const bin = path.join(base, "aimax.sh");
+    fs.writeFileSync(bin, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
+    const logs: string[] = [];
+    const runtime = createMogaoRuntime({
+      settings: mogaoSettings({ platform: { mogao: { command: bin } } }, {}),
+      agentsDir: path.join(base, "agents"),
+      log: (m) => logs.push(m),
+      chatOut: null,
+      env: { ...process.env, FAKE_AIMAX_DIR: fake, FAKE_AIMAX_LINGER_MS: "60000", ...(hold ? { FAKE_AIMAX_HOLD_OUTPUT: "1" } : {}) },
+      pollMs: 50,
+    });
+    try {
+      const started = Date.now();
+      const agent = await runtime.startAgent({ role: "builder", title: "实现", prompt: "WRITE:out.txt:hi", cwd: repo, labels: {}, parentAgentId: "chat-1" });
+      const outcome = await agent.wait(20_000);
+      assert.equal(outcome.status, "idle", outcome.error ?? "");
+      assert.ok(Date.now() - started < 15_000, "不等进程退出");
+      assert.equal(outcome.lastMessage, hold ? "done" : "done: 1 message(s)");
+      assert.match(logs.join("\n"), /还没有退出：按已完成处理/);
+      const record = JSON.parse(fs.readFileSync(path.join(base, "agents", agent.id, "agent.json"), "utf8")) as { pid: number };
+      for (let i = 0; i < 50 && isAlive(record.pid); i++) await new Promise((r) => setTimeout(r, 100));
+      assert.equal(isAlive(record.pid), false, "残留的 aimax run 进程已结束");
+      // The next turn of the same agent is not mistaken for the old one.
+      await agent.followUp("再写一个。WRITE:second.txt:yes");
+      assert.equal((await agent.wait(20_000)).status, "idle");
+      assert.equal(fs.readFileSync(path.join(repo, "second.txt"), "utf8"), "yes");
+    } finally {
+      await runtime.close();
+    }
+  });
+}

@@ -10,6 +10,7 @@
 // A laoshi step prompt (a <pipeline-context> block; or "请先完整阅读文件 <prompt.md>" naming one) is
 // done the way the engine's fake runtime does it: the step's artifact and a valid result file.
 // $FAKE_AIMAX_PAUSE_STEP names a step (e.g. implement) that first stops for an approval.
+// $FAKE_AIMAX_LINGER_MS / $FAKE_AIMAX_HOLD_OUTPUT: see finish().
 // Calls are logged to $FAKE_AIMAX_DIR/calls.jsonl; sessions kept in $FAKE_AIMAX_DIR/sessions.
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -39,9 +40,19 @@ async function post(event) {
   }
 }
 
+// $FAKE_AIMAX_LINGER_MS: like the real one in the sandbox, the process stays this long after the
+// agent is done; with $FAKE_AIMAX_HOLD_OUTPUT its result is printed only when it finally exits.
 function finish(result, code = 0) {
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exit(code);
+  const linger = Number(process.env.FAKE_AIMAX_LINGER_MS ?? 0);
+  const hold = Boolean(process.env.FAKE_AIMAX_HOLD_OUTPUT);
+  if (!hold || !linger) process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (!linger) process.exit(code);
+  setTimeout(() => {
+    if (hold) process.stdout.write(`${JSON.stringify(result)}\n`);
+    process.exit(code);
+  }, linger);
+  // Keeps running: nothing after finish() must run.
+  return new Promise(() => {});
 }
 
 const usage = { input: 1000, output: 200, total: 1200 };
@@ -111,21 +122,21 @@ if (command === "run") {
   if (wait) {
     if (timeout && wait > timeout) {
       await sleep(timeout);
-      finish({ sessionId: session.id, error: `Run timed out after ${timeout}ms`, usage }, 1);
+      await finish({ sessionId: session.id, error: `Run timed out after ${timeout}ms`, usage }, 1);
     }
     await sleep(wait);
   }
   for (const [, file, text] of message.matchAll(/WRITE:([^:\s]+):(\S+)/g)) {
     await tool(session, `echo ${text} > ${file}`, () => fs.writeFileSync(path.join(session.cwd, file), text));
   }
-  if (/FAIL/.test(message)) finish({ sessionId: session.id, error: "boom", usage }, 1);
+  if (/FAIL/.test(message)) await finish({ sessionId: session.id, error: "boom", usage }, 1);
   const step = laoshiStep(message);
   if (step) {
     session.step = step;
     if (process.env.FAKE_AIMAX_PAUSE_STEP === step.stepId && !session.approved) {
       session.pending = `req-${step.key}`;
       save(session);
-      finish({ sessionId: session.id, text: "⚠ 自定义规则拦截确认：rm -rf build", paused: { requestId: session.pending, kind: "approval", title: "⚠ 自定义规则拦截确认：rm -rf build" }, usage });
+      await finish({ sessionId: session.id, text: "⚠ 自定义规则拦截确认：rm -rf build", paused: { requestId: session.pending, kind: "approval", title: "⚠ 自定义规则拦截确认：rm -rf build" }, usage });
     }
     save(session);
     await doStep(session, step);
@@ -133,18 +144,18 @@ if (command === "run") {
   if (/PAUSE/.test(message) && !session.approved) {
     session.pending = `req-${session.messages.length}`;
     save(session);
-    finish({ sessionId: session.id, text: "⚠ 自定义规则拦截确认：rm -rf build", paused: { requestId: session.pending, kind: "approval", title: "⚠ 自定义规则拦截确认：rm -rf build" }, usage });
+    await finish({ sessionId: session.id, text: "⚠ 自定义规则拦截确认：rm -rf build", paused: { requestId: session.pending, kind: "approval", title: "⚠ 自定义规则拦截确认：rm -rf build" }, usage });
   }
   await post({ type: "usage", data: usage });
   await post({ type: "done", data: { result: { text: "done", usage, durationMs: 10 } } });
-  finish({ sessionId: session.id, text: `done: ${session.messages.length} message(s)`, usage, durationMs: 10, modelName: "fake" });
+  await finish({ sessionId: session.id, text: `done: ${session.messages.length} message(s)`, usage, durationMs: 10, modelName: "fake" });
 }
 
 if (command === "resume") {
   const session = load(opt("-s"));
   const requestId = opt("--request-id");
   const input = JSON.parse(opt("--input-json") ?? "{}");
-  if (session.pending !== requestId) finish({ sessionId: session.id, error: `request ${requestId} already "resolved", cannot resume` }, 1);
+  if (session.pending !== requestId) await finish({ sessionId: session.id, error: `request ${requestId} already "resolved", cannot resume` }, 1);
   session.pending = null;
   if (input.action === "approve") {
     session.approved = true;
@@ -152,7 +163,7 @@ if (command === "resume") {
     if (session.step) await doStep(session, session.step);
   }
   save(session);
-  finish({ sessionId: session.id, text: input.action === "approve" ? "approved and done" : "HITL approval denied. The tool was NOT executed.", usage });
+  await finish({ sessionId: session.id, text: input.action === "approve" ? "approved and done" : "HITL approval denied. The tool was NOT executed.", usage });
 }
 
 console.error(`fake aimax: unknown command ${argv.join(" ")}`);

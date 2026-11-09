@@ -101,6 +101,8 @@ interface AgentRecord {
   host: string | null;
   /** The HITL request a decision was sent for (decision.json), so it is answered once. */
   answered: string | null;
+  /** When the latest run started: its callback events are the ones after this. */
+  runStartedAt?: string | null;
 }
 
 /** A decision on a pending approval, written by `laoshi permission` (answerPermission). */
@@ -113,6 +115,9 @@ interface Decision {
 const CONTINUE_MESSAGE = "上一次运行被中断了（对话轮次结束）。请接着完成原来的任务：先看一下已经做了什么，不要重复已经完成的部分。";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** How long a run may stay after printing its result before it counts as lingering. */
+const LINGER_GRACE_MS = 2_000;
 
 const isAlive = (pid: number) => engineProcessAlive(pid);
 
@@ -210,7 +215,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       Object.assign(keep, { input: data.input ?? null, output: data.output ?? null, total: data.total ?? null });
     } else if (type === "done") {
       const result = (data.result ?? {}) as Record<string, unknown>;
-      Object.assign(keep, { usage: result.usage ?? null });
+      Object.assign(keep, { usage: result.usage ?? null, text: typeof result.text === "string" ? redact(result.text).slice(0, 4000) : null });
     } else if (type !== "start" && type !== "title_updated") {
       return;
     }
@@ -251,12 +256,16 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     fs.closeSync(out);
     fs.closeSync(err);
     children.set(record.id, child);
-    child.on("exit", () => children.delete(record.id));
+    // A lingering run stopped after its result can exit after the next run started: forget only itself.
+    const forget = () => {
+      if (children.get(record.id) === child) children.delete(record.id);
+    };
+    child.on("exit", forget);
     child.on("error", (e) => {
       fs.appendFileSync(path.join(dir(record.id), `run-${n}.err`), `\n${e.message}\n`);
-      children.delete(record.id);
+      forget();
     });
-    write({ ...record, runs: n, pid: child.pid ?? null, host: os.hostname() });
+    write({ ...record, runs: n, pid: child.pid ?? null, host: os.hostname(), runStartedAt: new Date().toISOString() });
   }
 
   const runArgs = (record: AgentRecord, message: string) => [
@@ -271,10 +280,14 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     ...(settings.pluginsConfig ? ["--plugins-config", settings.pluginsConfig] : []),
   ];
 
-  /** The latest run's result; null while it runs (here, or in another live process of this machine). */
+  /**
+   * The latest run's result; null while it runs (here, or in another live process of this machine).
+   * A run whose agent is done but whose `aimax run` process has not exited (seen in the sandbox:
+   * the engine then waited until the platform ended its command) counts as finished once its
+   * result is complete in its output or the platform's callback reported "done"; the lingering
+   * process is stopped.
+   */
   function finished(record: AgentRecord): { result: RunResult | null; stderr: string } | null {
-    if (children.has(record.id)) return null;
-    if (record.pid && record.host === os.hostname() && isAlive(record.pid)) return null;
     const read = (suffix: string) => {
       try {
         return fs.readFileSync(path.join(dir(record.id), `run-${record.runs}.${suffix}`), "utf8");
@@ -282,7 +295,43 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
         return "";
       }
     };
-    return { result: parseRunOutput(read("out")), stderr: read("err") };
+    // Only the latest run's own process counts (an earlier run's may still be exiting).
+    const tracked = children.get(record.id);
+    const child = tracked && tracked.pid === record.pid && record.host === os.hostname() ? tracked : undefined;
+    const alive = !!child || (!!record.pid && record.host === os.hostname() && isAlive(record.pid));
+    const result = parseRunOutput(read("out"));
+    if (!alive) return { result, stderr: read("err") };
+    const complete = result && (result.paused || result.error || typeof result.text === "string");
+    const done = complete ? null : doneEvent(record);
+    if (!complete && !done) return null;
+    // A process that has just printed its result usually exits a moment later: give it that moment.
+    const since = (() => {
+      try {
+        return Date.now() - fs.statSync(path.join(dir(record.id), `run-${record.runs}.out`)).mtimeMs;
+      } catch {
+        return Infinity;
+      }
+    })();
+    if (complete && since < LINGER_GRACE_MS) return null;
+    log(`agent ${record.id} 已经做完，但 aimax run 进程还没有退出：按已完成处理，并结束这个进程`);
+    if (child) child.kill("SIGTERM");
+    else if (record.pid) {
+      try {
+        process.kill(record.pid, "SIGTERM");
+      } catch {
+        // Gone meanwhile.
+      }
+    }
+    return { result: complete ? result : { sessionId: record.sessionId ?? undefined, text: done!.text ?? "", usage: done!.usage ?? null }, stderr: read("err") };
+  }
+
+  /** The platform's "done" callback for the latest run, if it came. */
+  function doneEvent(record: AgentRecord): { text: string | null; usage: RunResult["usage"] } | null {
+    if (!record.runStartedAt) return null;
+    const e = events(record.id).filter((x) => x.type === "done" && String(x.at) >= record.runStartedAt!).at(-1);
+    if (!e) return null;
+    const usage = (e.usage ?? null) as RunResult["usage"];
+    return { text: typeof e.text === "string" ? e.text : null, usage };
   }
 
   const stepAgent = (id: string): StepAgent => ({
