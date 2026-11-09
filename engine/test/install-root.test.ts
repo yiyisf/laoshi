@@ -13,6 +13,8 @@ import { codebaseOf, userOf, withoutCredentials } from "../src/identity.js";
 import { homeOf } from "../src/locations.js";
 import { dispatchNotifiers, type NotifierEvent } from "../src/notifiers.js";
 import { requirementRef, runRecord } from "../src/records.js";
+// The adapters register their user variables (AIMAX_USER_NAME) when the loader loads, as in the engine.
+import "../src/runtime-loader.js";
 
 const agents = {
   builder: { provider: "claude/m", modeId: "bypassPermissions" },

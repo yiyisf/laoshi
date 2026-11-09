@@ -73,7 +73,8 @@ req-kit 靠环境变量 `PASEO_AGENT_ID`、`PASEO_AGENT_CWD` 识别"当前对话
 
 新适配器必须通过：
 
-1. **编排测试**（`engine/test` 中基于 `fake-runtime.ts` 的用例）。注意它测的是核心对运行时的期望，适配器作者应当用同一套期望检查自己的实现（计划抽成可复用的 `runConformance(adapter)`）。
+1. **运行时一致性测试**（`engine/test/conformance.ts` 的 `runConformance`，M3 起）：在适配器的测试目录里写一个 `conformance.test.ts`，给出"用假的平台后端建一个运行时"的方法（`setup`）和适配器的能力声明，就会跑同一组用例：`startAgent` → `wait` 为 idle 且文件写在 `cwd` 下；`followUp` 开始新回合；出错时为 error 且有原因；没等到时为 timeout、之后能等到结束；另一个进程的运行时用 `attachAgent` 接上；`interruptAgent` 改做新指令；声明了工具调用的看得到命令；可选方法不抛出、不支持的返回 `null`。假后端要认识三种提示词：`WRITE:<文件>:<内容>`、`SLEEP:<毫秒>`、`FAIL`。现在接入的有命令行（Claude Code、Codex）和摸高（`adapters/*/test/conformance.test.ts`）。
+   编排测试（`engine/test` 中基于 `fake-runtime.ts` 的用例）测的是核心本身，适配器不需要再跑。
 2. **探针测试**（真实平台上运行，需要一个临时目录和少量用量）：
    - 创建一个子 agent，要求它写一个文件，`wait` 到 idle，检查文件落在 `cwd` 下；
    - `followUp` 一次；`notifyAgent` 一次且不打断；`interruptAgent` 一次；
