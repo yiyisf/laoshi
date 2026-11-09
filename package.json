@@ -57,6 +57,7 @@
     "adapters/*/*.mjs",
     "adapters/*/skill/**",
     "adapters/dsh/plugin/",
+    "adapters/paseo/plugin/",
     "adapters/dsh/intranet/",
     "skills/",
     "principles/",

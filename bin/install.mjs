@@ -147,7 +147,7 @@ if (args.uninstall) {
     }
     report("ok", `已从 ${dir} 删除 laoshi 安装的 skill`);
   }
-  mod.uninstall?.({ args, config: existing, report });
+  await mod.uninstall?.({ args, config: existing, report, home });
   for (const f of ["laoshi", "laoshi.cmd", "req", "req.cmd"]) fs.rmSync(path.join(home, "bin", f), { force: true });
   fs.rmSync(recordPath, { force: true });
   report("ok", `保留了安装根 ${home}（配置、使用记录）；不再需要时可以手工删除`);
@@ -218,7 +218,7 @@ fs.rmSync(rendered, { recursive: true, force: true });
 section(`平台：${platform}`);
 let next = [];
 try {
-  next = mod.setup({ kit, args, config, dry, report }) ?? [];
+  next = (await mod.setup({ kit, args, config, dry, report, home })) ?? [];
 } catch (error) {
   report("fail", error.message);
 }

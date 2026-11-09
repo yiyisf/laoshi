@@ -1,0 +1,85 @@
+// Data hooks: every read is an RPC to the daemon side (laoshi api), cached by React Query.
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRpc, useSettings } from "@getpaseo/plugin/client";
+import { configRpc, fileRpc, listRpc, modelsRpc, preferences, reviewUrlRpc, runRpc, setAgentsRpc, statsRpc, statusRpc, versionRpc, type Action, type AgentProfileData } from "../shared/contracts";
+
+export function usePreferences(): { readOnly: boolean; refreshMs: number } {
+  const settings = useSettings(preferences);
+  if (settings.status !== "ready") return { readOnly: true, refreshMs: 10_000 };
+  return { readOnly: settings.values.readOnly, refreshMs: settings.values.refreshSeconds * 1000 };
+}
+
+export function useRequirements() {
+  const list = useRpc(listRpc);
+  const { refreshMs } = usePreferences();
+  return useQuery({ queryKey: ["req", "list"], queryFn: () => list({}), refetchInterval: refreshMs });
+}
+
+export function useRequirement(repo: string, featureDir: string) {
+  const status = useRpc(statusRpc);
+  const { refreshMs } = usePreferences();
+  return useQuery({
+    queryKey: ["req", "status", repo, featureDir],
+    queryFn: () => status({ repo, featureDir }),
+    refetchInterval: refreshMs,
+    enabled: Boolean(repo && featureDir),
+  });
+}
+
+export function useDocument(repo: string, featureDir: string, file: string | null) {
+  const read = useRpc(fileRpc);
+  return useQuery({
+    queryKey: ["req", "file", repo, featureDir, file],
+    queryFn: () => read({ repo, featureDir, file: file ?? "" }),
+    enabled: Boolean(file),
+  });
+}
+
+export function useStats(period: { since?: string; month?: string }) {
+  const stats = useRpc(statsRpc);
+  return useQuery({ queryKey: ["req", "stats", period.since ?? "", period.month ?? ""], queryFn: () => stats(period) });
+}
+
+export function useKitInfo() {
+  const version = useRpc(versionRpc);
+  return useQuery({ queryKey: ["req", "version"], queryFn: () => version({}), retry: false });
+}
+
+export function useAction() {
+  const run = useRpc(runRpc);
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { action: Action; repo: string; featureDir: string; verifyEnv?: "local" | "deployed"; text?: string }) => run(input),
+    onSettled: () => queries.invalidateQueries({ queryKey: ["req"] }),
+  });
+}
+
+export function useModels() {
+  const models = useRpc(modelsRpc);
+  return useQuery({ queryKey: ["req", "models"], queryFn: () => models({}), retry: false });
+}
+
+export function useSetAgents() {
+  const set = useRpc(setAgentsRpc);
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { builder: AgentProfileData; reviewer: AgentProfileData; fallback: AgentProfileData | null }) => set(input),
+    onSettled: () => queries.invalidateQueries({ queryKey: ["req", "models"] }),
+  });
+}
+
+export function useConfigView(repo: string | null) {
+  const config = useRpc(configRpc);
+  return useQuery({ queryKey: ["req", "config", repo ?? ""], queryFn: () => config(repo ? { repo } : {}), retry: false });
+}
+
+/** The prototype review page's address (1.13); it stays valid while its server runs. */
+export function useReviewUrl(repo: string, featureDir: string, enabled: boolean, page: "prototype" | "check" | "code" = "prototype") {
+  const reviewUrl = useRpc(reviewUrlRpc);
+  return useQuery({
+    queryKey: ["req", "review-url", repo, featureDir, page],
+    queryFn: () => reviewUrl({ repo, featureDir, ...(page !== "prototype" ? { page } : {}) }),
+    enabled: enabled && Boolean(repo && featureDir),
+    retry: false,
+  });
+}

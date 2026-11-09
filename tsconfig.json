@@ -19,5 +19,8 @@
     "engine/test/**/*.ts",
     "adapters/**/*.ts",
     "test/**/*.ts"
+  ],
+  "exclude": [
+    "adapters/paseo/plugin"
   ]
 }

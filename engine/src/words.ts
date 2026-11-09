@@ -40,7 +40,7 @@ export interface PlatformWords {
   origin: string;
   /** What to check when the platform cannot be reached, a sentence. */
   connectFix: string;
-  /** The view where people follow requirements, e.g. "<平台> 的 req-kit 插件"; null when none. */
+  /** The view where people follow requirements, e.g. "<平台> 的 laoshi 插件"; null when none. */
   requirementView: string | null;
 }
 

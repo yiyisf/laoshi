@@ -68,7 +68,7 @@ export const paseoAdapter: PlatformAdapter = {
     requirementPage: "Paseo 侧边栏的\"需求\"",
     browser: "Paseo 内置的浏览器（`browser_*` 工具）",
     browserWatch: "需求方可以在 Paseo 桌面端实时看到你在浏览器中的操作。",
-    requirementView: "Paseo 的 req-kit 插件",
+    requirementView: "Paseo 的 laoshi 插件",
     connectFix: "确认 Paseo 桌面端或 daemon 在运行；设置了密码时，确认环境变量（默认 `PASEO_DAEMON_PASSWORD`）已设置。",
   },
   skillSetup: fileURLToPath(new URL("./skill/setup.md", import.meta.url)),
