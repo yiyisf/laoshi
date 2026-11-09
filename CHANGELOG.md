@@ -2,7 +2,9 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
-## 未发布
+## 0.2.0-beta.2 - 2026-11-10
+
+预发布版（npm 的 `beta` 标签，`latest` 仍是 0.1.1）：修复摸高上步骤做完要等很久才进入下一步的问题；新增不需要平台的命令行 agent 适配器、`laoshi migrate` 和随 laoshi 发布的 Paseo 需求插件。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform <平台>`。
 
 ### 使用者会看到的变化
 
@@ -13,7 +15,12 @@ laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题
 - **摸高：步骤做完后马上进入下一步**：agent 做完但 `aimax run` 进程不退出时，以完整的输出或平台回调的 `done` 为准结束这一步，并结束残留的进程（之前要等到平台结束后台命令、再继续时才进入下一步）。
 - **Paseo 的需求插件随 laoshi 发布**：`laoshi plugin install|status|remove`（从 paseo-req-kit 迁入，插件 id 改为 `laoshi`）；安装、升级时顺带更新插件。
 - **`laoshi migrate`**：从 paseo-req-kit 1.x 迁移本机的配置、使用记录、需求索引和需求状态；默认只预览，`--apply` 执行，`--rollback` 回滚；旧目录不动。
-- **文档**：新增《在摸高上使用》。
+- **文档**：新增《在摸高上使用》《只用命令行 agent》。
+
+### 升级须知
+
+- 摸高：专家包要按这个版本重新生成（`node adapters/mogao/make-expert.mjs`），入口 skill 第一次使用时会换上这个版本。
+- Paseo：装过 paseo-req-kit 插件的，可以改装 laoshi 插件（`laoshi plugin install`），确认可用后用 `req plugin remove` 移除旧的。
 
 ## 0.2.0-beta.1 - 2026-11-07
 
