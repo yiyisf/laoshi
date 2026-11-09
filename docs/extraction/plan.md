@@ -49,7 +49,7 @@ npm 包名：**`@yiyi_zhang/laoshi`**（`laoshi` 这个名字 npm 不允许发�
 
 ### M3 无头 CLI 运行时（第一个非 Paseo 适配器）
 - 每个步骤 agent 是一个编码 agent 命令行的子进程；通知写文件或走外部通知器。
-- 进展（2026-11-09）：第一版已实现，见 [cli-adapter](../design/cli-adapter.md) 和 [adapters/cli](../../adapters/cli/README.md)：Claude Code（`claude -p`）和 Codex（`codex exec`）两个驱动，会话续接、打断、意外中断后续跑、工具调用（危险命令拦截可用）、用量；假命令行上的运行时测试和 `laoshi start` 端到端测试通过。一致性测试 `runConformance(adapter)`（`engine/test/conformance.ts`）已抽出，命令行（Claude Code、Codex）和摸高接入。待做：真实命令行上跑 `evals/` 用例、dsh 和 Paseo 接入一致性测试、OpenCode / Pi 驱动。
+- 进展（2026-11-09）：第一版已实现，见 [cli-adapter](../design/cli-adapter.md) 和 [adapters/cli](../../adapters/cli/README.md)：Claude Code（`claude -p`）和 Codex（`codex exec`）两个驱动，会话续接、打断、意外中断后续跑、工具调用（危险命令拦截可用）、用量；假命令行上的运行时测试和 `laoshi start` 端到端测试通过。一致性测试 `runConformance(adapter)`（`engine/test/conformance.ts`）已抽出，命令行（Claude Code、Codex）和摸高接入。Paseo、dsh 也已接入（2026-11-09），四个适配器跑同一组用例。待做：真实命令行上跑 `evals/` 用例、OpenCode / Pi 驱动。
 - 同时抽出 `runConformance(adapter)`，让新适配器复用编排测试的期望。
 - 完成标准：不依赖 Paseo，在一台只有编码 agent 命令行的机器上跑通一个 `evals/` 用例，"夸大"为零。
 
