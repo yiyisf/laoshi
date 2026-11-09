@@ -510,7 +510,7 @@ test("方案审核要需求方决定时：builder 先自答，只把剩下的业
   assert.equal(reply.status, 0, reply.stdout + reply.stderr);
   const relayed = notifications(some).at(-1);
   assert.equal(relayed?.agentId, ORIGIN);
-  assert.match(relayed?.text ?? "", /来自 req-kit 插件[\s\S]*<plugin-reply>\n历史订单不显示\n<\/plugin-reply>/);
+  assert.match(relayed?.text ?? "", /来自 laoshi 插件[\s\S]*<plugin-reply>\n历史订单不显示\n<\/plugin-reply>/);
 });
 
 test("1.12.1：需求改了以后，上一次尝试留下的 agent 不接手、不沿用，先停掉再新建", () => {
@@ -1611,7 +1611,7 @@ test("定时检查（可选）：开启后运行期间预约对话定时检查�
   assert.deepEqual(state(env).wakeups, []);
 });
 
-test("定时检查（1.13）：req-kit 插件最近检查过时，不再预约对话的定时检查（插件会直接继续）", () => {
+test("定时检查（1.13）：需求插件最近检查过时，不再预约对话的定时检查（插件会直接继续）", () => {
   const file = path.join(KIT_HOME, "watchdog.json");
   const before = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
   fs.mkdirSync(KIT_HOME, { recursive: true });

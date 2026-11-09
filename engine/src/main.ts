@@ -329,7 +329,7 @@ async function main(): Promise<number> {
   // 1.13: when the req-kit plugin is checking (it continues dead runs itself, no model needed),
   // the chat is not woken up for it.
   const pluginWatching = (await import("./watchdog.js")).watchdogActive();
-  if (pluginWatching && config.watchdogMinutes > 0) log("req-kit 插件在检查后台进程，不再预约对话的定时检查");
+  if (pluginWatching && config.watchdogMinutes > 0) log("laoshi 插件在检查后台进程，不再预约对话的定时检查");
   if (config.watchdogMinutes > 0 && originAgentId && !pluginWatching) {
     watchdog = await runtime
       .scheduleMessage({

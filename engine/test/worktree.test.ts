@@ -128,7 +128,7 @@ test("从需求对齐开始显示：登记后列为对齐中；确认后久未�
     env: { ...process.env, PASEO_AGENT_ID: "chat-7", PASEO_AGENT_CWD: repo },
   });
   assert.equal(tracked.status, 0, tracked.stderr);
-  assert.match(tracked.stdout, /已登记需求：docs\/features\/20261022-export（Paseo 的 req-kit 插件里能看到它，状态"对齐中"，关联这个对话）/);
+  assert.match(tracked.stdout, /已登记需求：docs\/features\/20261022-export（Paseo 的 laoshi 插件里能看到它，状态"对齐中"，关联这个对话）/);
   const aligning = apiList({ repo, all: true }).find((x) => x.featureDir === FEATURE)!;
   assert.equal(aligning.stage, "对齐中");
   assert.equal(aligning.attention, null);
