@@ -9,6 +9,7 @@ laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题
 - **发起人**：状态文件和 `laoshi api list` 记下每个需求的发起人（`startedBy`，第一次运行时为谁运行，之后不改）。
 - **使用者取平台给的身份**：平台提供使用者时（摸高的 `AIMAX_USER_NAME`）优先用它，`LAOSHI_USER` 仍然最优先；`laoshi doctor` 显示使用者从哪里来。
 - **安装**：程序装在安装根的 `npm` 目录里时（摸高专家就这样安装），不再提示"需要设置环境变量 LAOSHI_HOME"。
+- **命令行 agent（不需要平台）**（`laoshi install --platform cli`）：步骤 agent 是 Claude Code（`claude -p`）或 Codex（`codex exec`）的一次运行，追问和打断用会话续接，工具调用来自命令行的事件流（危险命令拦截照常工作）；进展用 `laoshi status` 查看。第一版，真实命令行上的验证待做。
 - **文档**：新增《在摸高上使用》。
 
 ## 0.2.0-beta.1 - 2026-11-07

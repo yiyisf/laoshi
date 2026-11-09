@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { cliAdapter } from "../../adapters/cli/adapter.js";
 import { dshAdapter } from "../../adapters/dsh/adapter.js";
 import { mogaoAdapter } from "../../adapters/mogao/adapter.js";
 import { paseoAdapter } from "../../adapters/paseo/adapter.js";
@@ -17,6 +18,7 @@ const ADAPTERS: Record<string, PlatformAdapter> = {
   paseo: paseoAdapter,
   dsh: dshAdapter,
   mogao: mogaoAdapter,
+  cli: cliAdapter,
 };
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);
