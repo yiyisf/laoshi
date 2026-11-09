@@ -58,6 +58,8 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi index [--rebuild [目录…]] [--prune]
                                本机记录的需求（需求插件据此找到所有需求）；索引里缺的需求用 --rebuild 补登
   laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
+  laoshi migrate [--apply | --rollback] [--from <目录>] [--to <目录>]
+                               从 req-kit 1.x 迁移本机的配置、使用记录和需求状态（默认只预览）
 
 本机维护：
   npx -y [--registry=<npm 源>] @yiyi_zhang/laoshi@latest install --platform <平台>
@@ -216,6 +218,10 @@ switch (command) {
     break;
   case "docs":
     code = node([path.join(kitRoot, "bin", "req-docs.mjs"), ...rest]);
+    break;
+  case "migrate":
+    // From req-kit 1.x (~/.req-kit) to laoshi: preview by default, --apply, --rollback.
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "adapters", "paseo", "migrate.ts"), ...rest]) : 1;
     break;
   case "plugin":
     console.error("Paseo 的需求插件由 paseo-req-kit 提供：req plugin install（paseo-req-kit 的命令）。");

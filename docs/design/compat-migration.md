@@ -57,6 +57,8 @@ npx laoshi migrate --apply  # 确认后执行
 
 回滚：恢复 `.bak-v1` 状态文件和旧配置目录，重新安装 req-kit 1.x。`laoshi migrate` 的确认提示里要写明这一步。
 
+实现（2026-11-09，`adapters/paseo/migrate.ts`）与上面的差别：旧配置目录不改不删（只复制），所以回滚不需要恢复它，只恢复状态文件、删除迁移写入的文件（依据新目录里的 `migrate.json`）；skill 不由 migrate 安装，提示运行 `laoshi install --platform paseo`；有流水线正在运行时拒绝执行，而不只是提示。
+
 ## 6. 待定
 
 - ~~skill 名~~：已决定，见 [ADR 0005](../adr/0005-skill-names.md)。仍待做的是转发薄 skill 的写法：只做命令转发和一句"这个命令已改名为 /laoshi"，不复制手册内容，避免两份手册漂移。
