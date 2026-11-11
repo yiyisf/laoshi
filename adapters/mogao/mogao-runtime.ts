@@ -226,8 +226,10 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       Object.assign(keep, { callId: data.toolCallId, name: data.name, command: typeof input.command === "string" ? redact(input.command) : null, riskLevel: input.riskLevel ?? null });
     } else if (type === "tool_end") {
       const details = (data.details ?? {}) as Record<string, unknown>;
-      Object.assign(keep, { callId: data.toolCallId, exitCode: details.exitCode ?? null, output: typeof data.output === "string" ? redact(data.output).slice(-2000) : null });
-    } else if (type === "usage") {
+      // AgentProgressEvent tool_end: toolCallId, name, input, output, details, isError.
+      const exitCode = details.exitCode ?? (data.isError === true ? 1 : data.isError === false ? 0 : null);
+      Object.assign(keep, { callId: data.toolCallId, exitCode, output: typeof data.output === "string" ? redact(data.output).slice(-2000) : null });
+    } else if (type === "usage" || type === "model_usage") {
       // { type: "usage", usage: UsagePayload }; earlier probes saw the numbers at the top level.
       const u = (data.usage && typeof data.usage === "object" ? data.usage : data) as Record<string, unknown>;
       Object.assign(keep, { input: u.input ?? null, output: u.output ?? null, total: u.total ?? null, cacheReadTokens: u.cacheReadTokens ?? null });

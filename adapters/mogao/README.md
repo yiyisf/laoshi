@@ -40,7 +40,7 @@ node adapters/mogao/e2e/run-e2e.mjs [--out <目录>]
   - 原因：运行时以"`aimax run` 进程结束"作为这一步结束的信号，而 agent 做完后 `aimax run` 进程有时不退出。引擎一直等，直到平台到时结束后台命令（SIGTERM）；下一次 `laoshi resume` 读到已经写好的结果，才进入下一步。
   - 修复（`mogao-runtime.ts` 的 `finished`）：输出里已经有完整结果（给出结果 2 秒后进程仍在），或平台回调送来了这次运行的 `done` 事件，就算这一步结束，并结束残留的进程。假 `aimax` 的 `FAKE_AIMAX_LINGER_MS`、`FAKE_AIMAX_HOLD_OUTPUT` 模拟这种情况，有测试。
 
-- **回调格式按平台文档对齐**（2026-11-11，沙箱里的 `events.jsonl` 和平台文档 CallbackEventPayload）：回调事件是平铺的、按 `type` 区分（`start`、`progress`、`done`、`error`、`usage`、`hitl`、`title_updated` 等）。之前按摸底推测的格式解析，结果 `usage` 的数字都是 null（实际在 `usage` 字段里），工具调用一条也没收到（实际包在 `progress` 事件的 `event` 里），危险命令拦截和"最近活动"在摸高上没有生效。现在：`progress` 拆开取里面的事件，没用到的 `progress` 只记下种类；`usage` 从 `usage` 字段读，计入 `cacheReadTokens`；`error` 和 `done` 一样表示这次运行结束；判断 `done` 属于哪次运行改为看"最后一个 `start` 之后"，上一版启动的 agent（记录里没有开始时间）也能接上。`AgentProgressEvent` 的具体结构还没核对，先按"里面是工具事件"解析。
+- **回调格式按平台文档对齐**（2026-11-11，沙箱里的 `events.jsonl` 和平台文档 CallbackEventPayload）：回调事件是平铺的、按 `type` 区分（`start`、`progress`、`done`、`error`、`usage`、`hitl`、`title_updated` 等）。之前按摸底推测的格式解析，结果 `usage` 的数字都是 null（实际在 `usage` 字段里），工具调用一条也没收到（实际包在 `progress` 事件的 `event` 里），危险命令拦截和"最近活动"在摸高上没有生效。现在：`progress` 拆开取里面的事件，没用到的 `progress` 只记下种类；`usage` 从 `usage` 字段读，计入 `cacheReadTokens`；`error` 和 `done` 一样表示这次运行结束；判断 `done` 属于哪次运行改为看"最后一个 `start` 之后"，上一版启动的 agent（记录里没有开始时间）也能接上。`progress` 里的 `AgentProgressEvent` 已按平台文档核对：`tool_start`（`toolCallId`、`name`、`input`）、`tool_end`（另有 `output`、`details`、`isError`）、`model_usage`（单次模型请求的用量）等；其余种类（`thinking_end`、`skill_used`、`subagent_*`、`hitl_*`、`compaction` 等）只记下种类。
 
 ## 还没有做 / 待确认
 
