@@ -52,7 +52,9 @@ test("要求的版本和装的不同：先装那个版本，再用它运行同�
   assert.equal(out.status, 0, out.stderr);
   assert.match(out.stdout, /^ran 0\.2\.0-beta\.3 status x$/m);
   assert.doesNotMatch(out.stdout, /ran 0\.2\.0-beta\.2/);
-  assert.match(r.npmLog(), new RegExp(`install --prefix ${path.join(r.root, "npm").replace(/[\\\\]/g, "\\\\$&")} .*@yiyi_zhang/laoshi@0\\.2\\.0-beta\\.3`));
+  const log = r.npmLog();
+  assert.ok(log.includes(`install --prefix ${path.join(r.root, "npm")} `), log);
+  assert.ok(log.trim().endsWith("@yiyi_zhang/laoshi@0.2.0-beta.3"), log);
 });
 
 test("版本相同、没有要求、或装不上时，照常用现在的版本运行", () => {
