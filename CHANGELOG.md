@@ -2,11 +2,17 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
-## 未发布
+## 0.2.0-beta.3 - 2026-11-11
+
+预发布版（npm 的 `beta` 标签，`latest` 仍是 0.1.1）：摸高的回调按平台文档的格式解析，步骤做完后靠 `done` 及时进入下一步，工具调用和用量能收到。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform <平台>`。
 
 ### 使用者会看到的变化
 
 - **摸高：回调按平台文档的格式解析**：工具调用（包在 `progress` 事件里）现在收得到，危险命令拦截和"最近活动"在摸高上开始生效；用量从 `usage` 字段读并计入缓存命中；`error` 回调也表示运行结束；上一版启动、这一版接着等的步骤也能靠 `done` 及时结束。
+
+### 升级须知
+
+- 摸高：专家包要换成这个版本生成的（入口 skill 里写着要装的版本），第一次使用时会装上 0.2.0-beta.3；用 `node -p "require('/data/workspace/.laoshi/npm/node_modules/@yiyi_zhang/laoshi/package.json').version"` 确认。
 
 ## 0.2.0-beta.2 - 2026-11-10
 
