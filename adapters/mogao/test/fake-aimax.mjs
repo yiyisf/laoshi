@@ -99,9 +99,10 @@ async function doStep(session, step) {
 
 async function tool(session, command, effect) {
   const toolCallId = `t${crypto.randomBytes(3).toString("hex")}`;
-  await post({ type: "tool_start", data: { toolCallId, name: "exec", input: { command, riskLevel: "low", isReadOnly: false } } });
+  // The platform's CallbackEventPayload: flat, discriminated by type; tool calls come inside "progress".
+  await post({ type: "progress", sessionId: session.id, event: { type: "tool_start", toolCallId, name: "exec", input: { command, riskLevel: "low", isReadOnly: false } } });
   effect();
-  await post({ type: "tool_end", data: { toolCallId, output: "ok token=SECRET123456", details: { exitCode: 0, cwd: session.cwd, sessionId: session.id } } });
+  await post({ type: "progress", sessionId: session.id, event: { type: "tool_end", toolCallId, output: "ok token=SECRET123456", details: { exitCode: 0, cwd: session.cwd, sessionId: session.id } } });
 }
 
 const [command] = argv;
@@ -116,7 +117,7 @@ if (command === "run") {
   const message = opt("--message") ?? "";
   session.messages.push(message);
   save(session);
-  await post({ type: "start", data: { sessionId: session.id, channel: "cli", type: "run", message } });
+  await post({ type: "start", sessionId: session.id, message });
   const timeout = Number(opt("--timeout") ?? 0);
   const wait = Number(/SLEEP:(\d+)/.exec(message)?.[1] ?? 0);
   if (wait) {
@@ -146,8 +147,9 @@ if (command === "run") {
     save(session);
     await finish({ sessionId: session.id, text: "⚠ 自定义规则拦截确认：rm -rf build", paused: { requestId: session.pending, kind: "approval", title: "⚠ 自定义规则拦截确认：rm -rf build" }, usage });
   }
-  await post({ type: "usage", data: usage });
-  await post({ type: "done", data: { result: { text: "done", usage, durationMs: 10 } } });
+  await post({ type: "usage", sessionId: session.id, usage: { ...usage, cacheReadTokens: 500 } });
+  await post({ type: "title_updated", sessionId: session.id, title: "t", message });
+  await post({ type: "done", sessionId: session.id, result: { text: "done", usage: { ...usage, cacheReadTokens: 500 }, durationMs: 10 } });
   await finish({ sessionId: session.id, text: `done: ${session.messages.length} message(s)`, usage, durationMs: 10, modelName: "fake" });
 }
 

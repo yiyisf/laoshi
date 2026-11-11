@@ -1459,7 +1459,9 @@ test("自动新建工作区：在主分支上用 --worktree 启动，需求移�
 
   const stateFile = path.join(worktree, FEATURE, ".pipeline", "state.json");
   const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline && !(fs.existsSync(stateFile) && JSON.parse(fs.readFileSync(stateFile, "utf8")).status === "completed")) {
+  // The state says completed a moment before the last notification (the report) is sent: wait for both.
+  const reported = () => (notifications(env).at(-1)?.text ?? "").includes("完整报告");
+  while (Date.now() < deadline && !(fs.existsSync(stateFile) && JSON.parse(fs.readFileSync(stateFile, "utf8")).status === "completed" && reported())) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   const finished = JSON.parse(fs.readFileSync(stateFile, "utf8"));
