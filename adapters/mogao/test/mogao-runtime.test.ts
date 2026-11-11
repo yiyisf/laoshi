@@ -7,7 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { programHome } from "../../../engine/src/locations.js";
 import { isAlive } from "../../../engine/src/state.js";
-import { createMogaoRuntime, mogaoSettings, parseRunOutput, redact } from "../mogao-runtime.js";
+import { callbackEvent, createMogaoRuntime, mogaoSettings, parseRunOutput, redact, toAgentUsage } from "../mogao-runtime.js";
 
 const FAKE = path.join(import.meta.dirname, "fake-aimax.mjs");
 
@@ -258,3 +258,41 @@ for (const [label, hold] of [["输出里已经有完整结果", false], ["只有
     }
   });
 }
+
+test("摸高：回调按平台的格式解析（usage 在 usage 字段里，工具调用在 progress 里）", () => {
+  assert.deepEqual(callbackEvent({ type: "progress", event: { type: "tool_start", toolCallId: "t1", name: "exec" } }), { type: "tool_start", data: { type: "tool_start", toolCallId: "t1", name: "exec" }, progress: true });
+  assert.equal(callbackEvent({ type: "usage", usage: { input: 1 } }).data.usage !== undefined, true);
+  assert.equal(callbackEvent({ type: "done", result: { text: "x" } }).type, "done");
+  assert.deepEqual(toAgentUsage({ input: 210, output: 87, cacheReadTokens: 33728 }), { inputTokens: 33938, cachedInputTokens: 33728, outputTokens: 87 });
+});
+
+test("摸高：上一版启动的 agent（记录里没有 runStartedAt）也按最后一个 start 之后的 done 结束", { skip: process.platform === "win32" }, async () => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-mogao-handoff-")));
+  const repo = path.join(base, "repo");
+  const fake = path.join(base, "aimax");
+  fs.mkdirSync(repo);
+  fs.mkdirSync(fake);
+  const bin = path.join(base, "aimax.sh");
+  fs.writeFileSync(bin, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
+  const runtime = createMogaoRuntime({
+    settings: mogaoSettings({ platform: { mogao: { command: bin } } }, {}),
+    agentsDir: path.join(base, "agents"),
+    log: () => undefined,
+    chatOut: null,
+    env: { ...process.env, FAKE_AIMAX_DIR: fake, FAKE_AIMAX_LINGER_MS: "60000", FAKE_AIMAX_HOLD_OUTPUT: "1" },
+    pollMs: 50,
+  });
+  try {
+    const agent = await runtime.startAgent({ role: "builder", title: "实现", prompt: "WRITE:out.txt:hi", cwd: repo, labels: {}, parentAgentId: "chat-1" });
+    const file = path.join(base, "agents", agent.id, "agent.json");
+    const { runStartedAt: _dropped, ...older } = JSON.parse(fs.readFileSync(file, "utf8"));
+    fs.writeFileSync(file, JSON.stringify(older));
+    const started = Date.now();
+    const outcome = await agent.wait(20_000);
+    assert.equal(outcome.status, "idle", outcome.error ?? "");
+    assert.ok(Date.now() - started < 15_000);
+    assert.deepEqual(outcome.usage, { inputTokens: 1500, cachedInputTokens: 500, outputTokens: 200 });
+  } finally {
+    await runtime.close();
+  }
+});

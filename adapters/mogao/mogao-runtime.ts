@@ -50,14 +50,16 @@ export function mogaoSettings(config: unknown, env: NodeJS.ProcessEnv = process.
 export interface RunResult {
   sessionId?: string;
   text?: string;
-  usage?: { input?: number; output?: number; total?: number } | null;
+  usage?: { input?: number; output?: number; total?: number; cacheReadTokens?: number } | null;
   paused?: { requestId: string; kind?: string; title?: string } | null;
   error?: string | null;
 }
 
 export function toAgentUsage(u: RunResult["usage"]): AgentUsage | null {
   if (!u) return null;
-  return { inputTokens: u.input ?? 0, cachedInputTokens: 0, outputTokens: u.output ?? 0 };
+  // The platform counts tokens read from its prompt cache apart from `input` (cacheReadTokens).
+  const cached = u.cacheReadTokens ?? 0;
+  return { inputTokens: (u.input ?? 0) + cached, cachedInputTokens: cached, outputTokens: u.output ?? 0 };
 }
 
 /** Takes the JSON object out of a run's standard output (the last line that parses). */
@@ -160,9 +162,23 @@ class CallbackServer {
 
 /** An event's type and payload, whatever envelope the platform wraps them in. */
 export function eventParts(event: Record<string, unknown>): { type: string; data: Record<string, unknown> } {
-  const type = String(event.type ?? event.event ?? "");
+  const type = String(event.type ?? (typeof event.event === "string" ? event.event : "") ?? "");
   const data = (event.data ?? event.payload ?? event) as Record<string, unknown>;
   return { type, data: data && typeof data === "object" ? data : {} };
+}
+
+/**
+ * The callback's events (the platform's CallbackEventPayload, discriminated by `type`): start,
+ * progress (an agent progress event inside, e.g. a tool call), usage, done, error, hitl,
+ * title_updated, … A progress event is unwrapped to the event it carries.
+ */
+export function callbackEvent(event: Record<string, unknown>): { type: string; data: Record<string, unknown>; progress: boolean } {
+  const outer = eventParts(event);
+  if (outer.type !== "progress") return { ...outer, progress: false };
+  const inner = (outer.data.event ?? event.event) as unknown;
+  if (!inner || typeof inner !== "object") return { ...outer, progress: true };
+  const parts = eventParts(inner as Record<string, unknown>);
+  return { type: parts.type || "progress", data: parts.data, progress: true };
 }
 
 export interface MogaoRuntimeOptions {
@@ -198,7 +214,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
 
   const callbacks = new CallbackServer((agentId, event) => {
     if (!fs.existsSync(dir(agentId))) return;
-    const { type, data } = eventParts(event);
+    const { type, data, progress } = callbackEvent(event);
     if (type === "start" && typeof data.sessionId === "string") {
       const record = read(agentId);
       if (record && !record.sessionId) write({ ...record, sessionId: data.sessionId });
@@ -212,11 +228,18 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       const details = (data.details ?? {}) as Record<string, unknown>;
       Object.assign(keep, { callId: data.toolCallId, exitCode: details.exitCode ?? null, output: typeof data.output === "string" ? redact(data.output).slice(-2000) : null });
     } else if (type === "usage") {
-      Object.assign(keep, { input: data.input ?? null, output: data.output ?? null, total: data.total ?? null });
+      // { type: "usage", usage: UsagePayload }; earlier probes saw the numbers at the top level.
+      const u = (data.usage && typeof data.usage === "object" ? data.usage : data) as Record<string, unknown>;
+      Object.assign(keep, { input: u.input ?? null, output: u.output ?? null, total: u.total ?? null, cacheReadTokens: u.cacheReadTokens ?? null });
     } else if (type === "done") {
       const result = (data.result ?? {}) as Record<string, unknown>;
       Object.assign(keep, { usage: result.usage ?? null, text: typeof result.text === "string" ? redact(result.text).slice(0, 4000) : null });
-    } else if (type !== "start" && type !== "title_updated") {
+    } else if (type === "error") {
+      Object.assign(keep, { message: typeof data.message === "string" ? redact(data.message).slice(0, 2000) : null });
+    } else if (progress) {
+      // A progress event laoshi does not use yet: keep its kind only, to learn the platform's events.
+      Object.assign(keep, { type: "progress", kind: type });
+    } else if (type !== "start" && type !== "title_updated" && type !== "hitl") {
       return;
     }
     fs.appendFileSync(eventsFile(agentId), `${JSON.stringify(keep)}\n`);
@@ -322,16 +345,23 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
         // Gone meanwhile.
       }
     }
-    return { result: complete ? result : { sessionId: record.sessionId ?? undefined, text: done!.text ?? "", usage: done!.usage ?? null }, stderr: read("err") };
+    return {
+      result: complete ? result : { sessionId: record.sessionId ?? undefined, ...(done!.error ? { error: done!.error } : { text: done!.text ?? "" }), usage: done!.usage ?? null },
+      stderr: read("err"),
+    };
   }
 
-  /** The platform's "done" callback for the latest run, if it came. */
-  function doneEvent(record: AgentRecord): { text: string | null; usage: RunResult["usage"] } | null {
-    if (!record.runStartedAt) return null;
-    const e = events(record.id).filter((x) => x.type === "done" && String(x.at) >= record.runStartedAt!).at(-1);
+  /**
+   * The platform's "done" (or "error") callback for the latest run, if it came: the last one after
+   * the latest "start" (each run starts with one), and after the run was launched when that is known.
+   */
+  function doneEvent(record: AgentRecord): { text: string | null; usage: RunResult["usage"]; error: string | null } | null {
+    const all = events(record.id);
+    const lastStart = all.map((x) => x.type).lastIndexOf("start");
+    const e = all.slice(lastStart + 1).filter((x) => (x.type === "done" || x.type === "error") && (!record.runStartedAt || String(x.at) >= record.runStartedAt)).at(-1);
     if (!e) return null;
     const usage = (e.usage ?? null) as RunResult["usage"];
-    return { text: typeof e.text === "string" ? e.text : null, usage };
+    return { text: typeof e.text === "string" ? e.text : null, usage, error: e.type === "error" ? String(e.message ?? "运行出错") : null };
   }
 
   const stepAgent = (id: string): StepAgent => ({
@@ -402,7 +432,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
 
   const latestUsage = (id: string): AgentUsage | null => {
     const last = events(id).filter((e) => e.type === "usage").at(-1);
-    return last ? toAgentUsage({ input: Number(last.input ?? 0), output: Number(last.output ?? 0) }) : null;
+    return last ? toAgentUsage({ input: Number(last.input ?? 0), output: Number(last.output ?? 0), cacheReadTokens: Number(last.cacheReadTokens ?? 0) }) : null;
   };
 
   const chat = (text: string) => {
