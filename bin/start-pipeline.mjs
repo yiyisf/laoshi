@@ -7,9 +7,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureVersion } from "./ensure-version.mjs";
 import { findTsxCli } from "./locate.mjs";
 
 const toolDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+{
+  const { name, version } = JSON.parse(fs.readFileSync(path.join(toolDir, "package.json"), "utf8"));
+  ensureVersion({ kitRoot: toolDir, version, packageName: name, script: fileURLToPath(import.meta.url), argv: process.argv.slice(2) });
+}
 const tsxCli = findTsxCli(toolDir) ?? path.join(toolDir, "node_modules", "tsx", "dist", "cli.mjs");
 if (!fs.existsSync(tsxCli)) {
   console.error(`未启动：找不到 tsx。请先在 ${toolDir} 中执行 npm install。`);

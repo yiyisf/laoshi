@@ -23,6 +23,7 @@ export const mogaoAdapter: PlatformAdapter = {
   originEnv: { id: "AIMAX_SESSION_ID" },
   userEnv: "AIMAX_USER_NAME",
   runsInChat: true,
+  pinVersion: true,
   skillSetup: path.join(path.dirname(fileURLToPath(import.meta.url)), "skill", "setup.md"),
   words: {
     name: "摸高",

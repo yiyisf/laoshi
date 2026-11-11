@@ -79,6 +79,12 @@ test("skill 按平台渲染（laoshi M2e）：占位符都替换掉；dsh 用 la
       if (adapter === "mogao" || adapter === "cli") assert.doesNotMatch(text, /\bdsh\b|DeepSeek/i, `${adapter}：${file} 提到了 dsh`);
       if (adapter === "cli") assert.doesNotMatch(text, /摸高|aimax/i, `${adapter}：${file} 提到了摸高`);
     }
+    // 摸高's expert pins the version: every command that starts laoshi carries it (bin/ensure-version.mjs).
+    const entry = fs.readFileSync(path.join(out, "laoshi", "SKILL.md"), "utf8");
+    if (adapter === "mogao") {
+      assert.match(entry, /LAOSHI_WANT_VERSION=\S+ node "\/opt\/laoshi\/bin\/start-pipeline\.mjs"/);
+      assert.doesNotMatch(entry, /(?<!LAOSHI_WANT_VERSION=\S+ )node "\/opt\/laoshi\//, "摸高上每条 laoshi 命令都带版本");
+    } else assert.doesNotMatch(entry, /LAOSHI_WANT_VERSION/);
     const setup = fs.readFileSync(path.join(out, "laoshi-setup", "SKILL.md"), "utf8");
     assert.match(setup, adapter === "paseo" ? /paseo\.json/ : /\.laoshi\/services\.json/);
     assert.match(setup, /\/opt\/laoshi\/contracts\/verify\.md/);

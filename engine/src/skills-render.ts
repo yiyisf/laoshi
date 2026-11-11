@@ -25,6 +25,8 @@ export interface SkillValues {
   version: string;
   words: PlatformWords;
   fragments: Record<string, string>;
+  /** How the skills start laoshi's scripts: "node", or with the version they need ("LAOSHI_WANT_VERSION=… node"). */
+  node?: string;
 }
 
 /** "<!-- fragment: name -->" blocks of a fragments file, by name. */
@@ -60,6 +62,7 @@ export function skillValues(config?: unknown, root: string = KIT_ROOT): SkillVal
     version: kitVersion(),
     words: wordsFor(config),
     fragments: { ...builtin, ...own },
+    node: adapter.pinVersion ? `LAOSHI_WANT_VERSION=${kitVersion()} node` : "node",
   };
 }
 
@@ -71,8 +74,12 @@ export function renderSkillText(text: string, v: SkillValues): string {
     if (!m) lines.push(line);
     else if (v.fragments[m[1]]) lines.push(v.fragments[m[1]]);
   }
+  const node = v.node ?? "node";
   const filled = lines
     .join("\n")
+    // Commands that start laoshi's own scripts (not `node -p …` and the like).
+    .replaceAll('node "{{REQ_KIT_ROOT}}', `${node} "{{REQ_KIT_ROOT}}`)
+    .replaceAll('node "{{PIPELINE_LAUNCHER}}', `${node} "{{PIPELINE_LAUNCHER}}`)
     .replaceAll("{{REQ_KIT_ROOT}}", v.root.split(path.sep).join("/"))
     .replaceAll("{{PIPELINE_LAUNCHER}}", v.launcher.split(path.sep).join("/"))
     .replaceAll("{{REQ_KIT_VERSION}}", v.version);

@@ -338,6 +338,8 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       }
     })();
     if (complete && since < LINGER_GRACE_MS) return null;
+    // "done" is posted a moment before the run prints its result: prefer the printed result while it may still come.
+    if (!complete && done && Date.now() - Date.parse(done.at) < LINGER_GRACE_MS) return null;
     log(`agent ${record.id} 已经做完，但 aimax run 进程还没有退出：按已完成处理，并结束这个进程`);
     if (child) child.kill("SIGTERM");
     else if (record.pid) {
@@ -357,13 +359,13 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
    * The platform's "done" (or "error") callback for the latest run, if it came: the last one after
    * the latest "start" (each run starts with one), and after the run was launched when that is known.
    */
-  function doneEvent(record: AgentRecord): { text: string | null; usage: RunResult["usage"]; error: string | null } | null {
+  function doneEvent(record: AgentRecord): { at: string; text: string | null; usage: RunResult["usage"]; error: string | null } | null {
     const all = events(record.id);
     const lastStart = all.map((x) => x.type).lastIndexOf("start");
     const e = all.slice(lastStart + 1).filter((x) => (x.type === "done" || x.type === "error") && (!record.runStartedAt || String(x.at) >= record.runStartedAt)).at(-1);
     if (!e) return null;
     const usage = (e.usage ?? null) as RunResult["usage"];
-    return { text: typeof e.text === "string" ? e.text : null, usage, error: e.type === "error" ? String(e.message ?? "运行出错") : null };
+    return { at: String(e.at), text: typeof e.text === "string" ? e.text : null, usage, error: e.type === "error" ? String(e.message ?? "运行出错") : null };
   }
 
   const stepAgent = (id: string): StepAgent => ({

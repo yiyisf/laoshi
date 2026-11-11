@@ -5,10 +5,13 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureVersion } from "./ensure-version.mjs";
 import { findTsxCli } from "./locate.mjs";
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { name: packageName, version } = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8"));
+// The version a platform's skills ask for (LAOSHI_WANT_VERSION): installed first when different.
+ensureVersion({ kitRoot, version, packageName, script: fileURLToPath(import.meta.url), argv: process.argv.slice(2) });
 const tsxCli = findTsxCli(kitRoot) ?? path.join(kitRoot, "node_modules", "tsx", "dist", "cli.mjs");
 const launcher = path.join(kitRoot, "bin", "start-pipeline.mjs");
 
