@@ -123,6 +123,23 @@ const LINGER_GRACE_MS = 2_000;
 
 const isAlive = (pid: number) => engineProcessAlive(pid);
 
+/**
+ * Stops a run with everything it started. Each `aimax run` leads its own process group (spawned
+ * detached), so the commands its agent left running (a dev server, a build daemon) stop with it.
+ */
+function stopRun(pid: number | null | undefined): void {
+  if (!pid) return;
+  try {
+    process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
+  } catch {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // Gone already.
+    }
+  }
+}
+
 /** The callback receiver: one local HTTP server for all step agents of this engine process. */
 class CallbackServer {
   private server: http.Server | null = null;
@@ -277,7 +294,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     const out = fs.openSync(path.join(dir(record.id), `run-${n}.out`), "w");
     const err = fs.openSync(path.join(dir(record.id), `run-${n}.err`), "w");
     const callback = await callbacks.url(record.id);
-    const child = spawn(settings.command, [...args, "--output", "json", "--callback-url", callback], { cwd: record.cwd, env, stdio: ["ignore", out, err], windowsHide: true });
+    const child = spawn(settings.command, [...args, "--output", "json", "--callback-url", callback], { cwd: record.cwd, env, stdio: ["ignore", out, err], windowsHide: true, detached: process.platform !== "win32" });
     fs.closeSync(out);
     fs.closeSync(err);
     children.set(record.id, child);
@@ -341,14 +358,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     // "done" is posted a moment before the run prints its result: prefer the printed result while it may still come.
     if (!complete && done && Date.now() - Date.parse(done.at) < LINGER_GRACE_MS) return null;
     log(`agent ${record.id} 已经做完，但 aimax run 进程还没有退出：按已完成处理，并结束这个进程`);
-    if (child) child.kill("SIGTERM");
-    else if (record.pid) {
-      try {
-        process.kill(record.pid, "SIGTERM");
-      } catch {
-        // Gone meanwhile.
-      }
-    }
+    stopRun(child?.pid ?? record.pid);
     return {
       result: complete ? result : { sessionId: record.sessionId ?? undefined, ...(done!.error ? { error: done!.error } : { text: done!.text ?? "" }), usage: done!.usage ?? null },
       stderr: read("err"),
@@ -474,10 +484,11 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       const child = children.get(agentId);
       const record = read(agentId);
       if (child) {
-        child.kill("SIGTERM");
-        await new Promise((r) => child.once("exit", r));
+        const exited = new Promise((r) => child.once("exit", r));
+        stopRun(child.pid);
+        await exited;
       } else if (record?.pid && record.host === os.hostname() && isAlive(record.pid)) {
-        process.kill(record.pid, "SIGTERM");
+        stopRun(record.pid);
         for (let i = 0; i < 50 && isAlive(record.pid); i++) await sleep(100);
       }
       const now = read(agentId);
@@ -525,7 +536,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     },
 
     async close() {
-      for (const child of children.values()) child.kill("SIGTERM");
+      for (const child of children.values()) stopRun(child.pid);
       await callbacks.close();
     },
   };

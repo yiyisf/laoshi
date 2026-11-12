@@ -18,6 +18,8 @@ import { type PlatformWords, renderWords } from "./words.js";
 export const SKILLS_DIR = path.join(KIT_ROOT, "skills");
 /** laoshi's own /laoshi-setup sections, for platforms whose services are laoshi's builtin ones. */
 export const BUILTIN_SETUP = path.join(ENGINE_DIR, "skill-fragments", "setup-builtin.md");
+/** Sections every platform gets unless its own skill file has a block of the same name. */
+export const DEFAULT_FRAGMENTS = path.join(ENGINE_DIR, "skill-fragments", "defaults.md");
 
 export interface SkillValues {
   root: string;
@@ -61,7 +63,7 @@ export function skillValues(config?: unknown, root: string = KIT_ROOT): SkillVal
     launcher: path.join(root, path.relative(KIT_ROOT, LAUNCHER)),
     version: kitVersion(),
     words: wordsFor(config),
-    fragments: { ...builtin, ...own },
+    fragments: { ...parseFragments(fs.readFileSync(DEFAULT_FRAGMENTS, "utf8")), ...builtin, ...own },
     node: adapter.pinVersion ? `LAOSHI_WANT_VERSION=${kitVersion()} node` : "node",
   };
 }

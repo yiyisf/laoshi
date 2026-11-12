@@ -235,7 +235,7 @@ for (const [label, hold] of [["输出里已经有完整结果", false], ["只有
       agentsDir: path.join(base, "agents"),
       log: (m) => logs.push(m),
       chatOut: null,
-      env: { ...process.env, FAKE_AIMAX_DIR: fake, FAKE_AIMAX_LINGER_MS: "60000", ...(hold ? { FAKE_AIMAX_HOLD_OUTPUT: "1" } : {}) },
+      env: { ...process.env, FAKE_AIMAX_DIR: fake, FAKE_AIMAX_LINGER_MS: "60000", FAKE_AIMAX_BACKGROUND: path.join(base, "bg.pid"), ...(hold ? { FAKE_AIMAX_HOLD_OUTPUT: "1" } : {}) },
       pollMs: 50,
     });
     try {
@@ -249,6 +249,10 @@ for (const [label, hold] of [["输出里已经有完整结果", false], ["只有
       const record = JSON.parse(fs.readFileSync(path.join(base, "agents", agent.id, "agent.json"), "utf8")) as { pid: number };
       for (let i = 0; i < 50 && isAlive(record.pid); i++) await new Promise((r) => setTimeout(r, 100));
       assert.equal(isAlive(record.pid), false, "残留的 aimax run 进程已结束");
+      // What the run left running (a dev server, a build daemon) stops with it.
+      const bg = Number(fs.readFileSync(path.join(base, "bg.pid"), "utf8"));
+      for (let i = 0; i < 50 && isAlive(bg); i++) await new Promise((r) => setTimeout(r, 100));
+      assert.equal(isAlive(bg), false, "aimax run 留下的后台进程也结束了");
       // The next turn of the same agent is not mistaken for the old one.
       await agent.followUp("再写一个。WRITE:second.txt:yes");
       assert.equal((await agent.wait(20_000)).status, "idle");
