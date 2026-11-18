@@ -5,9 +5,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureVersion } from "./ensure-version.mjs";
 import { findTsxCli } from "./locate.mjs";
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+{
+  const { name, version } = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8"));
+  ensureVersion({ kitRoot: kitRoot, version, packageName: name, script: fileURLToPath(import.meta.url), argv: process.argv.slice(2) });
+}
 const tsxCli = findTsxCli(kitRoot) ?? path.join(kitRoot, "node_modules", "tsx", "dist", "cli.mjs");
 if (!fs.existsSync(tsxCli)) {
   console.log(`✗ 依赖未安装：找不到 tsx`);

@@ -879,13 +879,24 @@ async function runStep(
   }
 }
 
+/** The agent's context (its model's window) filled up: a new agent repeating the same reads fails the same way. */
+const CONTEXT_FULL =
+  /context.{0,30}(length|window|limit|exceed|overflow|too (long|large))|maximum context|prompt is too long|too many tokens|token.{0,20}(limit|exceed)|上下文.{0,10}(超|满|过长|溢出)|超出.{0,10}上下文/i;
+
+export function isContextFull(message: string): boolean {
+  return CONTEXT_FULL.test(message);
+}
+
 /** Tells the next agent of a step that an earlier one stopped part way. */
 function withRetryNote(extras: StepExtras, message: string): StepExtras {
   return {
     ...extras,
     contextLines: [
       ...(extras.contextLines ?? []).filter((l) => !l.startsWith("自动重试：")),
-      `自动重试：本步骤上一次中断了（${message.slice(0, 200)}）。工作区里可能留有上一次没做完的改动，先用 git status 和 git diff 查看，在此基础上继续，不要重复提交`,
+      `自动重试：本步骤上一次中断了（${message.slice(0, 200)}）。工作区里可能留有上一次没做完的改动，先用 git status 和 git diff 查看，在此基础上继续，不要重复提交` +
+        (isContextFull(message)
+          ? "。上一次是因为上下文占满而失败：这次严格按\"控制读入的内容量\"做，命令输出一律过滤后再看，不要解压或列出依赖包，先看已经写下的产物和 progress.md，接着它做，不要从头重新调查"
+          : ""),
     ],
   };
 }

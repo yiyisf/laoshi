@@ -68,6 +68,12 @@ export interface PlatformAdapter {
    * in the background: it runs in the chat's command, which shows what it tells the chat.
    */
   runsInChat?: boolean;
+  /**
+   * The skills are handed over with a fixed laoshi version (a platform's expert, installed on first
+   * use): every command in them carries it (LAOSHI_WANT_VERSION), and an installed laoshi of another
+   * version installs that one first (bin/ensure-version.mjs).
+   */
+  pinVersion?: boolean;
   /** Heading of the platform section in `doctor`. */
   doctorTitle: string;
   /** The platform section of `doctor` (connection, versions, profiles), when not --offline. */

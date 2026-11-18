@@ -105,6 +105,13 @@ async function tool(session, command, effect) {
   await post({ type: "progress", sessionId: session.id, event: { type: "tool_end", toolCallId, output: "ok token=SECRET123456", details: { exitCode: 0, cwd: session.cwd, sessionId: session.id } } });
 }
 
+// $FAKE_AIMAX_BACKGROUND: the agent leaves a process running (like a dev server); its pid goes to that file.
+if (process.env.FAKE_AIMAX_BACKGROUND && argv[0] === "run") {
+  const { spawn } = await import("node:child_process");
+  const bg = spawn(process.execPath, ["-e", "setTimeout(() => {}, 120000)"], { stdio: "ignore" });
+  fs.writeFileSync(process.env.FAKE_AIMAX_BACKGROUND, String(bg.pid));
+}
+
 const [command] = argv;
 if (command === "--version") {
   console.log("0.36.0");

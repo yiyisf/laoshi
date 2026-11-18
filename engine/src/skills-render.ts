@@ -18,6 +18,8 @@ import { type PlatformWords, renderWords } from "./words.js";
 export const SKILLS_DIR = path.join(KIT_ROOT, "skills");
 /** laoshi's own /laoshi-setup sections, for platforms whose services are laoshi's builtin ones. */
 export const BUILTIN_SETUP = path.join(ENGINE_DIR, "skill-fragments", "setup-builtin.md");
+/** Sections every platform gets unless its own skill file has a block of the same name. */
+export const DEFAULT_FRAGMENTS = path.join(ENGINE_DIR, "skill-fragments", "defaults.md");
 
 export interface SkillValues {
   root: string;
@@ -25,6 +27,8 @@ export interface SkillValues {
   version: string;
   words: PlatformWords;
   fragments: Record<string, string>;
+  /** How the skills start laoshi's scripts: "node", or with the version they need ("LAOSHI_WANT_VERSION=… node"). */
+  node?: string;
 }
 
 /** "<!-- fragment: name -->" blocks of a fragments file, by name. */
@@ -59,7 +63,8 @@ export function skillValues(config?: unknown, root: string = KIT_ROOT): SkillVal
     launcher: path.join(root, path.relative(KIT_ROOT, LAUNCHER)),
     version: kitVersion(),
     words: wordsFor(config),
-    fragments: { ...builtin, ...own },
+    fragments: { ...parseFragments(fs.readFileSync(DEFAULT_FRAGMENTS, "utf8")), ...builtin, ...own },
+    node: adapter.pinVersion ? `LAOSHI_WANT_VERSION=${kitVersion()} node` : "node",
   };
 }
 
@@ -71,8 +76,12 @@ export function renderSkillText(text: string, v: SkillValues): string {
     if (!m) lines.push(line);
     else if (v.fragments[m[1]]) lines.push(v.fragments[m[1]]);
   }
+  const node = v.node ?? "node";
   const filled = lines
     .join("\n")
+    // Commands that start laoshi's own scripts (not `node -p …` and the like).
+    .replaceAll('node "{{REQ_KIT_ROOT}}', `${node} "{{REQ_KIT_ROOT}}`)
+    .replaceAll('node "{{PIPELINE_LAUNCHER}}', `${node} "{{PIPELINE_LAUNCHER}}`)
     .replaceAll("{{REQ_KIT_ROOT}}", v.root.split(path.sep).join("/"))
     .replaceAll("{{PIPELINE_LAUNCHER}}", v.launcher.split(path.sep).join("/"))
     .replaceAll("{{REQ_KIT_VERSION}}", v.version);

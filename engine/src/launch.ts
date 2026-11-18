@@ -439,9 +439,11 @@ console.log(
     checked.branch ? `工作分支：${checked.branch}` : "不是 git 仓库：步骤不会提交代码。",
     loaded.sources.length > 1 ? `使用了项目配置：${loaded.sources[1]}` : null,
     `运行日志：${logPath}`,
-    args.originAgentId
-      ? `进展和结果会发回 agent ${args.originAgentId} 的对话。`
-      : "没有提供 --origin-agent，进展只写入日志。",
+    inChat
+      ? null
+      : args.originAgentId
+        ? `进展和结果会发回 agent ${args.originAgentId} 的对话。`
+        : "没有提供 --origin-agent，进展只写入日志。",
   ]
     .filter(Boolean)
     .join("\n"),
@@ -455,17 +457,29 @@ if (inChat) process.exit(await followInChat(child, chatOut));
  * with the chat's turn, so the chat keeps waiting for this command rather than ending its turn.
  */
 async function followInChat(engine: import("node:child_process").ChildProcess, file: string): Promise<number> {
-  console.log("流水线在这条命令里运行，进展会显示在下面；命令结束前请不要结束这一轮对话（对话结束时运行会中断，之后用继续命令接着做）。");
+  // How long the command may stay quiet before it says again that the pipeline is still running.
+  const HEARTBEAT_MS = Number(process.env.LAOSHI_HEARTBEAT_SECONDS ?? 180) * 1000;
+  const started = Date.now();
+  const stillRunning = () =>
+    `【流水线仍在运行，已运行 ${Math.round((Date.now() - started) / 60_000)} 分钟】流水线在这条命令里运行，不在后台：请继续等待这条命令的输出，不要结束这一轮对话（对话结束时机器被收回，流水线会停止，不会自己继续）。`;
+  console.log(stillRunning().replace(/已运行 \d+ 分钟/, "刚开始"));
   let shown = 0;
+  let lastOutput = Date.now();
   const show = () => {
     try {
       const text = fs.readFileSync(file, "utf8");
       if (text.length > shown) {
         process.stdout.write(text.slice(shown));
         shown = text.length;
+        lastOutput = Date.now();
       }
     } catch {
       // Not written yet.
+    }
+    // The chat reads this output to decide whether to keep waiting: say it again when quiet.
+    if (Date.now() - lastOutput >= HEARTBEAT_MS) {
+      console.log(stillRunning());
+      lastOutput = Date.now();
     }
   };
   const code = await new Promise<number>((resolve) => {
