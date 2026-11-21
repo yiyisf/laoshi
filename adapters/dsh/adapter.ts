@@ -4,7 +4,9 @@
 
 import fs from "node:fs";
 import type { AgentProfile } from "../../engine/src/config.js";
+import { kitVersion } from "../../engine/src/locations.js";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
+import { extractSemver, satisfies, supportedPlatformRange } from "../../engine/src/semver.js";
 import type { DshModels } from "./dsh-runtime.js";
 import { channelPaths, dshHome } from "./plugin/channel.mjs";
 
@@ -46,8 +48,18 @@ export const dshAdapter: PlatformAdapter = {
     const paths = channelPaths(dshHome(env));
     try {
       const call = pluginClient(env, 10_000);
-      const hello = await call<{ plugin: string; approvals: string }>("hello");
+      const hello = await call<{ plugin: string; approvals: string; dshVersion?: string | null }>("hello");
       tools.report("ok", `已连接 laoshi 的 dsh 插件 ${hello.plugin}（${paths.socket}），审批策略：${hello.approvals}`);
+      const expectedPlugin = kitVersion();
+      if (hello.plugin && hello.plugin !== expectedPlugin) {
+        tools.report("warn", `dsh 插件版本（${hello.plugin}）与当前 laoshi（${expectedPlugin}）不一致`, "运行 `laoshi install --platform dsh` 更新插件并重启 dsh");
+      }
+      const dshRange = supportedPlatformRange("dsh");
+      const dshVer = hello.dshVersion ? extractSemver(hello.dshVersion) : null;
+      if (dshRange && dshVer) {
+        if (satisfies(dshVer, dshRange)) tools.report("ok", `dsh 版本 ${dshVer} 在支持范围内（${dshRange}）`);
+        else tools.report("warn", `dsh 版本 ${dshVer} 不在已验证的支持范围（${dshRange}）内`, "dsh 处于快速迭代期，如接口行为异常请检查适配更新");
+      }
       const listed = await call<DshModels>("models").catch(() => null);
       if (!listed) {
         tools.report("warn", "插件没有列出 dsh 的模型（插件版本较旧？）", "重新运行安装脚本，更新 laoshi 的 dsh 插件后重启 dsh");

@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PlatformAdapter } from "../../engine/src/platform.js";
+import { extractSemver, satisfies, supportedPlatformRange } from "../../engine/src/semver.js";
 import { mogaoSettings } from "./mogao-runtime.js";
 
 export const mogaoAdapter: PlatformAdapter = {
@@ -42,7 +43,14 @@ export const mogaoAdapter: PlatformAdapter = {
       tools.report("fail", `运行 ${settings.command} --version 失败：${r.error?.message ?? (r.stderr || r.stdout).trim()}`, "在摸高的对话或沙箱里运行；不在 PATH 中时在安装级配置的 platform.mogao.command 写上它的完整路径");
       return;
     }
-    tools.report("ok", `aimax ${(r.stdout || "").trim()}（数据目录 ${settings.dataDir}，单次运行上限 ${settings.runTimeoutMinutes} 分钟）`);
+    const rawVersion = (r.stdout || "").trim();
+    const ver = extractSemver(rawVersion);
+    const range = supportedPlatformRange("mogao");
+    if (ver && range && !satisfies(ver, range)) {
+      tools.report("warn", `aimax ${rawVersion} 不在已验证的支持范围（${range}）内（数据目录 ${settings.dataDir}）`, "如回调或输出格式有变，请检查摸高适配器更新");
+    } else {
+      tools.report("ok", `aimax ${rawVersion}${range ? `（支持范围 ${range}）` : ""}（数据目录 ${settings.dataDir}，单次运行上限 ${settings.runTimeoutMinutes} 分钟）`);
+    }
     if (!process.env.AIMAX_SESSION_ID) tools.info("没有 AIMAX_SESSION_ID：不在摸高的对话里运行，进展只写入日志");
   },
 };
