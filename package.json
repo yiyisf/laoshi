@@ -60,6 +60,7 @@
     "adapters/*/skill/**",
     "adapters/dsh/plugin/",
     "adapters/paseo/plugin/",
+    "ui/",
     "adapters/dsh/intranet/",
     "skills/",
     "principles/",
