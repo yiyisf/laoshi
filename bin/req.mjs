@@ -61,6 +61,8 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi index [--rebuild [目录…]] [--prune]
                                本机记录的需求（需求插件据此找到所有需求）；索引里缺的需求用 --rebuild 补登
   laoshi api <命令> …          给程序用的 JSON 输出（见 contracts/cli-json.md）
+  laoshi board [--port <端口>] [--repo <目录>] [--read-only] [--no-open]
+                               在本机打开需求看板网页（查看所有需求、产物与待处理操作）
   laoshi plugin install [--yes] | status | remove
                                Paseo 的需求插件（在 Paseo 里看需求、确认方案、停止和继续）
   laoshi migrate [--apply | --rollback] [--from <目录>] [--to <目录>]
@@ -195,6 +197,9 @@ switch (command) {
     break;
   case "api":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "api.ts"), ...rest]) : 1;
+    break;
+  case "board":
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "board.ts"), ...rest]) : 1;
     break;
   case "reply":
     code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "reply.ts"), ...rest]) : 1;
