@@ -9,6 +9,11 @@ import { fill, type PlatformWords } from "./words.js";
 const HEADER =
   "【需求开发流水线通知】这条消息来自后台运行的开发流水线，不是用户发的。请把要点转告用户：讲需求和结果，不讲代码实现，除非用户问起。";
 
+/** Unified plain-language hint appended to every stop message so users always know why it paused and what to say next. */
+export function nextStepHint(reason: string, sayNext: string): string {
+  return `【停下原因】${reason}\n【下一步请说】${sayNext}`;
+}
+
 export function blockedMessage(input: {
   featureDir: string;
   questions: string[];
@@ -38,6 +43,10 @@ export function blockedMessage(input: {
     "",
     input.resumeCommand,
     ...(input.reminderHours ? ["", `（如果 ${input.reminderHours} 小时内还没有回答，会在这个对话里提醒一次。）`] : []),
+    "",
+    input.source === "reproduce"
+      ? nextStepHint("缺陷未能复现，需要你补充复现信息", "补充环境、账号/数据、操作步骤或报错信息，确认后说「继续」")
+      : nextStepHint("方案审核发现需要你拍板的业务问题", "逐条回答上面的问题，确认更新后的需求说明后说「继续」"),
   ].join("\n");
 }
 
@@ -56,6 +65,8 @@ export function permissionMessage(input: {
     "",
     `请告诉用户：${fill((input.words ?? wordsFor()).approvePermission, { agent: input.agentTitle })}。`,
     "如果这类等待经常出现，说明流水线配置中的 agent 模式还会询问权限，需要把配置中的 agent 改成免确认模式（运行 /laoshi-doctor 可以查看当前配置）。",
+    "",
+    nextStepHint(`「${input.stepTitle}」步骤正在等待权限批准`, "批准或拒绝上述操作（若需在对话里回答，说「批准」或「拒绝 + 理由」）"),
   ].join("\n");
 }
 
@@ -103,6 +114,11 @@ export function failedMessage(input: {
       : ["问题解决后，执行下面的命令可以从中断的步骤继续："]),
     "",
     input.resumeCommand,
+    "",
+    nextStepHint(
+      `在「${input.stepTitle}」步骤中断（${input.reason}）`,
+      input.autoResumeAt ? `等待 ${input.autoResumeAt} 自动继续，或现在说「继续」` : "问题处理好后说「继续」（已完成的步骤不会重做）",
+    ),
   ].join("\n");
 }
 
@@ -327,6 +343,11 @@ export function phaseDoneMessage(input: {
     "",
     input.verifyCommand,
     ...(input.reminderHours && !input.verifyAt ? ["", `（如果 ${input.reminderHours} 小时内还没有开始测试验证，会在这个对话里提醒一次。）`] : []),
+    "",
+    nextStepHint(
+      "研发已完成，等待开始测试验证",
+      input.verifyAt ? `等待 ${input.verifyAt} 自动开始测试，或现在说「开始测试验证」` : "准备好后说「开始测试验证」（或指定时间，如「明早 9 点开始测试」）",
+    ),
   ].join("\n");
 }
 
@@ -400,6 +421,8 @@ export function approvalMessage(input: {
     input.resumeCommand,
     ...(input.reminderHours ? ["", `（如果 ${input.reminderHours} 小时内还没有确认，会在这个对话里提醒一次。）`] : []),
     ...(input.autoContinueAt ? ["", `（按团队设置，到 ${input.autoContinueAt} 仍没有确认时，会按这个方案继续开发。）`] : []),
+    "",
+    nextStepHint("方案已通过审核，等待你确认后再开始写代码", "「可以，按这个做」确认开发，或直接说出要修改的地方"),
   ].join("\n");
 }
 
