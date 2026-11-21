@@ -78,6 +78,8 @@ const HELP = `laoshi ${version}（${kitRoot}）
   laoshi docs [--port <端口>] [--no-open]
                                在本机打开这个版本的文档站点（不需要外网）
   laoshi doctor [--no-project] 体检：安装、配置、平台、当前项目
+  laoshi diagnose <需求> [--out <目录>]
+                               导出已脱敏的诊断包（状态、日志、步骤输出与事件），发给维护者排查问题
   laoshi configure          配置向导：选择 builder 和 reviewer 用的 agent
   laoshi configure --auto   不提问，按推荐选好 builder、reviewer 和备用模型
   laoshi notify-test [--type blocked|failed|completed|milestone|permission]
@@ -167,6 +169,9 @@ switch (command) {
     break;
   case "doctor":
     code = node([path.join(kitRoot, "bin", "req-doctor.mjs"), ...rest]);
+    break;
+  case "diagnose":
+    code = needTsx() ? node([tsxCli, path.join(kitRoot, "engine", "src", "diagnose.ts"), ...rest]) : 1;
     break;
   case "configure":
   case "config":
