@@ -23,7 +23,18 @@ export interface BoardRenderOptions {
   platformName?: string;
   readOnly?: boolean;
   now?: number;
+  /** Optional API base path (e.g. "/api") enabling live actions, detail fetch, and document preview. */
+  apiBase?: string;
+  /** CSRF token required in X-Laoshi-Token header for POST actions when apiBase is set. */
+  csrfToken?: string;
 }
+
+const GROUP_SUBTITLES: Record<string, string> = {
+  running: "AI 正在推进",
+  verify: "研发已完成，等待测试验证",
+  done: "近 14 天内完成",
+  other: "较早或未启动的需求",
+};
 
 export function escapeHtml(text: string): string {
   return text
@@ -92,7 +103,7 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       return `<section class="rk-section" data-group="${g}">
   <div class="rk-section-head">
     <span class="rk-eyebrow">${GROUP_EYEBROWS[g]} · ${list.length}</span>
-    <span class="rk-section-sub">${GROUP_LABELS[g]}</span>
+    <span class="rk-section-sub">${GROUP_SUBTITLES[g] ?? GROUP_LABELS[g]}</span>
   </div>
   <div class="rk-list">
     ${list
@@ -130,6 +141,7 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
   const payload = JSON.stringify(
     items.map((i) => ({
       key: i.key,
+      repo: i.sourceRepo ?? i.repo,
       title: i.title,
       project: i.project,
       featureDir: i.featureDir,
@@ -138,10 +150,16 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       status: i.status,
       facts: facts(i),
       updated: ago(i.updatedAt, now),
+      waiting: i.waiting ?? null,
       stops: trackOf(i),
       actions: readOnly ? [] : actionsFor(i).map((a) => ({ id: a, ...ACTION_TEXT[a] })),
     })),
   ).replace(/</g, "\\u003c");
+  const runtimeCfg = JSON.stringify({
+    apiBase: options.apiBase ?? null,
+    csrfToken: options.csrfToken ?? null,
+    readOnly,
+  }).replace(/</g, "\\u003c");
 
   return `<!doctype html>
 <html lang="zh-CN" data-theme="dark">
@@ -225,7 +243,13 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
 .rk-btn { background: var(--rk-surface-2); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .rk-btn-primary { background: var(--rk-brand); border-color: var(--rk-brand); color: var(--rk-brand-fg); }
+.rk-btn-danger { background: var(--rk-danger-tint); border-color: var(--rk-danger); color: var(--rk-danger); }
 .rk-btn-ghost { background: transparent; }
+.rk-toast { position: fixed; bottom: 20px; right: 20px; max-width: 420px; background: var(--rk-surface-2); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 10px; padding: 10px 14px; font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .16s ease; }
+.rk-toast.show { opacity: 1; }
+.rk-toast.ok { border-color: var(--rk-success); }
+.rk-toast.err { border-color: var(--rk-danger); }
+.rk-doc-preview { background: var(--rk-bg); border: 1px solid var(--rk-border); border-radius: 10px; padding: 12px; font: 12px/1.6 var(--rk-mono); white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow-y: auto; margin: 0; }
 .rk-list { display: flex; flex-direction: column; gap: 8px; }
 .rk-row { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 316px 176px; align-items: center; gap: 14px; cursor: pointer; }
 .rk-row:hover { border-color: var(--rk-brand); }
@@ -262,14 +286,17 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 <div class="rk-shell">
   <header class="rk-topbar">
     <div class="rk-brand-title"><span class="rk-dot-brand"></span><span>${escapeHtml(title)}</span><span class="rk-stage">${escapeHtml(platformName)}</span></div>
-    <button type="button" class="rk-btn" id="rk-theme-toggle">切换深浅主题</button>
+    <div class="rk-card-actions" style="margin-top:0;padding-top:0">
+      ${options.apiBase ? `<button type="button" class="rk-btn" id="rk-refresh">刷新</button>` : ""}
+      <button type="button" class="rk-btn" id="rk-theme-toggle">切换深浅主题</button>
+    </div>
   </header>
 
   <section class="rk-kpi-grid" aria-label="状态概览">
     <button type="button" class="rk-kpi active" data-filter-group="all">
       <div class="rk-kpi-label">需要你处理</div>
       <div class="rk-kpi-num">${summary.attention}</div>
-      <div class="rk-kpi-sub">${summary.longestWaitText ? `最长 ${escapeHtml(summary.longestWaitText)}` : "全部处理完毕"}</div>
+      <div class="rk-kpi-sub">${summary.longestWaitText ? `最长${escapeHtml(summary.longestWaitText)}` : "全部处理完毕"}</div>
     </button>
     <button type="button" class="rk-kpi" data-filter-group="running">
       <div class="rk-kpi-label">进行中</div>
@@ -304,8 +331,10 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 
 <div class="rk-backdrop" id="rk-backdrop" aria-hidden="true"></div>
 <aside class="rk-drawer" id="rk-drawer" aria-hidden="true"></aside>
+<div class="rk-toast" id="rk-toast" role="status" aria-live="polite"></div>
 <script>
 const ITEMS = ${payload};
+const CFG = ${runtimeCfg};
 const byKey = new Map(ITEMS.map((i) => [i.key, i]));
 const STOP_STATE_LABEL = { done: "已完成", now: "进行中", needs: "等你处理", todo: "待开始" };
 let activeGroup = "all";
@@ -313,6 +342,16 @@ let activeProject = "";
 const searchEl = document.getElementById("rk-search");
 const drawer = document.getElementById("rk-drawer");
 const backdrop = document.getElementById("rk-backdrop");
+const toastEl = document.getElementById("rk-toast");
+let toastTimer = null;
+
+function showToast(msg, kind) {
+  if (!toastEl) return;
+  toastEl.textContent = msg;
+  toastEl.className = "rk-toast show " + (kind || "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 4200);
+}
 
 function closeDrawer() {
   drawer?.classList.remove("open");
@@ -322,6 +361,34 @@ function closeDrawer() {
 }
 
 backdrop?.addEventListener("click", closeDrawer);
+document.getElementById("rk-refresh")?.addEventListener("click", () => window.location.reload());
+
+async function runAction(actionId, key, btn) {
+  const item = byKey.get(key);
+  if (!item) return;
+  if (!CFG.apiBase) { showToast("当前为静态预览模式，请通过 laoshi board 启动看板后执行操作。", "err"); return; }
+  const act = (item.actions || []).find((a) => a.id === actionId);
+  if (act?.confirm && !window.confirm(act.confirm)) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(CFG.apiBase + "/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(CFG.csrfToken ? { "X-Laoshi-Token": CFG.csrfToken } : {}) },
+      body: JSON.stringify({ action: actionId, repo: item.repo, featureDir: item.featureDir }),
+    });
+    const data = await res.json().catch(() => ({ ok: false, message: "响应解析失败" }));
+    if (res.ok && data.ok) {
+      showToast(data.message || "操作已提交", "ok");
+      setTimeout(() => window.location.reload(), 900);
+    } else {
+      showToast(data.message || data.error || "操作失败", "err");
+      if (btn) btn.disabled = false;
+    }
+  } catch (err) {
+    showToast("请求失败：" + String(err), "err");
+    if (btn) btn.disabled = false;
+  }
+}
 
 function applyFilter() {
   const q = (searchEl?.value || "").trim().toLowerCase();
@@ -430,7 +497,7 @@ function openDrawer(key) {
     item.actions.forEach((a, idx) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = idx === 0 ? "rk-btn rk-btn-primary" : "rk-btn";
+      b.className = a.id === "stop" ? "rk-btn rk-btn-danger" : idx === 0 ? "rk-btn rk-btn-primary" : "rk-btn";
       b.dataset.action = a.id;
       b.dataset.key = item.key;
       b.textContent = a.label;
@@ -438,6 +505,46 @@ function openDrawer(key) {
     });
     actSec.append(actTitle, bar);
     drawer.append(actSec);
+  }
+
+  if (CFG.apiBase) {
+    const docSec = document.createElement("div");
+    docSec.className = "rk-drawer-section";
+    const docTitle = document.createElement("h3");
+    docTitle.className = "rk-drawer-section-title";
+    docTitle.textContent = "相关产物";
+    const docChips = document.createElement("div");
+    docChips.className = "rk-chips";
+    const docPre = document.createElement("pre");
+    docPre.className = "rk-doc-preview rk-hidden";
+    docSec.append(docTitle, docChips, docPre);
+    drawer.append(docSec);
+
+    const qs = new URLSearchParams({ repo: item.repo, feature: item.featureDir });
+    fetch(CFG.apiBase + "/detail?" + qs.toString())
+      .then((r) => (r.ok ? r.json() : null))
+      .then((detail) => {
+        const files = detail?.files || [];
+        if (files.length === 0) { docTitle.textContent = "相关产物（暂无）"; return; }
+        for (const f of files.slice(0, 8)) {
+          const c = document.createElement("button");
+          c.type = "button";
+          c.className = "rk-chip";
+          c.textContent = f;
+          c.onclick = async () => {
+            docChips.querySelectorAll(".rk-chip").forEach((x) => x.classList.remove("active"));
+            c.classList.add("active");
+            docPre.classList.remove("rk-hidden");
+            docPre.textContent = "加载中…";
+            const fq = new URLSearchParams({ repo: item.repo, feature: item.featureDir, file: f });
+            const resp = await fetch(CFG.apiBase + "/file?" + fq.toString());
+            const body = await resp.json().catch(() => null);
+            docPre.textContent = body?.content || "无法读取文件内容";
+          };
+          docChips.append(c);
+        }
+      })
+      .catch(() => { docTitle.textContent = "相关产物（加载失败）"; });
   }
 
   drawer.classList.add("open");
@@ -449,6 +556,8 @@ function openDrawer(key) {
 document.addEventListener("click", (e) => {
   const target = e.target;
   if (!(target instanceof HTMLElement)) return;
+  const actBtn = target.closest("[data-action]");
+  if (actBtn instanceof HTMLButtonElement) { runAction(actBtn.dataset.action || "", actBtn.dataset.key || "", actBtn); return; }
   const openBtn = target.closest("[data-open]");
   if (openBtn instanceof HTMLElement) { openDrawer(openBtn.dataset.open || ""); return; }
   const row = target.closest(".rk-row");
