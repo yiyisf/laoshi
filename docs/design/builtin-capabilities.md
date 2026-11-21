@@ -1,6 +1,6 @@
 # laoshi 内置能力：worktree、服务、本机调度
 
-- 状态：worktree 与服务**已实现**（M2b，`engine/src/builtin/`）；本机调度**已设计，未实现**
+- 状态：worktree 与服务**已实现**（M2b，`engine/src/builtin/`）；本机调度**不做**（2026-11-21 决定：Paseo 与 dsh 均自带定时任务，命令行适配器已冻结，设计保留供参考）
 - 依据：[ADR 0008](../adr/0008-capability-sources-and-platform-plugin.md) 决定 3
 - 相关：[adapter-guide §2](adapter-guide.md)、[dsh-adapter](dsh-adapter.md)
 
@@ -47,7 +47,7 @@
 - **停止**：结束运行器的整个进程树（运行器、shell 和服务）。Windows 用 `taskkill /T /F`；其他系统向进程组发送 SIGTERM，5 秒后仍在则发 SIGKILL。运行器以 detached 方式启动，所以它自成一个进程组，服务也在这个组里。
 - **已知限制**：进程号可能被系统复用，所以停止前不能确认它还是原来的服务进程；绑定 `0.0.0.0` 的服务，空闲端口按 `127.0.0.1` 检查。
 
-## 4. 本机调度（设计，未实现）
+## 4. 本机调度（设计归档，不做）
 
 **什么时候需要**：平台和插件都没有定时任务时才需要。dsh 的定时消息来自插件，Paseo 有自己的定时任务，所以现在两个适配器都用不上它。第一个用户会是 M3 的无头 CLI 运行时。引擎里用到定时的地方有：预约启动（`launch.ts`）、守护检查（`main.ts`，`cronEvery`）、等待提醒和自动继续（`pipeline.ts`）、需求总览定时发送（`digest.ts`，`scheduleNewAgent`）。
 
