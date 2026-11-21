@@ -207,13 +207,19 @@ export interface MogaoRuntimeOptions {
   chatOut: string | null;
   env?: NodeJS.ProcessEnv;
   pollMs?: number;
+  /** Maximum UTF-8 bytes passed inline to `--message`; longer messages are written to a file. */
+  maxInlineBytes?: number;
 }
 
 export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
   const { settings, agentsDir, log } = options;
   const env = options.env ?? process.env;
   const pollMs = options.pollMs ?? 500;
+  const envMax = Number(env.LAOSHI_MOGAO_MAX_INLINE_BYTES);
+  const maxInlineBytes = options.maxInlineBytes ?? (Number.isFinite(envMax) && envMax > 0 ? envMax : 100_000);
   const children = new Map<string, ChildProcess>();
+  /** Latest run number started by this runtime process, per agent (used to distinguish crashed own runs from cut-off earlier turns). */
+  const launchedRuns = new Map<string, number>();
   const dir = (id: string) => path.join(agentsDir, id);
   const recordFile = (id: string) => path.join(dir(id), "agent.json");
   const read = (id: string): AgentRecord | null => {
@@ -307,7 +313,22 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
       fs.appendFileSync(path.join(dir(record.id), `run-${n}.err`), `\n${e.message}\n`);
       forget();
     });
+    launchedRuns.set(record.id, n);
     write({ ...record, runs: n, pid: child.pid ?? null, host: os.hostname(), runStartedAt: new Date().toISOString() });
+  }
+
+  /**
+   * Passes short messages inline via `--message`; writes longer ones (start prompt, follow-up, or
+   * interrupt) to the agent's directory so we never hit OS ARG_MAX or CLI argument length limits.
+   */
+  function prepareMessage(record: AgentRecord, text: string, filename: string, alwaysWrite = false): string {
+    const file = path.join(dir(record.id), filename);
+    const over = Buffer.byteLength(text) > maxInlineBytes;
+    if (alwaysWrite || over) {
+      fs.mkdirSync(dir(record.id), { recursive: true });
+      fs.writeFileSync(file, text, "utf8");
+    }
+    return over ? `请先完整阅读文件 ${file}，然后严格按照其中的要求完成任务。` : text;
   }
 
   const runArgs = (record: AgentRecord, message: string) => [
@@ -414,8 +435,8 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
           }
           if (result && !result.error) return { ...base, usage, status: "idle", lastMessage: result.text ?? null };
           if (result?.error) return { ...base, usage, status: "error", error: /timed out/i.test(result.error) ? `超过 ${settings.runTimeoutMinutes} 分钟（单次运行的上限），运行已停止` : result.error };
-          // No result: the run was cut off (the chat's turn ended with the container). Continue its session.
-          if (record.sessionId && record.host !== os.hostname()) {
+          // No result: the previous turn's run was cut off (container recycled or command timed out). Continue its session.
+          if (record.sessionId && (record.host !== os.hostname() || launchedRuns.get(id) !== record.runs)) {
             log(`agent ${id} 的上一次运行被中断（没有结果），接着它的会话 ${record.sessionId} 继续`);
             await launch(record, runArgs(record, CONTINUE_MESSAGE));
             continue;
@@ -429,7 +450,8 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     async followUp(text: string): Promise<void> {
       const record = read(id);
       if (!record?.sessionId) throw new Error(`agent ${id} 还没有会话，不能追问`);
-      await launch(record, runArgs(record, text));
+      const message = prepareMessage(record, text, `followup-${record.runs + 1}.md`);
+      await launch(record, runArgs(record, message));
     },
     async archive(): Promise<void> {
       // Sessions stay with the platform (aimax sessions, export-html); nothing to archive.
@@ -462,10 +484,7 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
     async startAgent(input) {
       const record: AgentRecord = { id: `mogao-${crypto.randomBytes(6).toString("hex")}`, cwd: input.cwd, title: input.title, sessionId: null, runs: 0, pid: null, host: null, answered: null };
       write(record);
-      const promptFile = path.join(dir(record.id), "prompt.md");
-      fs.writeFileSync(promptFile, input.prompt);
-      // One command-line argument holds at most 128 KB on Linux: a longer prompt is read from its file.
-      const message = Buffer.byteLength(input.prompt) <= 100_000 ? input.prompt : `请先完整阅读文件 ${promptFile}，然后严格按照其中的要求完成任务。`;
+      const message = prepareMessage(record, input.prompt, "prompt.md", true);
       await launch(record, runArgs(record, message));
       return stepAgent(record.id);
     },
@@ -492,7 +511,10 @@ export function createMogaoRuntime(options: MogaoRuntimeOptions): AgentRuntime {
         for (let i = 0; i < 50 && isAlive(record.pid); i++) await sleep(100);
       }
       const now = read(agentId);
-      if (now?.sessionId) await launch(now, runArgs(now, text));
+      if (now?.sessionId) {
+        const message = prepareMessage(now, text, `interrupt-${now.runs + 1}.md`);
+        await launch(now, runArgs(now, message));
+      }
     },
 
     agentDirectory: async () => null,

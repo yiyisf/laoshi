@@ -300,3 +300,109 @@ test("摸高：上一版启动的 agent（记录里没有 runStartedAt）也按�
     await runtime.close();
   }
 });
+
+test("摸高：超长 prompt 与超长 followUp 改写文件，--message 只传短读取指令", { skip: process.platform === "win32" }, async () => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-mogao-longmsg-")));
+  const repo = path.join(base, "repo");
+  const fake = path.join(base, "aimax");
+  const seenLog = path.join(base, "seen-messages.txt");
+  fs.mkdirSync(repo);
+  fs.mkdirSync(fake);
+  // Wrapper records --message values passed to fake-aimax before forwarding.
+  const bin = path.join(base, "aimax.sh");
+  fs.writeFileSync(
+    bin,
+    `#!/bin/sh
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--message" ]; then printf "%s\\n---\\n" "$arg" >> "${seenLog}"; fi
+  prev="$arg"
+done
+exec "${process.execPath}" "${FAKE}" "$@"
+`,
+    { mode: 0o755 },
+  );
+  const runtime = createMogaoRuntime({
+    settings: mogaoSettings({ platform: { mogao: { command: bin } } }, {}),
+    agentsDir: path.join(base, "agents"),
+    log: () => undefined,
+    chatOut: null,
+    env: { ...process.env, FAKE_AIMAX_DIR: fake },
+    pollMs: 50,
+    maxInlineBytes: 64,
+  });
+  try {
+    const longPrompt = `长提示词正文：${"A".repeat(200)}`;
+    const agent = await runtime.startAgent({ role: "builder", title: "设计", prompt: longPrompt, cwd: repo, labels: {}, parentAgentId: "chat-1" });
+    assert.equal((await agent.wait(10_000)).status, "idle");
+    const longFollowUp = `长追问内容：${"B".repeat(200)}`;
+    await agent.followUp(longFollowUp);
+    assert.equal((await agent.wait(10_000)).status, "idle");
+
+    const promptFile = path.join(base, "agents", agent.id, "prompt.md");
+    const followUpFile = path.join(base, "agents", agent.id, "followup-2.md");
+    assert.equal(fs.readFileSync(promptFile, "utf8"), longPrompt);
+    assert.equal(fs.readFileSync(followUpFile, "utf8"), longFollowUp);
+
+    const seen = fs.readFileSync(seenLog, "utf8");
+    assert.match(seen, new RegExp(promptFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(seen, new RegExp(followUpFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(seen, /A{50}|B{50}/, "超长正文不应直接塞进命令行 --message");
+  } finally {
+    await runtime.close();
+  }
+});
+
+test("摸高：同主机上轮次被中止且无输出时，attachAgent 仍自动续接原会话", { skip: process.platform === "win32" }, async () => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-mogao-samehost-")));
+  const repo = path.join(base, "repo");
+  const fake = path.join(base, "aimax");
+  const agentsDir = path.join(base, "agents");
+  fs.mkdirSync(repo);
+  fs.mkdirSync(fake);
+  const bin = path.join(base, "aimax.sh");
+  fs.writeFileSync(bin, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
+
+  // First runtime establishes a session, then simulate a cut-off second run on the SAME hostname with dead pid and empty output.
+  const first = createMogaoRuntime({
+    settings: mogaoSettings({ platform: { mogao: { command: bin } } }, {}),
+    agentsDir,
+    log: () => undefined,
+    chatOut: null,
+    env: { ...process.env, FAKE_AIMAX_DIR: fake },
+    pollMs: 50,
+  });
+  let agentId = "";
+  try {
+    const a = await first.startAgent({ role: "builder", title: "实现", prompt: "WRITE:first.txt:ok", cwd: repo, labels: {}, parentAgentId: "chat-1" });
+    assert.equal((await a.wait(10_000)).status, "idle");
+    agentId = a.id;
+  } finally {
+    await first.close();
+  }
+
+  const recordPath = path.join(agentsDir, agentId, "agent.json");
+  const rec = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+  rec.runs = 2;
+  rec.pid = 999999; // non-existent pid on the SAME os.hostname()
+  rec.host = os.hostname();
+  fs.writeFileSync(recordPath, JSON.stringify(rec));
+  fs.writeFileSync(path.join(agentsDir, agentId, "run-2.out"), "");
+
+  const second = createMogaoRuntime({
+    settings: mogaoSettings({ platform: { mogao: { command: bin } } }, {}),
+    agentsDir,
+    log: () => undefined,
+    chatOut: null,
+    env: { ...process.env, FAKE_AIMAX_DIR: fake },
+    pollMs: 50,
+  });
+  try {
+    const outcome = await second.attachAgent(agentId).wait(10_000);
+    assert.equal(outcome.status, "idle", outcome.error ?? "");
+    const updated = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+    assert.equal(updated.runs, 3, "应自动续接并启动第 3 次运行");
+  } finally {
+    await second.close();
+  }
+});
