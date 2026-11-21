@@ -1,6 +1,6 @@
 # 命令行 agent 适配器（M3）
 
-- 状态：第一版已实现（[adapters/cli](../../adapters/cli/README.md)），用假的命令行测试；真实的 Claude Code、Codex 上的运行待验证。
+- 状态：**已冻结**（2026-11-21 决定，见 [roadmap](../roadmap.md)）。第一版已实现（[adapters/cli](../../adapters/cli/README.md)），保留现有代码作为一致性测试的参照，不再新增命令行驱动或在真实命令行上维护 evals；需要使用 Claude Code、Codex 时，经由 Paseo 等上层 agent 平台接入。
 - 目标：不依赖任何 agent 平台，在一台只装了编码 agent 命令行（Claude Code 的 `claude`、OpenAI Codex 的 `codex`）的机器上跑完整的流水线（[抽取计划 M3](../extraction/plan.md)）。这是第一个"非平台"的适配器，也是 [ADR 0002](../adr/0002-two-orchestration-modes.md) 里模式 A 的最小形态。
 
 ## 1. 形态

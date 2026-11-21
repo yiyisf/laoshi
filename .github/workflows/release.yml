@@ -145,6 +145,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           node scripts/pack-intranet.mjs --out "$RUNNER_TEMP/offline"
           cp "$RUNNER_TEMP"/offline/*.zip .
+      - name: Mogao expert package
+        run: |
+          node adapters/mogao/make-expert.mjs --out "$RUNNER_TEMP/expert"
+          cp "$RUNNER_TEMP"/expert/laoshi-expert-*.zip .
       - name: Tag the tested commit
         if: ${{ needs.tag.outputs.create == 'true' }}
         run: |
@@ -183,6 +187,7 @@ jobs:
           files: |
             laoshi-*.tgz
             laoshi-*-win32-x64.zip
+            laoshi-expert-*.zip
           prerelease: ${{ contains(env.TAG, '-') }}
           body_path: ${{ runner.temp }}/notes.md
       - name: Publish to npm failed
