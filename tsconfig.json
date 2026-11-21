@@ -18,6 +18,7 @@
     "engine/src/**/*.ts",
     "engine/test/**/*.ts",
     "adapters/**/*.ts",
+    "ui/**/*.ts",
     "test/**/*.ts"
   ],
   "exclude": [
