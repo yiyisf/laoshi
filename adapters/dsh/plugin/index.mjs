@@ -109,7 +109,7 @@ export function apply(ctx, config = {}) {
   }
 
   const methods = {
-    hello: async () => ({ plugin: VERSION, approvals }),
+    hello: async () => ({ plugin: VERSION, approvals, dshVersion: process.env.DSH_VERSION?.trim() || null }),
 
     /** The chat (or any session): does it exist, where does it work. */
     session: async ({ sessionId }) => {
