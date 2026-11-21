@@ -73,11 +73,11 @@ export const GROUP_LABELS: Record<Group, string> = {
 };
 
 export const GROUP_EYEBROWS: Record<Group, string> = {
-  attention: "NEEDS YOU",
-  running: "IN PROGRESS",
-  verify: "READY TO TEST",
-  done: "DONE",
-  other: "OTHERS",
+  attention: "需要你处理",
+  running: "进行中",
+  verify: "待测试验证",
+  done: "最近完成",
+  other: "其他",
 };
 
 export const ACTION_TEXT: Record<ActionKind, { label: string; confirm: string }> = {

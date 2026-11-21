@@ -107,11 +107,12 @@ test("summarizeBoard、buildInboxCards 与 filterRequirements 正确聚合与筛
   assert.equal(stops[2].state, "now");
 });
 
-test("renderBoardHtml 输出 Bento 看板并安全转义 HTML", () => {
+test("renderBoardHtml 输出全中文 Bento 看板并安全转义 HTML", () => {
   const html = renderBoardHtml(sampleItems(), { platformName: "dsh", now: NOW });
-  assert.match(html, /NEEDS YOU · 1/);
-  assert.match(html, /IN PROGRESS · 1/);
-  assert.match(html, /READY TO TEST · 1/);
+  assert.match(html, /需要你处理 · 1/);
+  assert.match(html, /进行中 · 1/);
+  assert.match(html, /待测试验证 · 1/);
+  assert.doesNotMatch(html, /NEEDS YOU|IN PROGRESS|READY TO TEST|DONE \(14D\)/, "界面分组与 KPI 文案应统一使用中文");
   assert.match(html, /多仓 \+2/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/, "标题中的脚本标签必须被转义");
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);

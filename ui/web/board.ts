@@ -57,8 +57,8 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       ? ""
       : `<section class="rk-section" data-group="attention">
   <div class="rk-section-head">
-    <span class="rk-eyebrow rk-eyebrow-needs">NEEDS YOU · ${inbox.length}</span>
-    <span class="rk-section-sub">需要你处理（按等待时长排序）</span>
+    <span class="rk-eyebrow rk-eyebrow-needs">需要你处理 · ${inbox.length}</span>
+    <span class="rk-section-sub">按等待时长从久到近排序</span>
   </div>
   <div class="rk-inbox-grid">
     ${inbox
@@ -190,7 +190,7 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .rk-kpi { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 14px; padding: 14px 16px; text-align: left; cursor: pointer; color: inherit; transition: border-color .15s, transform .15s; }
 .rk-kpi:hover, .rk-kpi.active { border-color: var(--rk-brand); }
-.rk-kpi-label { font: 600 11px/1.2 var(--rk-mono); letter-spacing: 0.12em; color: var(--rk-muted); text-transform: uppercase; }
+.rk-kpi-label { font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--rk-muted); }
 .rk-kpi-num { font-size: 26px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .rk-kpi-sub { font-size: 12px; color: var(--rk-muted); margin-top: 2px; }
 .rk-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -200,10 +200,10 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-chip.active { background: var(--rk-brand-tint); border-color: var(--rk-brand); color: var(--rk-brand); font-weight: 600; }
 .rk-section { margin-bottom: 24px; }
 .rk-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.rk-eyebrow { font: 600 11px/1.2 var(--rk-mono); letter-spacing: 0.14em; color: var(--rk-muted); }
+.rk-eyebrow { font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--rk-fg); }
 .rk-eyebrow-needs { color: var(--rk-brand); }
 .rk-section-sub { font-size: 12px; color: var(--rk-muted); }
-.rk-inbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.rk-inbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
 .rk-inbox-card { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-left: 3px solid var(--rk-brand); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
 .rk-urgency-urgent { border-left-color: var(--rk-danger); }
 .rk-urgency-elevated { border-left-color: var(--rk-warn); }
@@ -221,30 +221,40 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-meta code { font-family: var(--rk-mono); font-size: 11px; }
 .rk-todo { margin: 0; font-size: 13px; }
 .rk-impact { margin: 0; font-size: 12px; color: var(--rk-muted); }
-.rk-card-actions, .rk-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.rk-btn { background: var(--rk-surface-2); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.rk-card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+.rk-row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+.rk-btn { background: var(--rk-surface-2); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .rk-btn-primary { background: var(--rk-brand); border-color: var(--rk-brand); color: var(--rk-brand-fg); }
 .rk-btn-ghost { background: transparent; }
 .rk-list { display: flex; flex-direction: column; gap: 8px; }
-.rk-row { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) auto; align-items: center; gap: 14px; cursor: pointer; }
+.rk-row { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 316px 176px; align-items: center; gap: 14px; cursor: pointer; }
 .rk-row:hover { border-color: var(--rk-brand); }
 .rk-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rk-row-title { font-size: 14px; }
 .rk-stage { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--rk-surface-2); color: var(--rk-muted); }
-.rk-track { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 10px; }
-.rk-stop { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--rk-muted); }
-.rk-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--rk-border); }
+.rk-track { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.rk-stop { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--rk-muted); white-space: nowrap; }
+.rk-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--rk-border); flex-shrink: 0; }
 .rk-stop-done .rk-dot { background: var(--rk-success); }
 .rk-stop-now .rk-dot { background: var(--rk-data); box-shadow: 0 0 0 4px var(--rk-data-tint); }
 .rk-stop-needs .rk-dot { background: var(--rk-brand); box-shadow: 0 0 0 4px var(--rk-brand-tint); }
 .rk-stop-now .rk-stop-label, .rk-stop-needs .rk-stop-label { color: var(--rk-fg); font-weight: 600; }
 .rk-empty { background: var(--rk-surface-1); border: 1px dashed var(--rk-border); border-radius: 14px; padding: 32px; text-align: center; color: var(--rk-muted); }
-.rk-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); background: var(--rk-surface-1); border-left: 1px solid var(--rk-border); padding: 20px; transform: translateX(100%); transition: transform .18s ease; overflow-y: auto; z-index: 20; }
+.rk-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .18s ease; z-index: 19; }
+.rk-backdrop.open { opacity: 1; pointer-events: auto; }
+.rk-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); background: var(--rk-surface-1); border-left: 1px solid var(--rk-border); padding: 22px; transform: translateX(100%); transition: transform .18s ease; overflow-y: auto; z-index: 20; display: flex; flex-direction: column; gap: 16px; }
 .rk-drawer.open { transform: translateX(0); }
+.rk-drawer-section { border-top: 1px solid var(--rk-border); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.rk-drawer-section-title { font-size: 12px; font-weight: 600; color: var(--rk-muted); margin: 0; }
+.rk-vtrack { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rk-vstop { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--rk-surface-2); font-size: 13px; }
+.rk-vstop-left { display: flex; align-items: center; gap: 8px; }
+.rk-vstop-who { font-size: 12px; color: var(--rk-muted); }
 .rk-hidden { display: none !important; }
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .rk-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rk-row { grid-template-columns: 1fr; }
+  .rk-row-actions { justify-content: flex-start; }
 }
 </style>
 </head>
@@ -257,22 +267,22 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 
   <section class="rk-kpi-grid" aria-label="状态概览">
     <button type="button" class="rk-kpi active" data-filter-group="all">
-      <div class="rk-kpi-label">NEEDS YOU</div>
+      <div class="rk-kpi-label">需要你处理</div>
       <div class="rk-kpi-num">${summary.attention}</div>
       <div class="rk-kpi-sub">${summary.longestWaitText ? `最长 ${escapeHtml(summary.longestWaitText)}` : "全部处理完毕"}</div>
     </button>
     <button type="button" class="rk-kpi" data-filter-group="running">
-      <div class="rk-kpi-label">IN PROGRESS</div>
+      <div class="rk-kpi-label">进行中</div>
       <div class="rk-kpi-num">${summary.running}</div>
       <div class="rk-kpi-sub">AI 正在推进</div>
     </button>
     <button type="button" class="rk-kpi" data-filter-group="verify">
-      <div class="rk-kpi-label">READY TO TEST</div>
+      <div class="rk-kpi-label">待测试验证</div>
       <div class="rk-kpi-num">${summary.verify}</div>
-      <div class="rk-kpi-sub">待测试验证</div>
+      <div class="rk-kpi-sub">研发已完成</div>
     </button>
     <button type="button" class="rk-kpi" data-filter-group="done">
-      <div class="rk-kpi-label">DONE (14D)</div>
+      <div class="rk-kpi-label">最近完成（14天）</div>
       <div class="rk-kpi-num">${summary.done}</div>
       <div class="rk-kpi-sub">共 ${summary.total} 个需求</div>
     </button>
@@ -292,14 +302,26 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
   ${items.length === 0 ? `<div class="rk-empty">还没有记录任何需求。在对话中用 <code>/laoshi</code> 开始一个需求。</div>` : `${inboxHtml}\n${groupsHtml}`}
 </div>
 
+<div class="rk-backdrop" id="rk-backdrop" aria-hidden="true"></div>
 <aside class="rk-drawer" id="rk-drawer" aria-hidden="true"></aside>
 <script>
 const ITEMS = ${payload};
 const byKey = new Map(ITEMS.map((i) => [i.key, i]));
+const STOP_STATE_LABEL = { done: "已完成", now: "进行中", needs: "等你处理", todo: "待开始" };
 let activeGroup = "all";
 let activeProject = "";
 const searchEl = document.getElementById("rk-search");
 const drawer = document.getElementById("rk-drawer");
+const backdrop = document.getElementById("rk-backdrop");
+
+function closeDrawer() {
+  drawer?.classList.remove("open");
+  drawer?.setAttribute("aria-hidden", "true");
+  backdrop?.classList.remove("open");
+  backdrop?.setAttribute("aria-hidden", "true");
+}
+
+backdrop?.addEventListener("click", closeDrawer);
 
 function applyFilter() {
   const q = (searchEl?.value || "").trim().toLowerCase();
@@ -338,27 +360,90 @@ function openDrawer(key) {
   const item = byKey.get(key);
   if (!item || !drawer) return;
   drawer.innerHTML = "";
+
   const head = document.createElement("div");
   head.className = "rk-card-top";
   const h = document.createElement("h2");
   h.style.margin = "0";
+  h.style.fontSize = "17px";
   h.textContent = item.title;
   const close = document.createElement("button");
   close.className = "rk-btn";
   close.textContent = "关闭";
-  close.onclick = () => { drawer.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); };
+  close.onclick = closeDrawer;
   head.append(h, close);
-  const meta = document.createElement("p");
+
+  const info = document.createElement("div");
+  info.style.display = "flex";
+  info.style.flexDirection = "column";
+  info.style.gap = "6px";
+  const stageBadge = document.createElement("span");
+  stageBadge.className = "rk-badge rk-tone-needs";
+  stageBadge.textContent = item.stage;
+  const meta = document.createElement("div");
   meta.className = "rk-meta";
   meta.textContent = item.facts + (item.branch ? " · " + item.branch : "") + " · " + item.updated;
-  const stage = document.createElement("p");
-  stage.textContent = "当前阶段：" + item.stage;
-  const dir = document.createElement("p");
+  const dir = document.createElement("div");
   dir.className = "rk-meta";
   dir.textContent = "功能目录：" + item.featureDir;
-  drawer.append(head, meta, stage, dir);
+  info.append(stageBadge, meta, dir);
+
+  const trackSec = document.createElement("div");
+  trackSec.className = "rk-drawer-section";
+  const trackTitle = document.createElement("h3");
+  trackTitle.className = "rk-drawer-section-title";
+  trackTitle.textContent = "阶段放行轨";
+  const list = document.createElement("ol");
+  list.className = "rk-vtrack";
+  for (const s of item.stops || []) {
+    const li = document.createElement("li");
+    li.className = "rk-vstop rk-stop-" + s.state;
+    const left = document.createElement("span");
+    left.className = "rk-vstop-left";
+    const dot = document.createElement("span");
+    dot.className = "rk-dot";
+    const name = document.createElement("strong");
+    name.textContent = s.label;
+    const who = document.createElement("span");
+    who.className = "rk-vstop-who";
+    who.textContent = "（" + s.who + "）";
+    left.append(dot, name, who);
+    const st = document.createElement("span");
+    st.className = "rk-stage";
+    st.textContent = STOP_STATE_LABEL[s.state] || s.state;
+    li.append(left, st);
+    list.append(li);
+  }
+  trackSec.append(trackTitle, list);
+
+  drawer.append(head, info, trackSec);
+
+  if ((item.actions || []).length > 0) {
+    const actSec = document.createElement("div");
+    actSec.className = "rk-drawer-section";
+    const actTitle = document.createElement("h3");
+    actTitle.className = "rk-drawer-section-title";
+    actTitle.textContent = "可执行操作";
+    const bar = document.createElement("div");
+    bar.className = "rk-card-actions";
+    bar.style.marginTop = "0";
+    item.actions.forEach((a, idx) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = idx === 0 ? "rk-btn rk-btn-primary" : "rk-btn";
+      b.dataset.action = a.id;
+      b.dataset.key = item.key;
+      b.textContent = a.label;
+      bar.append(b);
+    });
+    actSec.append(actTitle, bar);
+    drawer.append(actSec);
+  }
+
   drawer.classList.add("open");
   drawer.setAttribute("aria-hidden", "false");
+  backdrop?.classList.add("open");
+  backdrop?.setAttribute("aria-hidden", "false");
 }
 
 document.addEventListener("click", (e) => {
@@ -372,7 +457,7 @@ document.addEventListener("click", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "/" && document.activeElement !== searchEl) { e.preventDefault(); searchEl?.focus(); }
-  if (e.key === "Escape") { drawer?.classList.remove("open"); drawer?.setAttribute("aria-hidden", "true"); }
+  if (e.key === "Escape") closeDrawer();
 });
 </script>
 </body>
