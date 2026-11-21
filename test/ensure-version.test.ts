@@ -69,3 +69,39 @@ test("版本相同、没有要求、或装不上时，照常用现在的版本�
   assert.match(out.stdout, /ran 0\.2\.0-beta\.3/);
   assert.match(out.stderr, /没能安装 9\.9\.9/);
 });
+
+test("安装失败后派生子脚本时，不会重复再试一次 npm install", () => {
+  const r = installRoot("0.2.0-beta.3");
+  fs.writeFileSync(
+    path.join(r.kit, "bin", "parent.mjs"),
+    `import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { ensureVersion } from "./ensure-version.mjs";
+const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { name, version } = JSON.parse(fs.readFileSync(path.join(kitRoot, "package.json"), "utf8"));
+ensureVersion({ kitRoot, version, packageName: name, script: fileURLToPath(import.meta.url), argv: process.argv.slice(2) });
+const child = spawnSync(process.execPath, [path.join(kitRoot, "bin", "run.mjs"), "child-arg"], { stdio: "inherit" });
+process.exit(child.status ?? 1);
+`,
+  );
+  const out = spawnSync(process.execPath, [path.join(r.kit, "bin", "parent.mjs")], {
+    encoding: "utf8",
+    env: { ...process.env, LAOSHI_NPM: path.join(r.root, "fake-npm.mjs"), LAOSHI_WANT_VERSION: "9.9.9" },
+  });
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /ran 0\.2\.0-beta\.3 child-arg/);
+  const lines = r.npmLog().trim().split("\n").filter(Boolean);
+  assert.equal(lines.length, 1, `npm 应只调用一次，实际：\n${r.npmLog()}`);
+});
+
+test("安装器更新平台设置失败时给出警告，并继续以新版本运行命令", () => {
+  const r = installRoot("0.2.0-beta.2");
+  fs.writeFileSync(path.join(r.root, "config.json"), JSON.stringify({ platform: { adapter: "mogao" } }));
+  fs.writeFileSync(path.join(r.kit, "bin", "install.mjs"), "process.exit(2);\n");
+  const out = r.run({ LAOSHI_WANT_VERSION: "0.2.0-beta.3" }, "status");
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stderr, /警告：更新 0\.2\.0-beta\.3 的平台设置失败（退出码 2）/);
+  assert.match(out.stdout, /^ran 0\.2\.0-beta\.3 status$/m);
+});

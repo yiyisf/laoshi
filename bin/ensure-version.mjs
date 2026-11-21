@@ -35,6 +35,8 @@ export function ensureVersion({ kitRoot, version, packageName, script, argv, env
   })();
   if (npm.status !== 0 || installed !== want) {
     console.error(`没能安装 ${want}（${installed ?? "读不到版本"}），这次仍用 ${version}。请检查 npm 镜像能否取到这个版本。`);
+    // Prevent child scripts spawned by this command (e.g. req.mjs -> start-pipeline.mjs) from retrying npm install.
+    env.LAOSHI_WANT_VERSION_DONE = "1";
     return;
   }
   // The new version's own setup (skills, platform settings) for the install root.
@@ -47,7 +49,10 @@ export function ensureVersion({ kitRoot, version, packageName, script, argv, env
   }
   const installer = path.join(kitRoot, "bin", "install.mjs");
   if (platform && fs.existsSync(installer)) {
-    spawnSync(process.execPath, [installer, "--platform", platform, "--home", root], { stdio: ["ignore", "ignore", "inherit"], env });
+    const setup = spawnSync(process.execPath, [installer, "--platform", platform, "--home", root], { stdio: ["ignore", "ignore", "inherit"], env });
+    if (setup.status !== 0) {
+      console.error(`警告：更新 ${want} 的平台设置失败（退出码 ${setup.status ?? "未知"}），将继续执行命令。`);
+    }
   }
   console.error(`已换成 ${want}。`);
   const again = spawnSync(process.execPath, [script, ...argv], { stdio: "inherit", env: { ...env, LAOSHI_WANT_VERSION_DONE: "1" }, windowsHide: true });
