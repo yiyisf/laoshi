@@ -5,7 +5,7 @@
 // as a child of the chat, schedule a message into the chat, answer a step's approval request by
 // policy; and it relays the rest (prompt, cancel, status, history) to dsh's session controller.
 // It holds no pipeline logic: order, rounds and gates stay in the engine.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -269,7 +269,7 @@ export function apply(ctx, config = {}) {
     }
     boardStartPromise = new Promise((resolve) => {
       const args = [reqBin, "board", "--no-open", "--port", String(boardPort), ...(boardReadOnly ? ["--read-only"] : [])];
-      const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
       boardChild = child;
       boardState.error = null;
       let settled = false;
@@ -361,11 +361,17 @@ export function apply(ctx, config = {}) {
   server.on("error", (e) => log({ serverError: String(e?.message ?? e) }));
 
   ctx.on("dispose", () => {
-    if (boardChild) {
-      try {
-        boardChild.kill("SIGTERM");
-      } catch {}
+    if (boardChild?.pid) {
+      const pid = boardChild.pid;
       boardChild = null;
+      try {
+        if (process.platform === "win32") spawnSync("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+        else process.kill(-pid, "SIGTERM");
+      } catch {
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch {}
+      }
     }
     server.close();
     fs.rmSync(paths.token, { force: true });
