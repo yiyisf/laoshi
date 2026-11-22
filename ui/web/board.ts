@@ -566,6 +566,18 @@ function openDrawer(key) {
       }
     };
 
+    const jointSec = document.createElement("div");
+    jointSec.className = "rk-drawer-section rk-hidden";
+    const jointTitle = document.createElement("h3");
+    jointTitle.className = "rk-drawer-section-title";
+    jointTitle.textContent = "联合开发仓库";
+    const jointList = document.createElement("div");
+    jointList.style.display = "flex";
+    jointList.style.flexDirection = "column";
+    jointList.style.gap = "8px";
+    jointSec.append(jointTitle, jointList);
+    overviewPane.append(jointSec);
+
     const docSec = document.createElement("div");
     docSec.className = "rk-drawer-section";
     const docTitle = document.createElement("h3");
@@ -584,6 +596,40 @@ function openDrawer(key) {
     fetch(CFG.apiBase + "/detail?" + qs.toString())
       .then((r) => (r.ok ? r.json() : null))
       .then((detail) => {
+        const joints = detail?.joint || [];
+        if (joints.length > 0) {
+          jointSec.classList.remove("rk-hidden");
+          jointTitle.textContent = "联合开发仓库（" + joints.length + " 个）";
+          for (const j of joints) {
+            const card = document.createElement("div");
+            card.style.padding = "10px 12px";
+            card.style.borderRadius = "10px";
+            card.style.border = "1px solid var(--border)";
+            card.style.background = "var(--surface)";
+            const top = document.createElement("div");
+            top.style.display = "flex";
+            top.style.justifyContent = "space-between";
+            top.style.alignItems = "center";
+            top.style.gap = "8px";
+            const name = document.createElement("strong");
+            name.style.fontSize = "13px";
+            name.textContent = j.name + (j.branch ? " · " + j.branch : "");
+            top.append(name);
+            if (j.gate && Array.isArray(j.gate.checks) && j.gate.checks.length > 0) {
+              const failed = j.gate.checks.filter((c) => c.outcome === "fail").length;
+              const badge = document.createElement("span");
+              badge.className = "rk-badge " + (failed > 0 ? "rk-tone-danger" : "rk-tone-success");
+              badge.textContent = failed > 0 ? "质量门 " + failed + " 项未通过" : "质量门已通过";
+              top.append(badge);
+            }
+            const sub = document.createElement("div");
+            sub.className = "rk-meta";
+            sub.style.marginTop = "4px";
+            sub.textContent = "工作区：" + (j.repo || "未建工作区");
+            card.append(top, sub);
+            jointList.append(card);
+          }
+        }
         const files = detail?.files || [];
         if (files.length === 0) { docTitle.textContent = "相关产物（暂无）"; return; }
         for (const f of files.slice(0, 8)) {

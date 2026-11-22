@@ -92,7 +92,7 @@ metadata:
       ]
     }
     ```
-  - `relatedRepos`（有关联仓库时）：`[{ "name": "后端", "path": "../backend", "role": "提供登录和订单接口" }]`。`path` 写相对项目目录的路径（团队约定把相关仓库放在同一个上级目录最方便），也可以写 `~/` 开头的路径。平时流水线的步骤只读不改；需求说明写了"联合开发"时，流水线会为这个需求在它那里新建工作区，一起开发。关联仓库最好也运行过 `/laoshi-setup`，它自己的检查命令、验证方法和项目说明会用在它的步骤里。
+  - `relatedRepos`（有关联仓库时）：`[{ "name": "后端", "path": "../backend", "role": "提供登录和订单接口" }]`。先自动扫描当前项目的上级目录，找出同级的其他 git 仓库并列出候选（排除本项目与已登记项），让用户勾选要关联的仓库并补充简称和职责；`path` 写相对项目目录的路径（如 `../backend`，团队约定把相关仓库放在同一个上级目录最方便），也可以写 `~/` 开头的路径。平时流水线的步骤只读不改；需求说明写了"联合开发"时，流水线会为这个需求在它那里新建工作区，一起开发（默认最多再涉及 2 个仓库，需要更多时可在 `.laoshi.json` 中设置 `maxJointRepos`，范围 1–10）。关联仓库最好也运行过 `/laoshi-setup`，它自己的检查命令、验证方法和项目说明会用在它的步骤里。
   - `cardSource`（第 3 步确认了从卡片接需求时）：`{ "system": "ALM", "projectId": "186149", "subsystems": ["CSP-CMASTER_云匠"], "titleKeywords": ["message-service"] }`。`system` 是团队对接配置中的系统名称；`titleKeywords` 只在同一子系统有几个仓库时写。之后 `req start --from` 不写仓库时，按卡片的子系统和标题选到这个仓库
   - 其他设置只在需要和本机配置不同时才写，例如 `"defaultProfile": "quick"`。不要写 `daemonUrl`、`daemonPasswordEnv`、`teamConfig`、`platform`、`user`，写了也会被忽略。
 - `.gitignore`：确认包含 `docs/features/*/.pipeline/`（流水线的运行状态），没有就建议加上。

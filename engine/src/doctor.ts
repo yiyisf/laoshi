@@ -11,6 +11,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, projectConfigPath, resolveRelatedRepo } from "./config.js";
 import { gitInfo } from "./git.js";
+import { discoverSiblingRepos, MAX_JOINT } from "./joint.js";
 import { codebaseOf, userOf } from "./identity.js";
 import { defaultConfigPath, homeOf, KIT_ROOT, kitPackageName, kitVersion } from "./locations.js";
 import { PROJECT_DIR } from "./prompts.js";
@@ -137,6 +138,14 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
         const dir = resolveRelatedRepo(r, repo);
         if (fs.existsSync(dir)) report("ok", `关联仓库（只读参考）：${r.name} → ${dir}`);
         else report("warn", `关联仓库「${r.name}」不在这台机器上：${dir}`, "把它克隆到这个位置；或修改 relatedRepos 中的路径（相对项目目录，团队约定把相关仓库放在同一个上级目录最方便）");
+      }
+      if (loaded.config.maxJointRepos !== MAX_JOINT) {
+        report("ok", `联合开发上限（maxJointRepos）：最多再涉及 ${loaded.config.maxJointRepos} 个仓库`);
+      }
+      const siblings = discoverSiblingRepos(repo, relatedRepos);
+      if (siblings.length > 0 && relatedRepos.length === 0) {
+        const preview = siblings.slice(0, 5).map((s) => `${s.name}（${s.path}）`).join("、");
+        info(`发现同级 git 仓库：${preview}${siblings.length > 5 ? ` 等 ${siblings.length} 个` : ""}；如需多仓参考或联调，可运行 /laoshi-setup 自动登记到 relatedRepos`);
       }
     }
     const push = loaded.config.push;

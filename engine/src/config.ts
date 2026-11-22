@@ -316,6 +316,8 @@ export interface PipelineConfig {
   slices: { profiles: ProfileName[]; max: number };
   /** Repositories the steps may read for reference, never change. */
   relatedRepos: RelatedRepo[];
+  /** Maximum number of additional joint repositories in one requirement (default 2, up to 10). */
+  maxJointRepos: number;
   /**
    * Design confirmation point (1.8): after the design review, show the requester what they
    * will get (preview.md, a prototype for UI changes) and wait for "yes" before writing code.
@@ -404,6 +406,7 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   qualityGate: { fixAttempts: 2, timeoutMinutes: 20 },
   slices: { profiles: ["standard"], max: 6 },
   relatedRepos: [],
+  maxJointRepos: 2,
   designApproval: { mode: "ui", profiles: ["standard"], autoContinueHours: 0 },
   reviewAxes: { enabled: true, profiles: ["standard"] },
 };
@@ -644,6 +647,9 @@ function validateChecks(config: PipelineConfig): void {
     if (typeof r.path !== "string" || r.path.trim() === "") throw new ConfigError(`relatedRepos[${i}].path 必须是这台机器上的目录`);
     if (r.role !== undefined && typeof r.role !== "string") throw new ConfigError(`relatedRepos[${i}].role 必须是字符串`);
   });
+  if (!Number.isInteger(config.maxJointRepos) || config.maxJointRepos < 1 || config.maxJointRepos > 10) {
+    throw new ConfigError("maxJointRepos 必须是 1 到 10 之间的整数");
+  }
 }
 
 /** Where a related repository is on this machine; relative paths start from the project's checkout. */

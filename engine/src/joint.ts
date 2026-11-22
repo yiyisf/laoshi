@@ -12,8 +12,51 @@ import { type CheckDef, projectConfigPath, type RelatedRepo, resolveRelatedRepo 
 import type { AgentRuntime } from "./runtime.js";
 import { ensurePipelineDir, hashFile, type JointRepo, type PipelineState } from "./state.js";
 
-/** At most this many other repositories in one requirement (three in all). */
+/** Default maximum number of other repositories in one requirement (configurable via maxJointRepos). */
 export const MAX_JOINT = 2;
+
+export interface DiscoveredRepo {
+  name: string;
+  path: string;
+  branch: string | null;
+}
+
+/**
+ * Discovers sibling git repositories next to `projectDir` (same parent directory),
+ * excluding `projectDir` itself and any directories already registered in `existing`.
+ */
+export function discoverSiblingRepos(projectDir: string, existing: RelatedRepo[] = []): DiscoveredRepo[] {
+  const absProject = fs.existsSync(projectDir) ? fs.realpathSync(projectDir) : path.resolve(projectDir);
+  const parent = path.dirname(absProject);
+  if (!fs.existsSync(parent)) return [];
+  const registered = new Set<string>([absProject]);
+  for (const r of existing) {
+    const resolved = resolveRelatedRepo(r, absProject);
+    registered.add(fs.existsSync(resolved) ? fs.realpathSync(resolved) : path.resolve(resolved));
+  }
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(parent, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found: DiscoveredRepo[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const candidate = path.join(parent, entry.name);
+    const real = fs.existsSync(candidate) ? fs.realpathSync(candidate) : candidate;
+    if (registered.has(real)) continue;
+    if (!fs.existsSync(path.join(real, ".git"))) continue;
+    let branch: string | null = null;
+    try {
+      branch = git(real, "rev-parse", "--abbrev-ref", "HEAD") || null;
+    } catch {
+      branch = null;
+    }
+    found.push({ name: entry.name, path: `../${entry.name}`, branch });
+  }
+  return found.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -39,13 +82,15 @@ export function slugFor(dir: string, taken: string[]): string {
 }
 
 /** Problems with the spec's "联合开发" names for this configuration, or null. */
-export function jointProblem(names: string[], related: RelatedRepo[], projectDir: string): string | null {
+export function jointProblem(names: string[], related: RelatedRepo[], projectDir: string, maxJoint = MAX_JOINT): string | null {
   if (names.length === 0) return null;
-  if (names.length > MAX_JOINT) return `联合开发最多再涉及 ${MAX_JOINT} 个仓库（一共 ${MAX_JOINT + 1} 个），需求说明里写了 ${names.length} 个：${names.join("、")}`;
+  if (names.length > maxJoint) {
+    return `联合开发最多再涉及 ${maxJoint} 个仓库（一共 ${maxJoint + 1} 个），需求说明里写了 ${names.length} 个：${names.join("、")}（如需更多，可在配置中调大 maxJointRepos）`;
+  }
   for (const name of names) {
     const r = related.find((x) => x.name === name);
     if (!r) {
-      return `需求说明的"联合开发"中有「${name}」，但项目配置的 relatedRepos 里没有登记这个仓库${related.length > 0 ? `（已登记：${related.map((x) => x.name).join("、")}）` : ""}。请在 .requirement-pipeline.json 中登记，或改正需求说明`;
+      return `需求说明的"联合开发"中有「${name}」，但项目配置的 relatedRepos 里没有登记这个仓库${related.length > 0 ? `（已登记：${related.map((x) => x.name).join("、")}）` : ""}。请在 .laoshi.json 中登记，或改正需求说明`;
     }
     const dir = resolveRelatedRepo(r, projectDir);
     if (!fs.existsSync(dir)) return `联合开发的仓库「${name}」不在这台机器上：${dir}`;

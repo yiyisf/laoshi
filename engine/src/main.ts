@@ -98,7 +98,7 @@ async function main(): Promise<number> {
       if (verifyAtText && !verifyAt) throw new Error(`看不懂测试验证的开始时间"${verifyAtText}"`);
       if (verifyAtText && phases.mode === "develop-only") throw new Error("只做研发时没有测试验证阶段，--verify-at 不适用");
       if (type === "assessment" && (verifyAtText || args.phase === "verify")) throw new Error("评估类需求只做调研、不写代码，没有测试验证阶段");
-      const jointIssue = jointProblem(jointNames, config.relatedRepos, chatDir);
+      const jointIssue = jointProblem(jointNames, config.relatedRepos, chatDir, config.maxJointRepos);
       if (jointIssue) throw new Error(jointIssue);
       if (checked.entersVerify) {
         const problem = verifyPhaseProblem(repo, featureDir, phases.environment);
