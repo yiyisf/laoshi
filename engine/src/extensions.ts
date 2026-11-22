@@ -229,10 +229,8 @@ export function runScriptExtension(
     LAOSHI_HOOK: step.after,
   };
   const timeout = (step.timeoutSeconds ?? 180) * 1000;
-  const r =
-    process.platform === "win32"
-      ? spawnSync(env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", step.command], { cwd, env, encoding: "utf8", timeout, windowsHide: true })
-      : spawnSync("/bin/sh", ["-c", step.command], { cwd, env, encoding: "utf8", timeout });
+  // shell: true runs cmd.exe /d /s /c with verbatim arguments on Windows (never PowerShell) and /bin/sh -c on POSIX.
+  const r = spawnSync(step.command, { cwd, env, encoding: "utf8", timeout, shell: true, windowsHide: true });
 
   const output = [r.stdout ?? "", r.stderr ?? "", r.error ? `ERROR: ${r.error.message}` : ""].filter(Boolean).join("\n").trim();
   const logFile = path.join(input.repo, input.featureDir, ".pipeline", "extensions", `${step.id}.log`);
