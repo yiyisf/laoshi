@@ -34,8 +34,9 @@ export async function setup({ kit, args = {}, dry, report, home }) {
   } else if (!staged && args["with-plugin"]) {
     if (dry) report("ok", "将安装 Paseo 需求插件（--with-plugin）");
     else {
-      await installPlugin({ yes: true, kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home } });
-      report("ok", "已安装 Paseo 需求插件");
+      const code = await installPlugin({ yes: true, kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home } });
+      if (code === 0) report("ok", "已安装 Paseo 需求插件");
+      else report("warn", "Paseo 插件文件已就绪，但尚未注册到 Paseo daemon", "启动 Paseo daemon 后再运行 laoshi plugin install");
     }
   } else if (!staged) {
     report("info", "Paseo 的需求插件（看需求、确认方案、一键试用、验收）：运行 laoshi plugin install（或安装时加 --with-plugin 一步装好）");
