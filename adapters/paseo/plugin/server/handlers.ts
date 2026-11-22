@@ -42,8 +42,16 @@ export function createHandlers(input: { req: ReqRunner; kitHome: () => string; r
     async run({ action, repo, featureDir, verifyEnv, text }) {
       if (await input.readOnly()) return { ok: false, message: "插件设置为只读：不能在这里操作需求。可以在插件设置中关闭只读，或在终端用 req 命令。" };
       if (action === "reply" && !text?.trim()) return { ok: false, message: "回复是空的" };
-      const extra = action === "verify" && verifyEnv ? ["--verify-env", verifyEnv] : action === "reply" ? [text!.trim()] : [];
-      const result = (await req(["run", action, featureDir, "--repo", repo, ...extra], { timeoutMs: 200_000 })) as { ok: boolean; message: string };
+      const cmd = action === "try-stop" ? "try" : action;
+      const extra =
+        action === "verify" && verifyEnv
+          ? ["--verify-env", verifyEnv]
+          : action === "reply"
+            ? [text!.trim()]
+            : action === "try-stop"
+              ? ["--stop"]
+              : [];
+      const result = (await req(["run", cmd, featureDir, "--repo", repo, ...extra], { timeoutMs: 200_000 })) as { ok: boolean; message: string };
       return { ok: result.ok, message: result.message };
     },
     async reviewUrl({ repo, featureDir, page }) {

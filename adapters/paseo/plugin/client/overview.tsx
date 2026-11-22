@@ -5,15 +5,15 @@ import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import type { Requirement } from "../shared/contracts";
 import { useRequirements } from "./data";
-import { type Group, GROUP_LABELS, groupOf } from "./format";
+import { type Group, GROUP_EYEBROWS, GROUP_LABELS, groupOf } from "./format";
 import { Inbox } from "./inbox";
 import { RequirementRow } from "./row";
 import { BrandHeader, Button, Chip, Eyebrow, Status, useStyles } from "./ui";
 
 export const ORDER: Group[] = ["attention", "running", "verify", "done", "other"];
 
-/** Uppercase mono group names (design/guidelines/plugin.md); the Chinese label follows. */
-const EYEBROW: Record<Group, string> = { attention: "NEEDS YOU", running: "IN PROGRESS", verify: "READY TO TEST", done: "DONE", other: "OTHERS" };
+/** Unified Chinese group headings (shared with dsh/Web board via ui/shared/view-model). */
+const EYEBROW: Record<Group, string> = GROUP_EYEBROWS;
 
 /** Opens a requirement's detail screen. */
 export type OpenRequirement = (item: Pick<Requirement, "repo" | "featureDir" | "title">) => void;

@@ -7,7 +7,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const id = "paseo";
-export const options = {};
+export const options = {
+  "with-plugin": { type: "boolean" },
+};
 
 export function platformConfig() {
   return { adapter: "paseo" };
@@ -23,14 +25,20 @@ export function skillTargets() {
   return roots;
 }
 
-export async function setup({ kit, dry, report, home }) {
-  const { refreshPlugin, stagedDir } = await import(pathToFileURL(path.join(kit, "adapters", "paseo", "plugin-cmd.mjs")).href);
+export async function setup({ kit, args = {}, dry, report, home }) {
+  const { installPlugin, refreshPlugin, stagedDir } = await import(pathToFileURL(path.join(kit, "adapters", "paseo", "plugin-cmd.mjs")).href);
   const staged = fs.existsSync(path.join(stagedDir(home), "paseo-plugin.json"));
   if (staged && !dry) {
     // Installed before: refresh its files from this version and reload it in Paseo.
     refreshPlugin({ kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home }, log: (m) => report("ok", m) });
+  } else if (!staged && args["with-plugin"]) {
+    if (dry) report("ok", "将安装 Paseo 需求插件（--with-plugin）");
+    else {
+      await installPlugin({ yes: true, kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home } });
+      report("ok", "已安装 Paseo 需求插件");
+    }
   } else if (!staged) {
-    report("info", "Paseo 的需求插件（在 Paseo 里看需求、确认方案、停止和继续）：laoshi plugin install");
+    report("info", "Paseo 的需求插件（看需求、确认方案、一键试用、验收）：运行 laoshi plugin install（或安装时加 --with-plugin 一步装好）");
   }
   return ["在终端运行 laoshi configure，选择 builder 和 reviewer 用的 agent"];
 }

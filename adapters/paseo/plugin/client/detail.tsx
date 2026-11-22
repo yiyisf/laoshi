@@ -224,6 +224,8 @@ export function RequirementView({
         <View style={s.row}>
           {canReviewCode ? <CodeReviewButton theme={theme} repo={d.sourceRepo ?? d.repo} featureDir={d.featureDir} title={d.title} label={reviewLabel} primary={primary === "code"} /> : null}
           {canAccept ? <ChecklistButton theme={theme} repo={d.sourceRepo ?? d.repo} featureDir={d.featureDir} title={d.title} primary={primary === "check"} /> : null}
+          {canAccept && !readOnly ? <Button theme={theme} label={ACTION_TEXT.try.label} onPress={() => setAction("try")} /> : null}
+          {canAccept && !readOnly ? <Button theme={theme} label={ACTION_TEXT["try-stop"].label} onPress={() => setAction("try-stop")} /> : null}
           {d.hasPrototype ? <ReviewButton theme={theme} repo={d.sourceRepo ?? d.repo} featureDir={d.featureDir} title={d.title} waiting={primary === "review"} /> : null}
           {actions.map((a) => (
             <Button key={a} theme={theme} primary={primary === a} label={ACTION_TEXT[a].label} onPress={() => setAction(a)} />
