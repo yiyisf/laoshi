@@ -232,14 +232,34 @@ export function apply(ctx, config = {}) {
     },
 
     /** A message into the session at a time (`at`, ISO) or on a five-field cron in a time zone. */
-    schedule: async ({ sessionId, title, prompt: text, at, cron, timeZone }) => {
+    schedule: async ({ sessionId, title, prompt: text, at, cron, timeZone, expiresAt }) => {
       const timing = cron ? { cron: { expression: cron, time_zone: timeZone } } : { at };
       const record = await ctx.schedule.create(sessionId, { title, prompt: text, ...timing });
-      log({ schedule: record.id, sessionId, title });
+      if (typeof expiresAt === "string" && expiresAt.trim()) {
+        const ms = Date.parse(expiresAt) - Date.now();
+        if (Number.isFinite(ms)) {
+          const key = `${sessionId}/${record.id}`;
+          const delay = Math.min(2_147_483_647, Math.max(0, ms));
+          const timer = setTimeout(() => {
+            scheduleTimers.delete(key);
+            ctx.schedule.delete({ sessionId, id: record.id }).catch(() => {});
+            log({ scheduleExpired: record.id, sessionId });
+          }, delay);
+          timer.unref?.();
+          scheduleTimers.set(key, timer);
+        }
+      }
+      log({ schedule: record.id, sessionId, title, ...(expiresAt ? { expiresAt } : {}) });
       return { id: record.id };
     },
 
     cancelSchedule: async ({ sessionId, id }) => {
+      const key = `${sessionId}/${id}`;
+      const timer = scheduleTimers.get(key);
+      if (timer) {
+        clearTimeout(timer);
+        scheduleTimers.delete(key);
+      }
       await ctx.schedule.delete({ sessionId, id });
       return {};
     },
@@ -250,6 +270,8 @@ export function apply(ctx, config = {}) {
       return { enabled: boardEnabled, running: boardState.running, url: boardState.url, error: boardState.error };
     },
   };
+
+  const scheduleTimers = new Map();
 
   // ---- optional hosted Web requirement board (`laoshi board --no-open`)
   const boardEnabled = Boolean(config.board);
@@ -361,6 +383,8 @@ export function apply(ctx, config = {}) {
   server.on("error", (e) => log({ serverError: String(e?.message ?? e) }));
 
   ctx.on("dispose", () => {
+    for (const timer of scheduleTimers.values()) clearTimeout(timer);
+    scheduleTimers.clear();
     if (boardChild?.pid) {
       const pid = boardChild.pid;
       boardChild = null;

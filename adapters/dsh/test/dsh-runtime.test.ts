@@ -249,3 +249,24 @@ test("dsh 按角色选模型（M4b）：provider 写成\"<提供方>/<模型>\"�
     host.dispose();
   }
 });
+
+test("dsh 定时任务支持 expiresAt：到期后插件自动取消定时任务", async () => {
+  const { host, call } = await started();
+  try {
+    const runtime = createRuntimeWithClient(call, () => {}, 10);
+    await runtime.scheduleMessage({
+      agentId: "chat-1",
+      name: "巡检",
+      prompt: "检查进展",
+      cron: "*/5 * * * *",
+      expiresAt: new Date(Date.now() + 40),
+    });
+    await new Promise((r) => setTimeout(r, 120));
+    assert.ok(
+      host.calls.some((c: { method: string }) => c.method === "schedule.delete"),
+      `预期到期后自动调用 schedule.delete，实际调用：${JSON.stringify(host.calls)}`,
+    );
+  } finally {
+    host.dispose();
+  }
+});
