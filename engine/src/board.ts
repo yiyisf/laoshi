@@ -4,13 +4,16 @@
 
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { apiFile, apiList, apiRun, apiStatus, type ListItem } from "./api.js";
-import { DEFAULT_CONFIG, loadConfig } from "./config.js";
+import { acceptanceText, type Answer, buildChecklist, type Checklist, recordAcceptance, verdictOf } from "./checklist.js";
+import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
 import { defaultConfigPath } from "./locations.js";
-import { wordsFor } from "./runtime-loader.js";
+import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
+import { howToTry, tryRequirement, type TryResult } from "./try.js";
 import type { RequirementView } from "../../ui/shared/view-model.js";
 import { renderBoardHtml } from "../../ui/web/board.js";
 
@@ -39,11 +42,28 @@ export function toRequirementView(item: ListItem): RequirementView {
   };
 }
 
+export interface AcceptanceView {
+  checklist: Checklist;
+  howTo: string[];
+  hasAcceptanceRecord: boolean;
+}
+
+export interface AcceptanceSubmitResult {
+  ok: boolean;
+  verdict?: "通过" | "不通过";
+  committed?: boolean;
+  missing?: string[];
+  message: string;
+}
+
 export interface BoardHandlers {
   list: () => RequirementView[];
   detail: (repo: string, feature: string) => unknown;
   file: (repo: string, feature: string, file: string) => unknown;
   run: (input: { action: string; repo: string; featureDir: string; text?: string; verifyEnv?: string }) => { ok: boolean; message: string };
+  acceptance?: (repo: string, feature: string) => AcceptanceView;
+  submitAcceptance?: (input: { repo: string; featureDir: string; reviewer: string; answers: Answer[] }) => AcceptanceSubmitResult;
+  tryRun?: (input: { repo: string; featureDir: string; stop?: boolean }) => Promise<TryResult>;
 }
 
 export interface BoardServerOptions {
@@ -128,6 +148,74 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
           return;
         }
         sendJson(res, 200, options.handlers.file(repo, feature, file));
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/acceptance") {
+        const repo = url.searchParams.get("repo") ?? "";
+        const feature = url.searchParams.get("feature") ?? "";
+        if (!repo || !feature) {
+          sendJson(res, 400, { error: "缺少 repo 或 feature 参数" });
+          return;
+        }
+        if (!options.handlers.acceptance) {
+          sendJson(res, 404, { error: "当前看板未启用验收工作台" });
+          return;
+        }
+        sendJson(res, 200, options.handlers.acceptance(repo, feature));
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/try") {
+        if (readOnly) {
+          sendJson(res, 403, { ok: false, error: "看板当前为只读模式" });
+          return;
+        }
+        if (req.headers["x-laoshi-token"] !== csrfToken) {
+          sendJson(res, 403, { ok: false, error: "缺少或无效的令牌" });
+          return;
+        }
+        if (!options.handlers.tryRun) {
+          sendJson(res, 404, { ok: false, error: "当前看板未启用一键试用" });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const repo = typeof body.repo === "string" ? body.repo : "";
+        const featureDir = typeof body.featureDir === "string" ? body.featureDir : "";
+        if (!repo || !featureDir) {
+          sendJson(res, 400, { ok: false, error: "缺少目标需求" });
+          return;
+        }
+        const result = await options.handlers.tryRun({ repo, featureDir, stop: Boolean(body.stop) });
+        sendJson(res, 200, result);
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/api/acceptance") {
+        if (readOnly) {
+          sendJson(res, 403, { ok: false, error: "看板当前为只读模式" });
+          return;
+        }
+        if (req.headers["x-laoshi-token"] !== csrfToken) {
+          sendJson(res, 403, { ok: false, error: "缺少或无效的令牌" });
+          return;
+        }
+        if (!options.handlers.submitAcceptance) {
+          sendJson(res, 404, { ok: false, error: "当前看板未启用验收提交" });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const repo = typeof body.repo === "string" ? body.repo : "";
+        const featureDir = typeof body.featureDir === "string" ? body.featureDir : "";
+        const reviewer = typeof body.reviewer === "string" && body.reviewer.trim() ? body.reviewer.trim() : "需求方";
+        const answers = Array.isArray(body.answers)
+          ? (body.answers as Array<Record<string, unknown>>)
+              .filter((a) => typeof a?.id === "string" && ["pass", "fail", "skip"].includes(String(a?.mark)))
+              .map((a) => ({ id: String(a.id), mark: String(a.mark) as Answer["mark"], note: typeof a.note === "string" ? a.note : undefined }))
+          : [];
+        if (!repo || !featureDir) {
+          sendJson(res, 400, { ok: false, error: "缺少目标需求" });
+          return;
+        }
+        const result = options.handlers.submitAcceptance({ repo, featureDir, reviewer, answers });
+        sendJson(res, result.ok ? 200 : 400, result);
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/action") {
@@ -224,6 +312,51 @@ async function main(argv: string[]): Promise<number> {
       if (verifyEnv) extra.push("--verify-env", verifyEnv);
       if (text) extra.push(text);
       return apiRun(action, repo, featureDir, extra);
+    },
+    acceptance: (repo, feature) => {
+      const featureAbs = path.join(repo, feature);
+      return {
+        checklist: buildChecklist(featureAbs),
+        howTo: howToTry(featureAbs),
+        hasAcceptanceRecord: fs.existsSync(path.join(featureAbs, "acceptance.md")),
+      };
+    },
+    submitAcceptance: ({ repo, featureDir, reviewer, answers }) => {
+      const featureAbs = path.join(repo, featureDir);
+      const list = buildChecklist(featureAbs);
+      const v = verdictOf(list, answers);
+      if (v.verdict === "通过" && v.missing.length > 0) {
+        return {
+          ok: false,
+          missing: v.missing.map((i) => i.id),
+          message: `还有 ${v.missing.length} 条必验项未勾选（${v.missing.map((i) => i.id).join("、")}），全部核对后才能提交通过。`,
+        };
+      }
+      const prevPath = path.join(featureAbs, "acceptance.md");
+      const previous = fs.existsSync(prevPath) ? fs.readFileSync(prevPath, "utf8") : undefined;
+      const date = new Date().toISOString().slice(0, 10);
+      const text = acceptanceText(list, answers, { verdict: v.verdict, reviewer, date, previous });
+      const { committed } = recordAcceptance(repo, featureDir, text);
+      return {
+        ok: true,
+        verdict: v.verdict,
+        committed,
+        message: `验收结论「${v.verdict}」已写入 acceptance.md${committed ? "并提交" : ""}。`,
+      };
+    },
+    tryRun: async ({ repo, featureDir, stop }) => {
+      let config: PipelineConfig = DEFAULT_CONFIG;
+      try {
+        config = loadConfig(defaultConfigPath(), repo).config;
+      } catch {
+        // Fallback to default config.
+      }
+      const runtime = await (await loadRuntimeFactory())({ config, log: () => undefined });
+      try {
+        return await tryRequirement({ repo, featureDir, stop, runtime, config });
+      } finally {
+        await runtime.close().catch(() => undefined);
+      }
     },
   };
 

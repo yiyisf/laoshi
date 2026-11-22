@@ -250,6 +250,21 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-toast.ok { border-color: var(--rk-success); }
 .rk-toast.err { border-color: var(--rk-danger); }
 .rk-doc-preview { background: var(--rk-bg); border: 1px solid var(--rk-border); border-radius: 10px; padding: 12px; font: 12px/1.6 var(--rk-mono); white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow-y: auto; margin: 0; }
+.rk-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--rk-border); padding-bottom: 10px; }
+.rk-tab { background: transparent; border: 1px solid transparent; color: var(--rk-muted); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rk-tab.active { background: var(--rk-brand-tint); border-color: var(--rk-brand); color: var(--rk-brand); }
+.rk-ac-card { background: var(--rk-surface-2); border: 1px solid var(--rk-border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.rk-ac-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.rk-ac-id { font: 600 11px/1 var(--rk-mono); color: var(--rk-brand); }
+.rk-ac-ev { font-size: 12px; color: var(--rk-muted); background: var(--rk-bg); border-radius: 6px; padding: 6px 8px; }
+.rk-mark-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rk-mark { background: var(--rk-surface-1); border: 1px solid var(--rk-border); color: var(--rk-muted); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.rk-mark.active-pass { background: rgba(74, 222, 128, 0.16); border-color: var(--rk-success); color: var(--rk-success); font-weight: 600; }
+.rk-mark.active-fail { background: var(--rk-danger-tint); border-color: var(--rk-danger); color: var(--rk-danger); font-weight: 600; }
+.rk-mark.active-skip { background: var(--rk-surface-1); border-color: var(--rk-muted); color: var(--rk-fg); font-weight: 600; }
+.rk-note-input { width: 100%; background: var(--rk-bg); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.rk-service-link { color: var(--rk-data); text-decoration: none; font-family: var(--rk-mono); font-size: 12px; }
+.rk-service-link:hover { text-decoration: underline; }
 .rk-list { display: flex; flex-direction: column; gap: 8px; }
 .rk-row { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 316px 176px; align-items: center; gap: 14px; cursor: pointer; }
 .rk-row:hover { border-color: var(--rk-brand); }
@@ -483,7 +498,13 @@ function openDrawer(key) {
   }
   trackSec.append(trackTitle, list);
 
-  drawer.append(head, info, trackSec);
+  drawer.append(head, info);
+
+  const overviewPane = document.createElement("div");
+  overviewPane.style.display = "flex";
+  overviewPane.style.flexDirection = "column";
+  overviewPane.style.gap = "16px";
+  overviewPane.append(trackSec);
 
   if ((item.actions || []).length > 0) {
     const actSec = document.createElement("div");
@@ -504,10 +525,47 @@ function openDrawer(key) {
       bar.append(b);
     });
     actSec.append(actTitle, bar);
-    drawer.append(actSec);
+    overviewPane.append(actSec);
   }
 
   if (CFG.apiBase) {
+    const tabs = document.createElement("div");
+    tabs.className = "rk-tabs";
+    const tabOverview = document.createElement("button");
+    tabOverview.type = "button";
+    tabOverview.className = "rk-tab active";
+    tabOverview.textContent = "概览与产物";
+    const tabAccept = document.createElement("button");
+    tabAccept.type = "button";
+    tabAccept.className = "rk-tab";
+    tabAccept.textContent = "验收工作台";
+    tabs.append(tabOverview, tabAccept);
+
+    const acceptPane = document.createElement("div");
+    acceptPane.className = "rk-hidden";
+    acceptPane.style.display = "flex";
+    acceptPane.style.flexDirection = "column";
+    acceptPane.style.gap = "14px";
+    acceptPane.textContent = "正在加载验收清单与试用信息…";
+
+    let acceptLoaded = false;
+    tabOverview.onclick = () => {
+      tabOverview.classList.add("active");
+      tabAccept.classList.remove("active");
+      overviewPane.classList.remove("rk-hidden");
+      acceptPane.classList.add("rk-hidden");
+    };
+    tabAccept.onclick = () => {
+      tabAccept.classList.add("active");
+      tabOverview.classList.remove("active");
+      overviewPane.classList.add("rk-hidden");
+      acceptPane.classList.remove("rk-hidden");
+      if (!acceptLoaded) {
+        acceptLoaded = true;
+        loadAcceptanceWorkbench(item, acceptPane);
+      }
+    };
+
     const docSec = document.createElement("div");
     docSec.className = "rk-drawer-section";
     const docTitle = document.createElement("h3");
@@ -518,7 +576,9 @@ function openDrawer(key) {
     const docPre = document.createElement("pre");
     docPre.className = "rk-doc-preview rk-hidden";
     docSec.append(docTitle, docChips, docPre);
-    drawer.append(docSec);
+    overviewPane.append(docSec);
+
+    drawer.append(tabs, overviewPane, acceptPane);
 
     const qs = new URLSearchParams({ repo: item.repo, feature: item.featureDir });
     fetch(CFG.apiBase + "/detail?" + qs.toString())
@@ -545,12 +605,197 @@ function openDrawer(key) {
         }
       })
       .catch(() => { docTitle.textContent = "相关产物（加载失败）"; });
+  } else {
+    drawer.append(overviewPane);
   }
 
   drawer.classList.add("open");
   drawer.setAttribute("aria-hidden", "false");
   backdrop?.classList.add("open");
   backdrop?.setAttribute("aria-hidden", "false");
+}
+
+function loadAcceptanceWorkbench(item, pane) {
+  const PIPE_LABEL = { pass: "流水线：通过", fail: "流水线：未通过", unverified: "流水线：未验证", unknown: "待人工核对" };
+  const qs = new URLSearchParams({ repo: item.repo, feature: item.featureDir });
+  fetch(CFG.apiBase + "/acceptance?" + qs.toString())
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("无法加载验收信息"))))
+    .then((data) => {
+      pane.innerHTML = "";
+      const list = data.checklist || { items: [], notes: [] };
+
+      const trySec = document.createElement("div");
+      trySec.className = "rk-drawer-section";
+      trySec.style.borderTop = "none";
+      trySec.style.paddingTop = "0";
+      const tryTitle = document.createElement("h3");
+      tryTitle.className = "rk-drawer-section-title";
+      tryTitle.textContent = "一键试用与测试准备";
+      const tryBar = document.createElement("div");
+      tryBar.className = "rk-mark-row";
+      const tryResult = document.createElement("div");
+      tryResult.className = "rk-meta";
+
+      if (!CFG.readOnly) {
+        const startTry = document.createElement("button");
+        startTry.type = "button";
+        startTry.className = "rk-btn rk-btn-primary";
+        startTry.textContent = "一键启动试用";
+        const stopTry = document.createElement("button");
+        stopTry.type = "button";
+        stopTry.className = "rk-btn";
+        stopTry.textContent = "停止试用";
+        const callTry = async (stop) => {
+          startTry.disabled = true;
+          stopTry.disabled = true;
+          tryResult.textContent = stop ? "正在停止试用服务…" : "正在启动试用服务…";
+          try {
+            const resp = await fetch(CFG.apiBase + "/try", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...(CFG.csrfToken ? { "X-Laoshi-Token": CFG.csrfToken } : {}) },
+              body: JSON.stringify({ repo: item.repo, featureDir: item.featureDir, stop }),
+            });
+            const body = await resp.json().catch(() => ({ ok: false, message: "响应解析失败" }));
+            tryResult.innerHTML = "";
+            const msg = document.createElement("div");
+            msg.textContent = body.message || (body.ok ? "完成" : "失败");
+            tryResult.append(msg);
+            for (const svc of body.services || []) {
+              if (svc.url) {
+                const a = document.createElement("a");
+                a.className = "rk-service-link";
+                a.href = svc.url;
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+                a.textContent = svc.name + "：" + svc.url;
+                tryResult.append(document.createElement("br"), a);
+              }
+            }
+            showToast(body.ok ? (stop ? "已停止试用服务" : "试用服务已启动") : (body.message || "试用操作未完成"), body.ok ? "ok" : "err");
+          } catch (err) {
+            tryResult.textContent = "请求失败：" + String(err);
+          } finally {
+            startTry.disabled = false;
+            stopTry.disabled = false;
+          }
+        };
+        startTry.onclick = () => callTry(false);
+        stopTry.onclick = () => callTry(true);
+        tryBar.append(startTry, stopTry);
+      }
+      trySec.append(tryTitle, tryBar, tryResult);
+      if ((data.howTo || []).length > 0) {
+        const pre = document.createElement("pre");
+        pre.className = "rk-doc-preview";
+        pre.style.maxHeight = "140px";
+        pre.textContent = data.howTo.join("\n");
+        trySec.append(pre);
+      }
+      pane.append(trySec);
+
+      const acSec = document.createElement("div");
+      acSec.className = "rk-drawer-section";
+      const acTitle = document.createElement("h3");
+      acTitle.className = "rk-drawer-section-title";
+      acTitle.textContent = "验收清单（共 " + (list.items || []).length + " 项）";
+      acSec.append(acTitle);
+
+      const answers = new Map();
+      if ((list.items || []).length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "rk-meta";
+        empty.textContent = "当前需求说明中没有解析到 AC 验收标准。";
+        acSec.append(empty);
+      } else {
+        for (const ac of list.items) {
+          const card = document.createElement("div");
+          card.className = "rk-ac-card";
+          const head = document.createElement("div");
+          head.className = "rk-ac-head";
+          const id = document.createElement("span");
+          id.className = "rk-ac-id";
+          id.textContent = ac.id + (ac.required ? "" : "（可选）");
+          const pipe = document.createElement("span");
+          pipe.className = "rk-stage";
+          pipe.textContent = PIPE_LABEL[ac.pipeline] || ac.pipeline;
+          head.append(id, pipe);
+
+          const title = document.createElement("div");
+          title.style.fontSize = "13px";
+          title.style.fontWeight = "600";
+          title.textContent = ac.title;
+          card.append(head, title);
+
+          if (ac.evidence) {
+            const ev = document.createElement("div");
+            ev.className = "rk-ac-ev";
+            ev.textContent = "证据：" + ac.evidence;
+            card.append(ev);
+          }
+
+          if (!CFG.readOnly) {
+            const marks = document.createElement("div");
+            marks.className = "rk-mark-row";
+            const note = document.createElement("input");
+            note.type = "text";
+            note.className = "rk-note-input";
+            note.placeholder = "备注（不通过时建议写明原因）";
+            const entry = { id: ac.id, mark: "", note: "" };
+            note.oninput = () => { entry.note = note.value; };
+            for (const [m, label] of [["pass", "通过"], ["fail", "不通过"], ["skip", "跳过"]]) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "rk-mark";
+              btn.textContent = label;
+              btn.onclick = () => {
+                entry.mark = m;
+                answers.set(ac.id, entry);
+                marks.querySelectorAll(".rk-mark").forEach((x) => { x.className = "rk-mark"; });
+                btn.className = "rk-mark active-" + m;
+              };
+              marks.append(btn);
+            }
+            card.append(marks, note);
+          }
+          acSec.append(card);
+        }
+
+        if (!CFG.readOnly) {
+          const submitRow = document.createElement("div");
+          submitRow.className = "rk-mark-row";
+          submitRow.style.marginTop = "6px";
+          const reviewer = document.createElement("input");
+          reviewer.type = "text";
+          reviewer.className = "rk-note-input";
+          reviewer.style.flex = "1";
+          reviewer.placeholder = "验收人姓名（默认：需求方）";
+          const submit = document.createElement("button");
+          submit.type = "button";
+          submit.className = "rk-btn rk-btn-primary";
+          submit.textContent = "提交验收结论";
+          submit.onclick = async () => {
+            submit.disabled = true;
+            try {
+              const payloadAnswers = [...answers.values()].filter((a) => a.mark);
+              const resp = await fetch(CFG.apiBase + "/acceptance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(CFG.csrfToken ? { "X-Laoshi-Token": CFG.csrfToken } : {}) },
+                body: JSON.stringify({ repo: item.repo, featureDir: item.featureDir, reviewer: reviewer.value, answers: payloadAnswers }),
+              });
+              const body = await resp.json().catch(() => ({ ok: false, message: "提交失败" }));
+              showToast(body.message || (body.ok ? "验收已提交" : "提交失败"), body.ok ? "ok" : "err");
+              if (body.ok) setTimeout(() => window.location.reload(), 1000);
+            } finally {
+              submit.disabled = false;
+            }
+          };
+          submitRow.append(reviewer, submit);
+          acSec.append(submitRow);
+        }
+      }
+      pane.append(acSec);
+    })
+    .catch((err) => { pane.textContent = "加载验收工作台失败：" + String(err); });
 }
 
 document.addEventListener("click", (e) => {
