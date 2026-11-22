@@ -182,7 +182,7 @@ export const statsRpc = defineRpc({
   output: z.custom<StatsSummary>(),
 });
 
-export const ACTIONS = ["approve", "stop", "resume", "verify", "sync", "reply", "start"] as const;
+export const ACTIONS = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try", "try-stop"] as const;
 export type Action = (typeof ACTIONS)[number];
 
 export const runRpc = defineRpc({

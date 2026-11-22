@@ -457,7 +457,7 @@ export function apiIndex(input: { rebuild: string[]; prune: boolean }) {
   return { scanned: [...dirs], registered, pruned, total: readIndex().length };
 }
 
-const RUNNABLE = ["approve", "stop", "resume", "verify", "sync", "reply", "start"] as const;
+const RUNNABLE = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try"] as const;
 
 /** Runs `req <command> <需求>` where people would, and reports what it said. */
 /**

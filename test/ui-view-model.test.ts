@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -135,4 +136,10 @@ test("summarizeChecklist 统计流水线验证与人工勾选进度", () => {
   assert.equal(s.checkedPass, 1);
   assert.equal(s.checkedFail, 0);
   assert.equal(s.remainingRequired, 1);
+});
+
+test("sync-ui-shared --check 确认插件内共享视图层与 ui/shared/view-model.ts 一致", () => {
+  const script = path.resolve(import.meta.dirname, "..", "scripts", "sync-ui-shared.mjs");
+  const r = spawnSync(process.execPath, [script, "--check"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
 });
