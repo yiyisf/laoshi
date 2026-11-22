@@ -14,6 +14,7 @@ import {
   type ReviewPanelMember,
 } from "./config.js";
 import { changedFiles, changedSince, checkApplies, headCommit, logName, matchesPath, runCheck, tail } from "./gate.js";
+import { buildAiExtensionPrompt, type ExtensionHook, runScriptExtension, selectExtensions } from "./extensions.js";
 import { activeJoint, ensureJointRepos, loadProjectChecks, type StepTarget, syncJointDocs } from "./joint.js";
 import { playbookSection, promptSections, stepTitle } from "./playbooks.js";
 import {
@@ -1994,11 +1995,97 @@ function acceptanceLines(ctx: PipelineContext, target?: StepTarget): string[] {
   return lines;
 }
 
+/** Controlled flow extensions (M3): runs configured AI/script steps attached after a fixed core stage. */
+async function runExtensionsAfter(ctx: PipelineContext, hook: ExtensionHook): Promise<void> {
+  const steps = selectExtensions(ctx.config.extensions ?? [], {
+    after: hook,
+    profile: ctx.state.profile,
+    type: ctx.state.type,
+  });
+  for (const ext of steps) {
+    const key = `ext:${ext.id}`;
+    if (ctx.state.results[key]) continue;
+    if (ext.kind === "script") {
+      ctx.log(`执行脚本扩展「${ext.title}」（${ext.id}，触发点：${hook} 之后）`);
+      const res = runScriptExtension(ext, { repo: ctx.repo, featureDir: ctx.featureDir });
+      ctx.state.results[key] = {
+        kind: "script",
+        hook,
+        ok: res.ok,
+        exitCode: res.exitCode,
+        logFile: path.relative(ctx.repo, res.logFile),
+      };
+      save(ctx);
+      if (!res.ok) {
+        const msg = `脚本执行失败（退出码 ${res.exitCode ?? "未知"}），日志见 ${res.logFile}`;
+        if (ext.onFailure === "warn") {
+          ctx.log(`⚠ 扩展「${ext.title}」${msg}，按 onFailure=warn 继续`);
+        } else {
+          throw new StepFailure(`扩展：${ext.title}`, msg);
+        }
+      } else {
+        ctx.log(`完成脚本扩展「${ext.title}」（${ext.id}）`);
+      }
+      continue;
+    }
+
+    ctx.log(`执行 AI 扩展「${ext.title}」（${ext.id}，触发点：${hook} 之后）`);
+    const role = ext.role ?? "builder";
+    const profile = ctx.config.agents[role];
+    const prompt = buildAiExtensionPrompt(ext, { repo: ctx.repo, featureDir: ctx.featureDir });
+    const title = `${featureName(ctx.featureDir)} · 扩展：${ext.title}`;
+    const agent = await ctx.runtime.startAgent({
+      role,
+      title,
+      prompt,
+      cwd: ctx.repo,
+      labels: {
+        "requirement-pipeline": featureName(ctx.featureDir),
+        "pipeline-step": key,
+      },
+      parentAgentId: ctx.config.attachToOriginChat ? ctx.state.originSessionId : null,
+      profile,
+      workspaceId: ctx.state.worktree?.workspaceRef ?? null,
+    });
+    const deadline = Date.now() + (ext.timeoutMinutes ?? 30) * 60_000;
+    let outcome: WaitOutcome = { status: "timeout", error: null, lastMessage: null, pendingPermissions: [] };
+    try {
+      while (Date.now() < deadline) {
+        const chunk = Math.min(ctx.config.waitChunkSeconds * 1000, Math.max(1000, deadline - Date.now()));
+        outcome = await agent.wait(chunk);
+        if (outcome.status !== "timeout") break;
+      }
+    } finally {
+      if (ctx.config.archiveStepAgents) {
+        await agent.archive().catch((err: Error) => ctx.log(`归档扩展 agent 失败：${err.message}`));
+      }
+    }
+    ctx.state.results[key] = {
+      kind: "ai",
+      hook,
+      status: outcome.status,
+      message: outcome.lastMessage ? outcome.lastMessage.slice(0, 500) : null,
+    };
+    save(ctx);
+    if (outcome.status !== "idle") {
+      const reason = outcome.error ?? (outcome.status === "timeout" ? "执行超时" : `状态为 ${outcome.status}`);
+      if (ext.onFailure === "warn") {
+        ctx.log(`⚠ AI 扩展「${ext.title}」未成功（${reason}），按 onFailure=warn 继续`);
+      } else {
+        throw new StepFailure(`扩展：${ext.title}`, reason);
+      }
+    } else {
+      ctx.log(`完成 AI 扩展「${ext.title}」（${ext.id}）`);
+    }
+  }
+}
+
 /** Assessment: read-only research → assessment.md → independent review ⇄ revise. */
 async function assessmentPhase(ctx: PipelineContext): Promise<void> {
   const rounds = ctx.config.profiles[ctx.state.profile].rounds;
   recordCodeBase(ctx);
   await runStep(ctx, "design");
+  await runExtensionsAfter(ctx, "design");
   for (let r = 1; r <= rounds.designReview; r++) {
     const review = await runReview(ctx, "design_review", r, rounds.designReview);
     if (review.verdict === "approved") break;
@@ -2008,6 +2095,7 @@ async function assessmentPhase(ctx: PipelineContext): Promise<void> {
     }
     await runStep(ctx, "design_revise", r, rounds.designReview);
   }
+  await runExtensionsAfter(ctx, "design_review");
 }
 
 /**
@@ -2062,6 +2150,7 @@ async function developPhase(ctx: PipelineContext): Promise<Record<string, unknow
     // Fixing what could not be reproduced is guessing: ask for what is missing.
     throw new BusinessDecisionNeeded(design.questions as string[], "reproduce");
   }
+  await runExtensionsAfter(ctx, "design");
 
   let designRounds = 0;
   for (let r = 1; r <= rounds.designReview; r++) {
@@ -2076,6 +2165,7 @@ async function developPhase(ctx: PipelineContext): Promise<Record<string, unknow
     // the implementer reads both the review and the revision record.
     await runStep(ctx, "design_revise", r, rounds.designReview);
   }
+  await runExtensionsAfter(ctx, "design_review");
   confirmDesign(ctx);
   const slices = implementationSlices(ctx);
   await milestone(
@@ -2107,6 +2197,7 @@ async function developPhase(ctx: PipelineContext): Promise<Record<string, unknow
   };
   // Joint requirement: every repository is implemented at the same time, against the contract.
   await allOrFirstError([implementHere(), ...joint.map((t) => runStep(ctx, "implement", null, null, { gate: true, target: t }))]);
+  await runExtensionsAfter(ctx, "implement");
 
   const reviewLoop = async (target?: StepTarget) => {
     for (let r = 1; r <= rounds.codeReview; r++) {
@@ -2117,7 +2208,9 @@ async function developPhase(ctx: PipelineContext): Promise<Record<string, unknow
     }
   };
   await allOrFirstError([reviewLoop(), ...joint.map((t) => reviewLoop(t))]);
+  await runExtensionsAfter(ctx, "code_review");
   await runStep(ctx, "handoff", null, null, { contextLines: jointLines(ctx) });
+  await runExtensionsAfter(ctx, "handoff");
   return design;
 }
 
@@ -2167,15 +2260,20 @@ async function verifyPhase(ctx: PipelineContext, design: Record<string, unknown>
   const joint = jointTargets(ctx);
   const jointContext = joint.length > 0 ? { contextLines: jointLines(ctx) } : {};
   const verification = await runStep(ctx, "verify", null, null, jointContext);
-  if (verification.result !== "defects_found") return false;
+  if (verification.result !== "defects_found") {
+    await runExtensionsAfter(ctx, "verify");
+    return false;
+  }
   if (phases.defects === "report") {
     ctx.log("验证发现了问题，按设置只记录、不修复，直接写报告。");
+    await runExtensionsAfter(ctx, "verify");
     return false;
   }
   if (phases.defects === "handback") {
     const used = ctx.state.handbacks ?? 0;
     if (used < rounds.defectFix) return true;
     ctx.log(`已经退回研发 ${used} 次（上限 ${rounds.defectFix}），不再退回，问题写进报告。`);
+    await runExtensionsAfter(ctx, "verify");
     return false;
   }
   await milestone(ctx, "fixing-defects", `验证中发现了一些问题，正在修复并重新验证（最多 ${rounds.defectFix} 轮）。`);
@@ -2188,6 +2286,7 @@ async function verifyPhase(ctx: PipelineContext, design: Record<string, unknown>
     if (recheck.result === "pass") break;
     found = recheck;
   }
+  await runExtensionsAfter(ctx, "verify");
   return false;
 }
 
@@ -2304,7 +2403,7 @@ async function flow(ctx: PipelineContext): Promise<Record<string, unknown>> {
     await assessmentPhase(ctx);
     const changed = changedOutsideFeature(ctx) ?? [];
     if (changed.length > 0) ctx.log(`评估期间功能目录之外有文件被改动：${changed.join("、")}`);
-    return runStep(ctx, "report", null, null, {
+    const report = await runStep(ctx, "report", null, null, {
       contextLines: [
         ...usageLines(ctx),
         ...(changed.length > 0
@@ -2312,6 +2411,8 @@ async function flow(ctx: PipelineContext): Promise<Record<string, unknown>> {
           : []),
       ],
     });
+    await runExtensionsAfter(ctx, "report");
+    return report;
   }
   for (;;) {
     const design = await developPhase(ctx);
@@ -2319,9 +2420,11 @@ async function flow(ctx: PipelineContext): Promise<Record<string, unknown>> {
     if (phaseOf(ctx) !== "verify") {
       if (phases.mode === "develop-only") {
         await stopManagedServices(ctx);
-        return runStep(ctx, "report", null, null, {
+        const report = await runStep(ctx, "report", null, null, {
           contextLines: [...reportLines(ctx), "只做研发：本次不做测试验证，完成报告按本步骤说明中“只做研发时”一节写成研发报告"],
         });
+        await runExtensionsAfter(ctx, "report");
+        return report;
       }
       if (phases.mode === "gated") {
         const at = ctx.state.verifyAt ? new Date(ctx.state.verifyAt) : null;
@@ -2339,7 +2442,9 @@ async function flow(ctx: PipelineContext): Promise<Record<string, unknown>> {
     await handBack(ctx);
   }
   await stopManagedServices(ctx);
-  return runStep(ctx, "report", null, null, { contextLines: reportLines(ctx) });
+  const report = await runStep(ctx, "report", null, null, { contextLines: reportLines(ctx) });
+  await runExtensionsAfter(ctx, "report");
+  return report;
 }
 
 export async function runPipeline(ctx: PipelineContext): Promise<PipelineOutcome> {
