@@ -14,6 +14,8 @@ export const options = {
   profile: { type: "string" },
   "dsh-bin": { type: "string" },
   approvals: { type: "string" },
+  "no-board": { type: "boolean" },
+  "board-port": { type: "string" },
 };
 
 const slash = (p) => p.split(path.sep).join("/");
@@ -70,16 +72,26 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
   const patchFile = path.join(profileDir, "cordis.patch.yml");
   // dsh writes the file with an empty flow list ("[]"); entries go into a block list instead.
   const current = (fs.existsSync(patchFile) ? fs.readFileSync(patchFile, "utf8") : "").replace(/^\s*\[\]\s*$/m, "");
-  if (current.includes("laoshi-dsh-plugin")) report("ok", `${patchFile} 中已挂载插件，不改动（审批策略以文件中的为准）`);
+  if (current.includes("laoshi-dsh-plugin")) report("ok", `${patchFile} 中已挂载插件，不改动（审批与看板配置以文件中的为准）`);
   else {
+    const enableBoard = !args["no-board"];
+    const boardPort = args["board-port"] ? Number(args["board-port"]) || 0 : 0;
     if (!dry) {
       fs.mkdirSync(profileDir, { recursive: true });
-      const block = `- insert:\n    - id: laoshi-dsh\n      name: 'laoshi-dsh-plugin'\n      config:\n        approvals: ${approvals}\n`;
+      const extraLines = [
+        `        kitRoot: '${slash(kit)}'`,
+        `        board: ${enableBoard}`,
+        ...(boardPort > 0 ? [`        boardPort: ${boardPort}`] : []),
+      ];
+      const block = `- insert:\n    - id: laoshi-dsh\n      name: 'laoshi-dsh-plugin'\n      config:\n        approvals: ${approvals}\n${extraLines.join("\n")}\n`;
       fs.writeFileSync(patchFile, `${current}${current && !current.endsWith("\n") ? "\n" : ""}${block}`);
     }
-    report("ok", `在 ${patchFile} 末尾挂载插件（审批策略 ${approvals}）`);
+    report("ok", `在 ${patchFile} 末尾挂载插件（审批策略 ${approvals}，需求看板${enableBoard ? "已启用" : "已关闭"}）`);
   }
-  return [`重启 dsh（profile ${profile}），让插件生效`];
+  return [
+    `重启 dsh（profile ${profile}），让插件与需求看板生效`,
+    "运行 laoshi doctor 可查看需求看板地址；也可随时运行 laoshi board 打开",
+  ];
 }
 
 /** Removes laoshi's dsh plugin and its mount. */

@@ -5,6 +5,7 @@
 // as a child of the chat, schedule a message into the chat, answer a step's approval request by
 // policy; and it relays the rest (prompt, cancel, status, history) to dsh's session controller.
 // It holds no pipeline logic: order, rounds and gates stay in the engine.
+import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -242,7 +243,78 @@ export function apply(ctx, config = {}) {
       await ctx.schedule.delete({ sessionId, id });
       return {};
     },
+
+    /** Status (and optional on-demand start) of the hosted requirement board web UI. */
+    board: async ({ start = false } = {}) => {
+      if (start && !boardState.running) await startBoard();
+      return { enabled: boardEnabled, running: boardState.running, url: boardState.url, error: boardState.error };
+    },
   };
+
+  // ---- optional hosted Web requirement board (`laoshi board --no-open`)
+  const boardEnabled = Boolean(config.board);
+  const boardPort = Number(config.boardPort ?? 0) || 0;
+  const boardReadOnly = Boolean(config.boardReadOnly);
+  const kitRoot = typeof config.kitRoot === "string" && config.kitRoot.trim() ? path.resolve(config.kitRoot.trim()) : null;
+  const boardState = { running: false, url: null, error: null };
+  let boardChild = null;
+  let boardStartPromise = null;
+
+  function startBoard() {
+    if (boardStartPromise) return boardStartPromise;
+    const reqBin = kitRoot ? path.join(kitRoot, "bin", "req.mjs") : null;
+    if (!reqBin || !fs.existsSync(reqBin)) {
+      boardState.error = "未配置有效的 kitRoot，请重新运行 laoshi install --platform dsh";
+      return Promise.resolve(boardState);
+    }
+    boardStartPromise = new Promise((resolve) => {
+      const args = [reqBin, "board", "--no-open", "--port", String(boardPort), ...(boardReadOnly ? ["--read-only"] : [])];
+      const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
+      boardChild = child;
+      boardState.error = null;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve(boardState);
+      };
+      const timer = setTimeout(finish, 8_000);
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        const m = /(http:\/\/127\.0\.0\.1:\d+\/)/.exec(chunk);
+        if (m) {
+          boardState.running = true;
+          boardState.url = m[1];
+          log({ board: m[1] });
+          clearTimeout(timer);
+          finish();
+        }
+      });
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        if (!boardState.running && chunk.trim()) boardState.error = chunk.trim().slice(0, 300);
+      });
+      child.on("exit", (code) => {
+        if (boardChild === child) {
+          boardChild = null;
+          boardStartPromise = null;
+          boardState.running = false;
+          boardState.url = null;
+          if (!settled && code !== 0) boardState.error = boardState.error || `看板进程退出（${code}）`;
+        }
+        clearTimeout(timer);
+        finish();
+      });
+      child.on("error", (err) => {
+        boardState.error = String(err?.message ?? err);
+        clearTimeout(timer);
+        finish();
+      });
+    });
+    return boardStartPromise;
+  }
+
+  if (boardEnabled) startBoard().catch(() => {});
 
   // ---- the local socket
   const token = crypto.randomBytes(32).toString("hex");
@@ -289,6 +361,18 @@ export function apply(ctx, config = {}) {
   server.on("error", (e) => log({ serverError: String(e?.message ?? e) }));
 
   ctx.on("dispose", () => {
+    if (boardChild?.pid) {
+      const pid = boardChild.pid;
+      boardChild = null;
+      try {
+        if (process.platform === "win32") spawnSync("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+        else process.kill(-pid, "SIGTERM");
+      } catch {
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch {}
+      }
+    }
     server.close();
     fs.rmSync(paths.token, { force: true });
     if (process.platform !== "win32") fs.rmSync(paths.socket, { force: true });
