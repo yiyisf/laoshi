@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { type ExtensionStep, mergeExtensions, validateExtensions } from "./extensions.js";
 import { type IntegrationConfig, validateIntegrations } from "./integrations.js";
 import { NOTIFIER_EVENT_TYPES, type NotifierConfig } from "./notifiers.js";
 import type { StepId } from "./steps.js";
@@ -329,6 +330,11 @@ export interface PipelineConfig {
    * in parallel; the reviewer consolidates. A configured review panel takes precedence.
    */
   reviewAxes: { enabled: boolean; profiles: ProfileName[] };
+  /**
+   * Controlled flow extensions (M3): custom AI/skill or shell script steps attached after
+   * fixed core stages, without altering the core pipeline skeleton.
+   */
+  extensions: ExtensionStep[];
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
@@ -406,6 +412,7 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   relatedRepos: [],
   designApproval: { mode: "ui", profiles: ["standard"], autoContinueHours: 0 },
   reviewAxes: { enabled: true, profiles: ["standard"] },
+  extensions: [],
 };
 
 /** Project file, at the repository root, that overrides the install-level configuration (laoshi M2c). */
@@ -547,6 +554,14 @@ function merge(base: PipelineConfig, raw: Record<string, unknown>): PipelineConf
     ...(isRecord(raw.designApproval) ? (raw.designApproval as Partial<PipelineConfig["designApproval"]>) : {}),
   };
   merged.reviewAxes = { ...base.reviewAxes, ...(isRecord(raw.reviewAxes) ? (raw.reviewAxes as Partial<PipelineConfig["reviewAxes"]>) : {}) };
+  if (raw.extensions !== undefined) {
+    if (Array.isArray(raw.extensions) && Array.isArray(base.extensions)) {
+      const checked = validateExtensions(raw.extensions);
+      merged.extensions = checked.errors.length === 0 ? mergeExtensions(base.extensions, checked.extensions) : (raw.extensions as ExtensionStep[]);
+    } else {
+      merged.extensions = raw.extensions as ExtensionStep[];
+    }
+  }
   delete (merged as unknown as Record<string, unknown>).rounds;
   return merged;
 }
@@ -772,6 +787,8 @@ function validate(config: PipelineConfig): void {
   }
   validatePhases(config.phases);
   validateChecks(config);
+  const extCheck = validateExtensions(config.extensions);
+  if (extCheck.errors.length > 0) throw new ConfigError(extCheck.errors.join("；"));
   for (const key of ["waitChunkSeconds", "permissionPollSeconds", "serviceReadySeconds", "queuePollSeconds"] as const) {
     if (typeof config[key] !== "number" || config[key] <= 0) throw new ConfigError(`${key} 必须是正数`);
   }

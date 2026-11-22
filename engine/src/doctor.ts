@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, type PipelineConfig, PROJECT_CONFIG_FILE, projectConfigPath, resolveRelatedRepo } from "./config.js";
+import { validateExtensions } from "./extensions.js";
 import { gitInfo } from "./git.js";
 import { codebaseOf, userOf } from "./identity.js";
 import { defaultConfigPath, homeOf, KIT_ROOT, kitPackageName, kitVersion } from "./locations.js";
@@ -118,6 +119,15 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
     const proposals = loaded.config.designProposals;
     if (proposals.enabled) {
       report("ok", `方案提案：${proposals.members.length || "builder 和 reviewer 各"} ${proposals.members.length ? "位成员" : "一份"}，用于 ${proposals.profiles.join("、")}档`);
+    }
+    const extensions = loaded.config.extensions;
+    if (extensions.length > 0) {
+      const summary = extensions.map((e) => `${e.id}(${e.kind}@${e.after})`).join("、");
+      report("ok", `受控流程扩展：${extensions.length} 项（${summary}）`);
+      if (repo) {
+        const check = validateExtensions(extensions, repo);
+        for (const err of check.errors) report("warn", `流程扩展检查：${err}`, `检查 ${path.basename(projectConfigPath(repo))} 或本机配置中的 extensions`);
+      }
     }
     if (repo) {
       const { checks, relatedRepos } = loaded.config;
