@@ -10,6 +10,7 @@ import {
   groupOf,
   type RequirementView,
   summarizeBoard,
+  summarizeChecklist,
   trackOf,
   urgencyOf,
 } from "../ui/shared/view-model.js";
@@ -116,4 +117,22 @@ test("renderBoardHtml 输出全中文 Bento 看板并安全转义 HTML", () => {
   assert.match(html, /多仓 \+2/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/, "标题中的脚本标签必须被转义");
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+});
+
+test("summarizeChecklist 统计流水线验证与人工勾选进度", () => {
+  const s = summarizeChecklist(
+    [
+      { id: "AC-1.1", kind: "criterion", title: "导出成功", required: true, pipeline: "pass", evidence: "通过" },
+      { id: "AC-1.2", kind: "criterion", title: "空数据提示", required: true, pipeline: "unverified", evidence: null },
+      { id: "AC-2.1", kind: "criterion", title: "可选美化", required: false, pipeline: "unknown", evidence: null },
+    ],
+    { "AC-1.1": "pass" },
+  );
+  assert.equal(s.total, 3);
+  assert.equal(s.requiredTotal, 2);
+  assert.equal(s.pipelinePass, 1);
+  assert.equal(s.pipelineNeedsEyes, 2);
+  assert.equal(s.checkedPass, 1);
+  assert.equal(s.checkedFail, 0);
+  assert.equal(s.remainingRequired, 1);
 });

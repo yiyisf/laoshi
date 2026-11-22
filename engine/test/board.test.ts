@@ -122,3 +122,77 @@ test("createBoardServer 只读模式拒绝全部 POST /api/action", async () => 
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test("createBoardServer 验收工作台支持读取清单、一键试用与提交验收结论", async () => {
+  const calls: string[] = [];
+  const { server, csrfToken } = createBoardServer({
+    handlers: {
+      list: () => SAMPLE,
+      detail: () => ({ files: ["preview.md"] }),
+      file: () => ({ content: "ok" }),
+      run: () => ({ ok: true, message: "ok" }),
+      acceptance: () => ({
+        checklist: {
+          title: "支持批量导出",
+          specVersion: "1",
+          reportVerdict: "已完成",
+          items: [{ id: "AC-1.1", kind: "criterion", title: "可导出 CSV", details: [], required: true, pipeline: "pass", evidence: "AC-1.1 通过" }],
+          notes: ["测试账号：demo"],
+        },
+        howTo: ["怎么跑起来：", "npm run dev"],
+        hasAcceptanceRecord: false,
+      }),
+      tryRun: async ({ stop }) => {
+        calls.push(stop ? "try:stop" : "try:start");
+        return { ok: true, message: stop ? "已停止" : "已启动", services: stop ? [] : [{ name: "web", url: "http://127.0.0.1:4100", running: true, output: null }], howTo: [], stopped: stop };
+      },
+      submitAcceptance: ({ answers, reviewer }) => {
+        calls.push(`accept:${reviewer}:${answers.length}`);
+        if (answers.length === 0) return { ok: false, missing: ["AC-1.1"], message: "还有 1 条必验项未勾选" };
+        return { ok: true, verdict: "通过", committed: true, message: "验收结论「通过」已写入 acceptance.md并提交。" };
+      },
+    },
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  assert.ok(addr && typeof addr === "object");
+  const base = `http://127.0.0.1:${addr.port}`;
+
+  try {
+    const acc = await fetch(`${base}/api/acceptance?repo=/work/repo&feature=docs/features/20261121-demo`);
+    assert.equal(acc.status, 200);
+    const accJson = (await acc.json()) as { checklist: { items: Array<{ id: string }> }; howTo: string[] };
+    assert.equal(accJson.checklist.items[0].id, "AC-1.1");
+    assert.ok(accJson.howTo.includes("npm run dev"));
+
+    const tryStart = await fetch(`${base}/api/try`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ repo: "/work/repo", featureDir: "docs/features/20261121-demo", stop: false }),
+    });
+    assert.equal(tryStart.status, 200);
+    const tryJson = (await tryStart.json()) as { ok: boolean; services: Array<{ url: string }> };
+    assert.equal(tryJson.services[0].url, "http://127.0.0.1:4100");
+
+    const missing = await fetch(`${base}/api/acceptance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ repo: "/work/repo", featureDir: "docs/features/20261121-demo", reviewer: "测试同事", answers: [] }),
+    });
+    assert.equal(missing.status, 400);
+
+    const submitted = await fetch(`${base}/api/acceptance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ repo: "/work/repo", featureDir: "docs/features/20261121-demo", reviewer: "测试同事", answers: [{ id: "AC-1.1", mark: "pass", note: "核对无误" }] }),
+    });
+    assert.equal(submitted.status, 200);
+    const subJson = (await submitted.json()) as { ok: boolean; verdict: string };
+    assert.equal(subJson.ok, true);
+    assert.equal(subJson.verdict, "通过");
+    assert.deepEqual(calls, ["try:start", "accept:测试同事:0", "accept:测试同事:1"]);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

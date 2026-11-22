@@ -368,3 +368,55 @@ export function summarizeBoard(items: RequirementView[], now = Date.now()): Boar
     longestWaitText: oldestWaitSince ? waited(oldestWaitSince, now) : null,
   };
 }
+
+export interface ChecklistItemView {
+  id: string;
+  kind: "criterion" | "decision";
+  title: string;
+  required: boolean;
+  pipeline: "pass" | "fail" | "unverified" | "unknown";
+  evidence: string | null;
+}
+
+export interface ChecklistSummary {
+  total: number;
+  requiredTotal: number;
+  pipelinePass: number;
+  pipelineNeedsEyes: number;
+  checkedPass: number;
+  checkedFail: number;
+  remainingRequired: number;
+}
+
+/** Summarizes pipeline verification progress and human acceptance ticks for the workbench. */
+export function summarizeChecklist(
+  items: ChecklistItemView[],
+  marks: Record<string, "pass" | "fail" | "skip"> = {},
+): ChecklistSummary {
+  let requiredTotal = 0;
+  let pipelinePass = 0;
+  let pipelineNeedsEyes = 0;
+  let checkedPass = 0;
+  let checkedFail = 0;
+  let remainingRequired = 0;
+
+  for (const item of items) {
+    if (item.required) requiredTotal++;
+    if (item.pipeline === "pass") pipelinePass++;
+    else pipelineNeedsEyes++;
+    const m = marks[item.id];
+    if (m === "pass") checkedPass++;
+    else if (m === "fail") checkedFail++;
+    else if (item.required) remainingRequired++;
+  }
+
+  return {
+    total: items.length,
+    requiredTotal,
+    pipelinePass,
+    pipelineNeedsEyes,
+    checkedPass,
+    checkedFail,
+    remainingRequired,
+  };
+}
