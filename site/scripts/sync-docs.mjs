@@ -19,6 +19,7 @@ export const PAGES = [
   ["docs/guide/安装与升级.md", "guide/install"],
   ["docs/guide/项目定制与运行规则.md", "guide/project"],
   ["docs/guide/维护者指南.md", "guide/maintainer"],
+  ["docs/guide/真实环境走查.md", "guide/walkthrough"],
   ["docs/intranet/install-verify.md", "guide/intranet"],
   ["adapters/dsh/README.md", "guide/dsh"],
   ["docs/guide/在摸高上使用.md", "guide/mogao"],

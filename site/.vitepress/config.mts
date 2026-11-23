@@ -95,6 +95,7 @@ export default defineConfig({
             { text: "内网安装与验证", link: "/guide/intranet" },
             { text: "项目定制与运行规则", link: "/guide/project" },
             { text: "维护者指南", link: "/guide/maintainer" },
+            { text: "真实环境走查清单", link: "/guide/walkthrough" },
           ],
         },
       ],
