@@ -270,3 +270,31 @@ test("dsh 定时任务支持 expiresAt：到期后插件自动取消定时任务
     host.dispose();
   }
 });
+
+test("dsh scheduleNewAgent 通过插件新建定时会话并可取消", async () => {
+  const { host, call } = await started();
+  try {
+    const notes: string[] = [];
+    const runtime = createRuntimeWithClient(call, (m) => notes.push(m), 10);
+    const id = await runtime.scheduleNewAgent({
+      name: "每周总览",
+      prompt: "运行 digest",
+      cron: "0 9 * * 1",
+      cwd: "/repo",
+      profile: { provider: "deepseek/deepseek-reasoner" },
+    });
+    assert.equal(id, "dsh:session-new/schedule-1");
+    assert.match(notes.join("\n"), /默认模型/);
+    const created = host.calls.find((c: { method: string }) => c.method === "schedule.create") as {
+      method: string;
+      args: { sessionId: string; req: { cron?: { expression: string } } };
+    };
+    assert.equal(created.args.sessionId, "session-new");
+    assert.equal(created.args.req.cron?.expression, "0 9 * * 1");
+
+    await runtime.cancelSchedule(id!);
+    assert.deepEqual(host.calls.at(-1), { method: "schedule.delete", args: { sessionId: "session-new", id: "schedule-1" } });
+  } finally {
+    host.dispose();
+  }
+});

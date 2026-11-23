@@ -4,7 +4,7 @@
 //
 // Worktrees and services are laoshi's builtin ones (engine/src/builtin, laoshi M2b): the methods
 // below are placeholders the runtime layer replaces. Each role can run on its own dsh model
-// (stepModel). Not yet: provider quota, platform agent profiles, recurring schedules' expiry.
+// (stepModel). Not yet: provider quota, platform agent profiles, event-stream wait, browser capabilities.
 import fs from "node:fs";
 import net from "node:net";
 import type { RunningTool } from "../../engine/src/scan-guard.js";
@@ -103,7 +103,7 @@ function parseScheduleId(id: string): { sessionId: string; id: string } | null {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function createRuntimeWithClient(call: PluginCall, _log: (message: string) => void, pollMs = 1000): AgentRuntime {
+export function createRuntimeWithClient(call: PluginCall, log: (message: string) => void, pollMs = 1000): AgentRuntime {
   const stepAgent = (id: string): StepAgent => ({
     id,
     async wait(timeoutMs: number): Promise<WaitOutcome> {
@@ -215,7 +215,18 @@ export function createRuntimeWithClient(call: PluginCall, _log: (message: string
       return scheduleId(input.agentId, id);
     },
 
-    scheduleNewAgent: async () => null,
+    async scheduleNewAgent(input) {
+      // dsh sessions.create takes { cwd } and uses dsh's default session model.
+      if (stepModel(input.profile)) log("dsh 的定时会话使用 dsh 默认模型");
+      const r = await call<{ id: string; sessionId: string }>("scheduleAgent", {
+        cwd: input.cwd,
+        title: input.name,
+        prompt: input.prompt,
+        cron: input.cron,
+        timeZone: localTimeZone(),
+      });
+      return scheduleId(r.sessionId, r.id);
+    },
 
     async cancelSchedule(id) {
       const parsed = parseScheduleId(id);

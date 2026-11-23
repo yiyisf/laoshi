@@ -54,8 +54,8 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 | `listPaseoProfiles`（将改名，见 ADR 0008） | `agentPresets` 的列表，以及模型目录 | platform | 否 |
 | `listServices` / `startServices` / `stopServices` | dsh 没有服务定义。由 laoshi 内置的服务管理读取代码库配置中的服务，分配端口，做健康检查，保留输出 | builtin | — |
 | `createWorktree` / `waitForWorkspaceSetup` | laoshi 内置的 `git worktree`。可选启用 `dsh-experimental-worktree`，但它会改变会话的工作目录，和"步骤在 worktree、对话在原目录"的做法需要先对齐 | builtin | — |
-| `scheduleMessage` / `cancelSchedule` | 插件调用 `ctx.schedule.create(sessionId, …)`；用 `/api` 的 `schedule/delete` 取消 | plugin | 创建已验证 |
-| `scheduleNewAgent` | 插件为定时任务创建一个专用会话，再预约到它 | plugin | 否 |
+| `scheduleMessage` / `cancelSchedule` | 插件调用 `ctx.schedule.create(sessionId, …)`，支持 `expiresAt` 到期由插件定时取消；`ctx.schedule.delete` 取消 | plugin | 创建、取消与到期取消已单元测试（mock host） |
+| `scheduleNewAgent` | 插件为定时任务创建一个专用会话，再预约到它（使用 dsh 默认模型） | plugin | 单元测试（mock host） |
 | `startSessionAgent` | `session/create`，再 `session/prompt` | platform | 是 |
 | `providerQuota` | 没有订阅额度；只能拿到每个会话的 `tokenUsage` | none | — |
 | `recentActivity` / `runningTool` / `toolCalls` | `session/page` 中的 `tool/call`、`tool/result` 事件 | platform | 事件已确认 |

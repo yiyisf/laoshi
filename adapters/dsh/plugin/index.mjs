@@ -253,6 +253,21 @@ export function apply(ctx, config = {}) {
       return { id: record.id };
     },
 
+    /** A cron schedule that creates a dedicated session in cwd and schedules into it. */
+    scheduleAgent: async ({ cwd, title, prompt: text, cron, timeZone }) => {
+      if (typeof cwd !== "string" || !cwd.trim()) throw new Error("scheduleAgent: cwd is required");
+      if (typeof text !== "string" || !text.trim()) throw new Error("scheduleAgent: prompt is required");
+      if (typeof cron !== "string" || !cron.trim()) throw new Error("scheduleAgent: cron is required");
+      const { sessionId } = await sessions.create({ cwd });
+      const record = await ctx.schedule.create(sessionId, {
+        title: typeof title === "string" && title.trim() ? title.trim() : "laoshi",
+        prompt: text,
+        cron: { expression: cron, time_zone: timeZone },
+      });
+      log({ scheduleAgent: record.id, sessionId, title, cron });
+      return { id: record.id, sessionId };
+    },
+
     cancelSchedule: async ({ sessionId, id }) => {
       const key = `${sessionId}/${id}`;
       const timer = scheduleTimers.get(key);
