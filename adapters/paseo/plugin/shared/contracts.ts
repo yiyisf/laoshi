@@ -34,6 +34,8 @@ export interface Requirement {
   updatedAt: string;
   usage: Usage | null;
   present: boolean;
+  startedBy?: string | null;
+  owner?: string | null;
   /** req-kit 1.13+: it has an interface prototype, which the review page shows. */
   hasPrototype?: boolean;
   /** req-kit 1.12+: what a requirement that needs a person is waiting for; absent before. */
@@ -182,8 +184,28 @@ export const statsRpc = defineRpc({
   output: z.custom<StatsSummary>(),
 });
 
-export const ACTIONS = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try", "try-stop"] as const;
+export const ACTIONS = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try", "try-stop", "change", "handover"] as const;
 export type Action = (typeof ACTIONS)[number];
+
+export interface HandoverEvent {
+  from: string | null;
+  to: string;
+  at: string;
+  note: string | null;
+}
+
+export interface RequirementHistory {
+  specVersion: string | null;
+  changes: Array<{ title: string; body: string }>;
+  commits: Array<{ commit: string; date: string; author: string; subject: string; diff: string; truncated: boolean }>;
+  owner: { owner: string | null; history: HandoverEvent[] };
+}
+
+export const historyRpc = defineRpc({
+  name: "req.history",
+  input: target,
+  output: z.custom<RequirementHistory>(),
+});
 
 export const runRpc = defineRpc({
   name: "req.run",
@@ -191,8 +213,12 @@ export const runRpc = defineRpc({
     action: z.enum(ACTIONS),
     /** For verify: local | deployed. */
     verifyEnv: z.enum(["local", "deployed"]).optional(),
-    /** For reply (1.12): the answer, passed to the requirement's chat. */
+    /** For reply / change: the answer or change request passed to the requirement's chat. */
     text: z.string().max(8000).optional(),
+    /** For handover: new owner name/account. */
+    to: z.string().max(64).optional(),
+    /** For handover: optional handover note. */
+    note: z.string().max(500).optional(),
   }),
   output: z.object({ ok: z.boolean(), message: z.string() }),
 });

@@ -1,12 +1,12 @@
 // One requirement: where it stands, its steps, the quality gate, its documents, and the
 // management actions (each one is `req <command>` on the daemon machine, after confirming).
 import type { PluginHostProps, PluginScreenProps, PluginSurfaceProps } from "@getpaseo/plugin/client";
-import { Modal, ScrollView, useToast } from "@getpaseo/plugin/client/react-native";
+import { Modal, ScrollView, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Action, RequirementDetail, Step } from "../shared/contracts";
-import { useAction, useDocument, usePreferences, useRequirement, useRequirements } from "./data";
+import { useAction, useDocument, useHistory, usePreferences, useRequirement, useRequirements } from "./data";
 import { ACTION_TEXT, actionsFor, ago, ATTENTION_LABELS, facts, FILE_LABELS, minutes, tokens, trackOf } from "./format";
 import { Markdown, tsvToMarkdown } from "./markdown";
 import { ChecklistButton, CodeReviewButton, ReviewButton } from "./review";
@@ -126,6 +126,234 @@ function ActionModal({
   );
 }
 
+function ChangeModal({
+  theme,
+  layout,
+  detail,
+  open,
+  onClose,
+}: {
+  theme: Theme;
+  layout: Layout;
+  detail: RequirementDetail;
+  open: boolean;
+  onClose(): void;
+}) {
+  const s = useStyles(theme, layout.compact);
+  const run = useAction();
+  const toast = useToast();
+  const [text, setText] = useState("");
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      toast.error("请先写下要修改的需求内容");
+      return;
+    }
+    try {
+      const result = await run.mutateAsync({ action: "change", repo: detail.sourceRepo ?? detail.repo, featureDir: detail.featureDir, text: trimmed });
+      const first = result.message.split("\n").find((l) => l.trim()) ?? "";
+      if (result.ok) {
+        toast.show(first || "已发送改需求通知", { variant: "success", durationMs: 4000 });
+        setText("");
+        onClose();
+      } else {
+        toast.error(first || "发送失败");
+      }
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+  return (
+    <Modal title={`发起改需求：${detail.title}`} open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <Modal.Content>
+        <Text style={s.text}>{ACTION_TEXT.change.confirm}</Text>
+        <TextInput
+          value={text}
+          onChangeText={setText}
+          multiline
+          placeholder="描述要调整的功能、字段或验收标准…"
+          placeholderTextColor={theme.colors.foregroundMuted}
+          style={{
+            minHeight: 88,
+            padding: 10,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface0,
+            color: theme.colors.foreground,
+            fontSize: 14,
+            textAlignVertical: "top",
+          }}
+        />
+        <View style={s.row}>
+          <Button theme={theme} primary label={run.isPending ? "正在发送…" : "确认发起"} disabled={run.isPending || !text.trim()} onPress={() => void submit()} />
+          <Button theme={theme} label="取消" disabled={run.isPending} onPress={onClose} />
+        </View>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function HandoverModal({
+  theme,
+  layout,
+  detail,
+  open,
+  onClose,
+}: {
+  theme: Theme;
+  layout: Layout;
+  detail: RequirementDetail;
+  open: boolean;
+  onClose(): void;
+}) {
+  const s = useStyles(theme, layout.compact);
+  const run = useAction();
+  const toast = useToast();
+  const [to, setTo] = useState("");
+  const [note, setNote] = useState("");
+  const inputStyle = {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface0,
+    color: theme.colors.foreground,
+    fontSize: 14,
+  };
+  const submit = async () => {
+    const trimmed = to.trim();
+    if (!trimmed) {
+      toast.error("请填写接手人");
+      return;
+    }
+    try {
+      const result = await run.mutateAsync({
+        action: "handover",
+        repo: detail.sourceRepo ?? detail.repo,
+        featureDir: detail.featureDir,
+        to: trimmed,
+        note: note.trim() || undefined,
+      });
+      const first = result.message.split("\n").find((l) => l.trim()) ?? "";
+      if (result.ok) {
+        toast.show(first || "已转交", { variant: "success", durationMs: 4000 });
+        setTo("");
+        setNote("");
+        onClose();
+      } else {
+        toast.error(first || "转交失败");
+      }
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+  return (
+    <Modal title={`转交需求：${detail.title}`} open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <Modal.Content>
+        <Text style={s.text}>{ACTION_TEXT.handover.confirm}</Text>
+        <TextInput value={to} onChangeText={setTo} placeholder="接手人姓名或账号" placeholderTextColor={theme.colors.foregroundMuted} style={inputStyle} />
+        <TextInput value={note} onChangeText={setNote} placeholder="交接说明（可选，例如：请跟进验收阶段）" placeholderTextColor={theme.colors.foregroundMuted} style={inputStyle} />
+        <View style={s.row}>
+          <Button theme={theme} primary label={run.isPending ? "正在转交…" : "确认转交"} disabled={run.isPending || !to.trim()} onPress={() => void submit()} />
+          <Button theme={theme} label="取消" disabled={run.isPending} onPress={onClose} />
+        </View>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function HistorySection({ theme, layout, detail }: { theme: Theme; layout: Layout; detail: RequirementDetail }) {
+  const s = useStyles(theme, layout.compact);
+  const c = rk(theme);
+  const history = useHistory(detail.repo, detail.featureDir);
+  const [openChange, setOpenChange] = useState<number | null>(null);
+  const [openCommit, setOpenCommit] = useState<string | null>(null);
+  const h = history.data;
+  const ownerName = h?.owner.owner ?? detail.owner ?? detail.startedBy ?? "未指定";
+  return (
+    <View style={s.card}>
+      <Text style={s.heading}>变更历史与负责人</Text>
+      <Text style={s.text}>
+        当前负责人：{ownerName} · 需求说明版本：{h?.specVersion ? `v${h.specVersion}` : "未标注"}
+      </Text>
+      {h && h.owner.history.length > 0 ? (
+        <Text style={s.muted}>
+          最近转交：{h.owner.history.at(-1)!.from ?? "未指定"} → {h.owner.history.at(-1)!.to}
+          {h.owner.history.at(-1)!.note ? `（${h.owner.history.at(-1)!.note}）` : ""}
+        </Text>
+      ) : null}
+      <Status theme={theme} loading={history.isPending} error={history.error} />
+      {h && h.changes.length > 0 ? (
+        <View style={{ gap: 6, marginTop: 4 }}>
+          <Text style={s.muted}>变更记录（{h.changes.length} 项）</Text>
+          {h.changes.map((ch, idx) => (
+            <View key={`${ch.title}-${idx}`} style={{ borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, padding: 8, gap: 4 }}>
+              <Pressable accessibilityRole="button" onPress={() => setOpenChange(openChange === idx ? null : idx)}>
+                <View style={s.row}>
+                  <Text style={[s.text, { flex: 1, fontWeight: "600" }]}>{ch.title}</Text>
+                  <Text style={s.muted}>{openChange === idx ? "收起" : "展开"}</Text>
+                </View>
+              </Pressable>
+              {openChange === idx && ch.body ? <Text style={s.mono}>{ch.body}</Text> : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {h && h.commits.length > 0 ? (
+        <View style={{ gap: 6, marginTop: 4 }}>
+          <Text style={s.muted}>需求说明修改历史（{h.commits.length} 次提交）</Text>
+          {h.commits.map((cm) => {
+            const opened = openCommit === cm.commit;
+            const day = cm.date ? cm.date.slice(0, 16).replace("T", " ") : "";
+            return (
+              <View key={cm.commit} style={{ borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, padding: 8, gap: 4 }}>
+                <Pressable accessibilityRole="button" onPress={() => setOpenCommit(opened ? null : cm.commit)}>
+                  <View style={s.row}>
+                    <Text style={[s.text, { flex: 1 }]}>
+                      {day ? `${day} · ` : ""}
+                      {cm.author ? `${cm.author} · ` : ""}
+                      {cm.subject || cm.commit.slice(0, 7)}
+                    </Text>
+                    <Text style={s.muted}>{opened ? "收起差异" : "查看差异"}</Text>
+                  </View>
+                </Pressable>
+                {opened && cm.diff ? (
+                  <View style={{ borderRadius: 6, backgroundColor: theme.colors.surface0, padding: 6, gap: 1 }}>
+                    {cm.diff.split(/\r?\n/).map((line, li) => {
+                      const isAdd = line.startsWith("+") && !line.startsWith("+++");
+                      const isDel = line.startsWith("-") && !line.startsWith("---");
+                      const isHunk = line.startsWith("@@");
+                      return (
+                        <Text
+                          key={li}
+                          style={[
+                            s.mono,
+                            isAdd
+                              ? { color: theme.colors.statusSuccess, backgroundColor: c.successTint }
+                              : isDel
+                                ? { color: theme.colors.statusDanger, backgroundColor: c.failedTint }
+                                : isHunk
+                                  ? { color: c.data }
+                                  : undefined,
+                          ]}
+                        >
+                          {line || " "}
+                        </Text>
+                      );
+                    })}
+                    {cm.truncated ? <Text style={s.muted}>差异内容较长，已截断至 20000 字符。</Text> : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function GateSummary({ theme, layout, detail }: { theme: Theme; layout: Layout; detail: RequirementDetail }) {
   const s = useStyles(theme, layout.compact);
   const runs = [...(detail.gate?.runs ?? []), ...detail.joint.flatMap((j) => j.gate?.runs ?? [])];
@@ -163,6 +391,8 @@ export function RequirementView({
   const { readOnly } = usePreferences();
   const [doc, setDoc] = useState<string | null>(null);
   const [action, setAction] = useState<Action | null>(null);
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
   const [allSteps, setAllSteps] = useState(false);
   const d = query.data;
   if (!d) return <Status theme={theme} loading={query.isPending} error={query.error} />;
@@ -205,7 +435,10 @@ export function RequirementView({
           ) : null}
         </View>
         <StepTrack theme={theme} steps={trackOf(d, hr)} />
-        <Text style={s.muted}>{facts(d)}</Text>
+        <Text style={s.muted}>
+          {facts(d)}
+          {d.owner ? ` · 负责人：${d.owner}` : ""}
+        </Text>
         <Text style={[s.text, { color: d.attention ? c.brandText : theme.colors.foreground }]}>{d.stage}</Text>
         {d.estimate && d.attention !== "approval" ? (
           <Text style={s.muted}>
@@ -220,7 +453,7 @@ export function RequirementView({
         {d.attention === "business" ? <Text style={s.muted}>需求方的决定请在发起需求的对话中回答，回答后再继续。</Text> : null}
       </View>
 
-      {actions.length > 0 || d.hasPrototype || canAccept || canReviewCode ? (
+      {actions.length > 0 || d.hasPrototype || canAccept || canReviewCode || !readOnly ? (
         <View style={s.row}>
           {canReviewCode ? <CodeReviewButton theme={theme} repo={d.sourceRepo ?? d.repo} featureDir={d.featureDir} title={d.title} label={reviewLabel} primary={primary === "code"} /> : null}
           {canAccept ? <ChecklistButton theme={theme} repo={d.sourceRepo ?? d.repo} featureDir={d.featureDir} title={d.title} primary={primary === "check"} /> : null}
@@ -230,6 +463,8 @@ export function RequirementView({
           {actions.map((a) => (
             <Button key={a} theme={theme} primary={primary === a} label={ACTION_TEXT[a].label} onPress={() => setAction(a)} />
           ))}
+          {!readOnly ? <Button theme={theme} label={ACTION_TEXT.change.label} onPress={() => setChangeOpen(true)} /> : null}
+          {!readOnly ? <Button theme={theme} label={ACTION_TEXT.handover.label} onPress={() => setHandoverOpen(true)} /> : null}
         </View>
       ) : null}
 
@@ -302,6 +537,7 @@ export function RequirementView({
       ) : null}
 
       <GateSummary theme={theme} layout={layout} detail={d} />
+      <HistorySection theme={theme} layout={layout} detail={d} />
 
       {d.steps.length > 0 ? (
         <View style={s.card}>
@@ -317,6 +553,8 @@ export function RequirementView({
 
       <DocumentModal theme={theme} layout={layout} repo={d.repo} featureDir={d.featureDir} file={doc} onClose={() => setDoc(null)} />
       <ActionModal theme={theme} layout={layout} detail={d} action={action} onClose={() => setAction(null)} />
+      <ChangeModal theme={theme} layout={layout} detail={d} open={changeOpen} onClose={() => setChangeOpen(false)} />
+      <HandoverModal theme={theme} layout={layout} detail={d} open={handoverOpen} onClose={() => setHandoverOpen(false)} />
     </View>
   );
 }

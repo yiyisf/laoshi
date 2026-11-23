@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import vm from "node:vm";
 import { test } from "node:test";
 import {
   actionsFor,
@@ -35,6 +36,7 @@ function sampleItems(): RequirementView[] {
       attention: "approval",
       running: false,
       updatedAt: "2026-11-20T06:00:00.000Z",
+      owner: "zhangsan",
       current: [],
       jointCount: 2,
       waiting: { since: "2026-11-20T06:00:00.000Z", questions: [], card: { system: "ALM", id: "REQ-42" } },
@@ -101,6 +103,7 @@ test("summarizeBoard、buildInboxCards 与 filterRequirements 正确聚合与筛
 
   assert.equal(filterRequirements(items, { project: "web-portal" }, NOW).length, 1);
   assert.equal(filterRequirements(items, { query: "REQ-42" }, NOW).length, 1);
+  assert.equal(filterRequirements(items, { query: "zhangsan" }, NOW).length, 1);
   assert.equal(filterRequirements(items, { group: "verify" }, NOW).length, 1);
 
   assert.equal(groupOf(items[1], NOW), "running");
@@ -116,8 +119,14 @@ test("renderBoardHtml 输出全中文 Bento 看板并安全转义 HTML", () => {
   assert.match(html, /待测试验证 · 1/);
   assert.doesNotMatch(html, /NEEDS YOU|IN PROGRESS|READY TO TEST|DONE \(14D\)/, "界面分组与 KPI 文案应统一使用中文");
   assert.match(html, /多仓 \+2/);
+  assert.match(html, /负责人：zhangsan/);
+  assert.match(html, /变更与接手/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/, "标题中的脚本标签必须被转义");
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+
+  const scriptMatch = /<script>([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(scriptMatch, "应包含内联脚本");
+  assert.doesNotThrow(() => new vm.Script(scriptMatch[1], { filename: "board-inline.js" }), "看板内联脚本必须无语法错误");
 });
 
 test("summarizeChecklist 统计流水线验证与人工勾选进度", () => {

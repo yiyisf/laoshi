@@ -11,13 +11,14 @@ import { fileURLToPath } from "node:url";
 import { apiFile, apiList, apiRun, apiStatus, type ListItem } from "./api.js";
 import { acceptanceText, type Answer, buildChecklist, type Checklist, recordAcceptance, verdictOf } from "./checklist.js";
 import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
+import { apiHistory, type RequirementHistory } from "./history.js";
 import { defaultConfigPath } from "./locations.js";
 import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import { howToTry, tryRequirement, type TryResult } from "./try.js";
 import type { RequirementView } from "../../ui/shared/view-model.js";
 import { renderBoardHtml } from "../../ui/web/board.js";
 
-const ALLOWED_ACTIONS = new Set(["approve", "stop", "resume", "verify", "sync", "start", "reply"]);
+const ALLOWED_ACTIONS = new Set(["approve", "stop", "resume", "verify", "sync", "start", "reply", "change", "handover"]);
 
 export function toRequirementView(item: ListItem): RequirementView {
   return {
@@ -36,6 +37,7 @@ export function toRequirementView(item: ListItem): RequirementView {
     running: item.running,
     updatedAt: item.updatedAt,
     startedBy: item.startedBy,
+    owner: item.owner ?? null,
     hasPrototype: item.hasPrototype,
     current: item.current,
     waiting: item.waiting,
@@ -60,7 +62,8 @@ export interface BoardHandlers {
   list: () => RequirementView[];
   detail: (repo: string, feature: string) => unknown;
   file: (repo: string, feature: string, file: string) => unknown;
-  run: (input: { action: string; repo: string; featureDir: string; text?: string; verifyEnv?: string }) => { ok: boolean; message: string };
+  run: (input: { action: string; repo: string; featureDir: string; text?: string; to?: string; note?: string; verifyEnv?: string }) => { ok: boolean; message: string };
+  history?: (repo: string, feature: string) => RequirementHistory | unknown;
   acceptance?: (repo: string, feature: string) => AcceptanceView;
   submitAcceptance?: (input: { repo: string; featureDir: string; reviewer: string; answers: Answer[] }) => AcceptanceSubmitResult;
   tryRun?: (input: { repo: string; featureDir: string; stop?: boolean }) => Promise<TryResult>;
@@ -164,6 +167,20 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
         sendJson(res, 200, options.handlers.acceptance(repo, feature));
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/history") {
+        const repo = url.searchParams.get("repo") ?? "";
+        const feature = url.searchParams.get("feature") ?? "";
+        if (!repo || !feature) {
+          sendJson(res, 400, { error: "缺少 repo 或 feature 参数" });
+          return;
+        }
+        if (!options.handlers.history) {
+          sendJson(res, 404, { error: "当前看板未启用变更历史" });
+          return;
+        }
+        sendJson(res, 200, options.handlers.history(repo, feature));
+        return;
+      }
       if (req.method === "POST" && url.pathname === "/api/try") {
         if (readOnly) {
           sendJson(res, 403, { ok: false, error: "看板当前为只读模式" });
@@ -231,16 +248,30 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
         const action = typeof body.action === "string" ? body.action : "";
         const repo = typeof body.repo === "string" ? body.repo : "";
         const featureDir = typeof body.featureDir === "string" ? body.featureDir : "";
+        const text = typeof body.text === "string" ? body.text : undefined;
+        const to = typeof body.to === "string" ? body.to : undefined;
+        const note = typeof body.note === "string" ? body.note : undefined;
+        const verifyEnv = typeof body.verifyEnv === "string" ? body.verifyEnv : undefined;
         if (!ALLOWED_ACTIONS.has(action) || !repo || !featureDir) {
           sendJson(res, 400, { ok: false, error: "无效的操作或缺少目标需求" });
+          return;
+        }
+        if (action === "change" && !text?.trim()) {
+          sendJson(res, 400, { ok: false, error: "改动内容是空的", message: "改动内容是空的" });
+          return;
+        }
+        if (action === "handover" && !to?.trim()) {
+          sendJson(res, 400, { ok: false, error: "接手人不能为空", message: "接手人不能为空" });
           return;
         }
         const result = options.handlers.run({
           action,
           repo,
           featureDir,
-          text: typeof body.text === "string" ? body.text : undefined,
-          verifyEnv: typeof body.verifyEnv === "string" ? body.verifyEnv : undefined,
+          text,
+          to,
+          note,
+          verifyEnv,
         });
         sendJson(res, 200, result);
         return;
@@ -307,7 +338,18 @@ async function main(argv: string[]): Promise<number> {
     list: () => apiList({ repo: args.repo ?? process.cwd(), all: !args.repo }).map(toRequirementView),
     detail: (repo, feature) => apiStatus(repo, feature),
     file: (repo, feature, file) => apiFile(repo, feature, file),
-    run: ({ action, repo, featureDir, text, verifyEnv }) => {
+    history: (repo, feature) => apiHistory(repo, feature),
+    run: ({ action, repo, featureDir, text, to, note, verifyEnv }) => {
+      if (action === "change") {
+        const msg = text?.trim() ?? "";
+        if (!msg) return { ok: false, message: "改动内容是空的" };
+        return apiRun("reply", repo, featureDir, ["--change", msg]);
+      }
+      if (action === "handover") {
+        const target = to?.trim() ?? "";
+        if (!target) return { ok: false, message: "接手人不能为空" };
+        return apiRun("handover", repo, featureDir, [target, ...(note?.trim() ? ["--note", note.trim()] : [])]);
+      }
       const extra: string[] = [];
       if (verifyEnv) extra.push("--verify-env", verifyEnv);
       if (text) extra.push(text);

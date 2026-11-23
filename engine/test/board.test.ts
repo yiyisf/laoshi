@@ -61,6 +61,43 @@ test("createBoardServer 提供看板页面、详情/文件接口与受令牌保�
     const detailJson = (await detailRes.json()) as { files: string[] };
     assert.deepEqual(detailJson.files, ["preview.md", "spec.md"]);
 
+    // History endpoint not enabled -> 404
+    const noHist = await fetch(`${base}/api/history?repo=/work/repo&feature=docs/features/20261121-demo`);
+    assert.equal(noHist.status, 404);
+
+    // Empty change text -> 400
+    const emptyChange = await fetch(`${base}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "change", repo: "/work/repo", featureDir: "docs/features/20261121-demo", text: "   " }),
+    });
+    assert.equal(emptyChange.status, 400);
+
+    // Empty handover target -> 400
+    const emptyHo = await fetch(`${base}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "handover", repo: "/work/repo", featureDir: "docs/features/20261121-demo", to: "" }),
+    });
+    assert.equal(emptyHo.status, 400);
+
+    // Valid change & handover actions allowed
+    const chAct = await fetch(`${base}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "change", repo: "/work/repo", featureDir: "docs/features/20261121-demo", text: "增加 Excel 导出" }),
+    });
+    assert.equal(chAct.status, 200);
+    assert.equal(((await chAct.json()) as { ok: boolean }).ok, true);
+
+    const hoAct = await fetch(`${base}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "handover", repo: "/work/repo", featureDir: "docs/features/20261121-demo", to: "wangwu", note: "请跟进" }),
+    });
+    assert.equal(hoAct.status, 200);
+    assert.equal(((await hoAct.json()) as { ok: boolean }).ok, true);
+
     const fileRes = await fetch(`${base}/api/file?repo=/work/repo&feature=docs/features/20261121-demo&file=preview.md`);
     assert.equal(fileRes.status, 200);
     const fileJson = (await fileRes.json()) as { content: string };
@@ -91,8 +128,10 @@ test("createBoardServer 提供看板页面、详情/文件接口与受令牌保�
     assert.equal(okAct.status, 200);
     const okJson = (await okAct.json()) as { ok: boolean; message: string };
     assert.equal(okJson.ok, true);
-    assert.equal(ran.length, 1);
-    assert.equal(ran[0].action, "approve");
+    assert.deepEqual(
+      ran.map((r) => r.action),
+      ["change", "handover", "approve"],
+    );
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -118,6 +157,18 @@ test("createBoardServer 只读模式拒绝全部 POST /api/action", async () => 
       body: JSON.stringify({ action: "approve", repo: "/work/repo", featureDir: "docs/features/20261121-demo" }),
     });
     assert.equal(res.status, 403);
+    const chRes = await fetch(`http://127.0.0.1:${addr.port}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "change", repo: "/work/repo", featureDir: "docs/features/20261121-demo", text: "改一下" }),
+    });
+    assert.equal(chRes.status, 403);
+    const hoRes = await fetch(`http://127.0.0.1:${addr.port}/api/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Laoshi-Token": csrfToken },
+      body: JSON.stringify({ action: "handover", repo: "/work/repo", featureDir: "docs/features/20261121-demo", to: "lisi" }),
+    });
+    assert.equal(hoRes.status, 403);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -192,6 +243,36 @@ test("createBoardServer 验收工作台支持读取清单、一键试用与提�
     assert.equal(subJson.ok, true);
     assert.equal(subJson.verdict, "通过");
     assert.deepEqual(calls, ["try:start", "accept:测试同事:0", "accept:测试同事:1"]);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("createBoardServer /api/history 返回变更记录、commit 与负责人信息", async () => {
+  const { server } = createBoardServer({
+    handlers: {
+      list: () => SAMPLE,
+      detail: () => ({ files: [] }),
+      file: () => ({ content: "" }),
+      run: () => ({ ok: true, message: "ok" }),
+      history: () => ({
+        specVersion: "2",
+        changes: [{ title: "2026-11-23 调整导出", body: "- 支持 Excel" }],
+        commits: [{ commit: "abc1234", date: "2026-11-23T10:00:00Z", author: "dev", subject: "v2", diff: "+Excel", truncated: false }],
+        owner: { owner: "lisi", history: [] },
+      }),
+    },
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  assert.ok(addr && typeof addr === "object");
+  try {
+    const res = await fetch(`http://127.0.0.1:${addr.port}/api/history?repo=/work/repo&feature=docs/features/20261121-demo`);
+    assert.equal(res.status, 200);
+    const json = (await res.json()) as { specVersion: string; changes: Array<{ title: string }>; owner: { owner: string } };
+    assert.equal(json.specVersion, "2");
+    assert.equal(json.changes[0].title, "2026-11-23 调整导出");
+    assert.equal(json.owner.owner, "lisi");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

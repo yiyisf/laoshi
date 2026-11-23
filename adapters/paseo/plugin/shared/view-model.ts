@@ -36,6 +36,7 @@ export interface RequirementView {
   running: boolean;
   updatedAt: string;
   startedBy?: string | null;
+  owner?: string | null;
   hasPrototype?: boolean;
   current: Array<{ key: string; title?: string }>;
   waiting?: RequirementWaiting | null;
@@ -320,6 +321,7 @@ export function filterRequirements(items: RequirementView[], filter: BoardFilter
       item.branch ?? "",
       item.stage,
       item.startedBy ?? "",
+      item.owner ?? "",
       item.waiting?.card?.id ?? "",
     ]
       .join(" ")

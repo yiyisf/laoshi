@@ -26,7 +26,8 @@ interface ReqModule {
 interface HandlersModule {
   createHandlers(input: { req: Runner; kitHome: () => string; readOnly: () => Promise<boolean> }): {
     list(): Promise<unknown[]>;
-    run(input: { action: string; repo: string; featureDir: string; verifyEnv?: string }): Promise<{ ok: boolean; message: string }>;
+    history(input: { repo: string; featureDir: string }): Promise<unknown>;
+    run(input: { action: string; repo: string; featureDir: string; verifyEnv?: string; text?: string; to?: string; note?: string }): Promise<{ ok: boolean; message: string }>;
     setAgents(input: { builder: object; reviewer: object; fallback: object | null }): Promise<{ ok: boolean; message: string }>;
   };
 }
@@ -114,6 +115,23 @@ test("插件后台：只读时拒绝管理操作；操作转成 laoshi api run�
   await handlers.run({ action: "reply", repo: "/repo", featureDir: "docs/features/a", text: " 1. 只有新订单 " } as never);
   assert.deepEqual(calls.at(-1), ["run", "reply", "docs/features/a", "--repo", "/repo", "1. 只有新订单"]);
   assert.equal((await handlers.run({ action: "reply", repo: "/repo", featureDir: "docs/features/a", text: "  " } as never)).ok, false);
+
+  // X5: change -> req api run reply --change; handover -> req api run handover; history -> req api history.
+  await handlers.run({ action: "change", repo: "/repo", featureDir: "docs/features/a", text: " 新增批量导出 " });
+  assert.deepEqual(calls.at(-1), ["run", "reply", "docs/features/a", "--repo", "/repo", "--change", "新增批量导出"]);
+  assert.equal((await handlers.run({ action: "change", repo: "/repo", featureDir: "docs/features/a", text: " " })).ok, false);
+
+  await handlers.run({ action: "handover", repo: "/repo", featureDir: "docs/features/a", to: " zhangsan ", note: " 请跟进验证 " });
+  assert.deepEqual(calls.at(-1), ["run", "handover", "docs/features/a", "--repo", "/repo", "zhangsan", "--note", "请跟进验证"]);
+  assert.equal((await handlers.run({ action: "handover", repo: "/repo", featureDir: "docs/features/a", to: " " })).ok, false);
+
+  await handlers.history({ repo: "/repo", featureDir: "docs/features/a" });
+  assert.deepEqual(calls.at(-1), ["history", "docs/features/a", "--repo", "/repo"]);
+
+  readOnly = true;
+  assert.equal((await handlers.run({ action: "change", repo: "/repo", featureDir: "docs/features/a", text: "改一下" })).ok, false);
+  assert.equal((await handlers.run({ action: "handover", repo: "/repo", featureDir: "docs/features/a", to: "lisi" })).ok, false);
+  readOnly = false;
 
   // 1.12: the model settings page writes through req api set-agents; read-only refuses it too.
   const agents = { builder: { provider: "claude/x" }, reviewer: { provider: "codex/y" }, fallback: null };

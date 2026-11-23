@@ -76,7 +76,7 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       .map((card) => {
         const { item, kind, waitedText, urgency, primaryAction } = card;
         const primary = primaryAction ? ACTION_TEXT[primaryAction] : null;
-        return `<article class="rk-inbox-card rk-urgency-${urgency}" data-key="${escapeHtml(item.key)}" data-project="${escapeHtml(item.project)}" data-group="attention" data-search="${escapeHtml(`${item.title} ${item.project} ${item.featureDir} ${item.branch ?? ""} ${item.waiting?.card?.id ?? ""}`.toLowerCase())}">
+        return `<article class="rk-inbox-card rk-urgency-${urgency}" data-key="${escapeHtml(item.key)}" data-project="${escapeHtml(item.project)}" data-group="attention" data-search="${escapeHtml(`${item.title} ${item.project} ${item.featureDir} ${item.branch ?? ""} ${item.owner ?? ""} ${item.waiting?.card?.id ?? ""}`.toLowerCase())}">
       <div class="rk-card-top">
         <div class="rk-card-title-wrap">
           <span class="rk-badge rk-tone-${kind.tone}">${escapeHtml(kind.label)}</span>
@@ -84,7 +84,7 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
         </div>
         <span class="rk-wait rk-wait-${urgency}">${escapeHtml(waitedText)}</span>
       </div>
-      <div class="rk-meta">${escapeHtml(facts(item))}${item.waiting?.card ? ` · 卡片 ${escapeHtml(item.waiting.card.system)} ${escapeHtml(item.waiting.card.id)}` : ""}</div>
+      <div class="rk-meta">${escapeHtml(facts(item))}${item.owner ? ` · 负责人：${escapeHtml(item.owner)}` : ""}${item.waiting?.card ? ` · 卡片 ${escapeHtml(item.waiting.card.system)} ${escapeHtml(item.waiting.card.id)}` : ""}</div>
       <p class="rk-todo">${escapeHtml(kind.todo)}</p>
       <p class="rk-impact">${escapeHtml(kind.impact)}</p>
       <div class="rk-card-actions">
@@ -110,13 +110,13 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       .map((item) => {
         const stops = trackOf(item);
         const actions = actionsFor(item);
-        return `<article class="rk-row" tabindex="0" data-key="${escapeHtml(item.key)}" data-project="${escapeHtml(item.project)}" data-group="${g}" data-search="${escapeHtml(`${item.title} ${item.project} ${item.featureDir} ${item.branch ?? ""} ${item.stage}`.toLowerCase())}">
+        return `<article class="rk-row" tabindex="0" data-key="${escapeHtml(item.key)}" data-project="${escapeHtml(item.project)}" data-group="${g}" data-search="${escapeHtml(`${item.title} ${item.project} ${item.featureDir} ${item.branch ?? ""} ${item.owner ?? ""} ${item.stage}`.toLowerCase())}">
       <div class="rk-row-main">
         <div class="rk-row-head">
           <strong class="rk-row-title">${escapeHtml(item.title)}</strong>
           <span class="rk-stage">${escapeHtml(item.stage)}</span>
         </div>
-        <div class="rk-meta">${escapeHtml(facts(item))}${item.branch ? ` · <code>${escapeHtml(item.branch)}</code>` : ""} · ${escapeHtml(ago(item.updatedAt, now))}</div>
+        <div class="rk-meta">${escapeHtml(facts(item))}${item.owner ? ` · 负责人：${escapeHtml(item.owner)}` : ""}${item.branch ? ` · <code>${escapeHtml(item.branch)}</code>` : ""} · ${escapeHtml(ago(item.updatedAt, now))}</div>
       </div>
       <ol class="rk-track" aria-label="阶段进度">
         ${stops
@@ -148,6 +148,8 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       branch: i.branch ?? null,
       stage: i.stage,
       status: i.status,
+      startedBy: i.startedBy ?? null,
+      owner: i.owner ?? null,
       facts: facts(i),
       updated: ago(i.updatedAt, now),
       waiting: i.waiting ?? null,
@@ -184,6 +186,7 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
   --rk-danger: #f87171;
   --rk-danger-tint: rgba(248, 113, 113, 0.14);
   --rk-success: #4ade80;
+  --rk-success-tint: rgba(74, 222, 128, 0.14);
   --rk-mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
 }
 [data-theme="light"] {
@@ -198,6 +201,10 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
   --rk-brand-tint: rgba(91, 140, 0, 0.12);
   --rk-data: #0284c7;
   --rk-data-tint: rgba(2, 132, 199, 0.12);
+  --rk-danger: #dc2626;
+  --rk-danger-tint: rgba(220, 38, 38, 0.12);
+  --rk-success: #15803d;
+  --rk-success-tint: rgba(21, 128, 61, 0.12);
 }
 * { box-sizing: border-box; }
 body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--rk-bg); color: var(--rk-fg); }
@@ -231,6 +238,7 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-badge { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
 .rk-tone-needs { background: var(--rk-brand-tint); color: var(--rk-brand); }
 .rk-tone-danger { background: var(--rk-danger-tint); color: var(--rk-danger); }
+.rk-tone-success { background: var(--rk-success-tint); color: var(--rk-success); }
 .rk-tone-muted { background: var(--rk-surface-2); color: var(--rk-muted); }
 .rk-wait { font: 500 12px/1 var(--rk-mono); color: var(--rk-muted); white-space: nowrap; }
 .rk-wait-urgent { color: var(--rk-danger); font-weight: 700; }
@@ -265,6 +273,17 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-note-input { width: 100%; background: var(--rk-bg); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
 .rk-service-link { color: var(--rk-data); text-decoration: none; font-family: var(--rk-mono); font-size: 12px; }
 .rk-service-link:hover { text-decoration: underline; }
+.rk-info-box { background: var(--rk-surface-2); border: 1px solid var(--rk-border); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; }
+.rk-textarea { width: 100%; min-height: 76px; resize: vertical; background: var(--rk-bg); border: 1px solid var(--rk-border); color: var(--rk-fg); border-radius: 8px; padding: 8px 10px; font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.rk-change-item { background: var(--rk-surface-2); border: 1px solid var(--rk-border); border-radius: 10px; overflow: hidden; }
+.rk-change-head { width: 100%; background: transparent; border: none; color: inherit; padding: 9px 12px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.rk-change-head:hover { background: var(--rk-surface-1); }
+.rk-change-body { border-top: 1px solid var(--rk-border); background: var(--rk-bg); padding: 10px 12px; font: 12px/1.6 var(--rk-mono); white-space: pre-wrap; word-break: break-word; margin: 0; }
+.rk-diff { border-top: 1px solid var(--rk-border); background: var(--rk-bg); padding: 8px 0; font: 12px/1.55 var(--rk-mono); overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.rk-diff-line { padding: 1px 10px; white-space: pre-wrap; word-break: break-word; }
+.rk-diff-add { background: var(--rk-success-tint); color: var(--rk-success); }
+.rk-diff-del { background: var(--rk-danger-tint); color: var(--rk-danger); }
+.rk-diff-hunk { color: var(--rk-data); }
 .rk-list { display: flex; flex-direction: column; gap: 8px; }
 .rk-row { background: var(--rk-surface-1); border: 1px solid var(--rk-border); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 316px 176px; align-items: center; gap: 14px; cursor: pointer; }
 .rk-row:hover { border-color: var(--rk-brand); }
@@ -467,7 +486,8 @@ function openDrawer(key) {
   meta.textContent = item.facts + (item.branch ? " · " + item.branch : "") + " · " + item.updated;
   const dir = document.createElement("div");
   dir.className = "rk-meta";
-  dir.textContent = "功能目录：" + item.featureDir;
+  const whoLabel = item.owner ? " · 负责人：" + item.owner : item.startedBy ? " · 发起人：" + item.startedBy : "";
+  dir.textContent = "功能目录：" + item.featureDir + whoLabel;
   info.append(stageBadge, meta, dir);
 
   const trackSec = document.createElement("div");
@@ -539,7 +559,11 @@ function openDrawer(key) {
     tabAccept.type = "button";
     tabAccept.className = "rk-tab";
     tabAccept.textContent = "验收工作台";
-    tabs.append(tabOverview, tabAccept);
+    const tabHistory = document.createElement("button");
+    tabHistory.type = "button";
+    tabHistory.className = "rk-tab";
+    tabHistory.textContent = "变更与接手";
+    tabs.append(tabOverview, tabAccept, tabHistory);
 
     const acceptPane = document.createElement("div");
     acceptPane.className = "rk-hidden";
@@ -548,21 +572,36 @@ function openDrawer(key) {
     acceptPane.style.gap = "14px";
     acceptPane.textContent = "正在加载验收清单与试用信息…";
 
+    const historyPane = document.createElement("div");
+    historyPane.className = "rk-hidden";
+    historyPane.style.display = "flex";
+    historyPane.style.flexDirection = "column";
+    historyPane.style.gap = "14px";
+    historyPane.textContent = "正在加载变更历史与负责人信息…";
+
     let acceptLoaded = false;
-    tabOverview.onclick = () => {
-      tabOverview.classList.add("active");
-      tabAccept.classList.remove("active");
-      overviewPane.classList.remove("rk-hidden");
-      acceptPane.classList.add("rk-hidden");
+    let historyLoaded = false;
+    const selectTab = (which) => {
+      tabOverview.classList.toggle("active", which === "overview");
+      tabAccept.classList.toggle("active", which === "accept");
+      tabHistory.classList.toggle("active", which === "history");
+      overviewPane.classList.toggle("rk-hidden", which !== "overview");
+      acceptPane.classList.toggle("rk-hidden", which !== "accept");
+      historyPane.classList.toggle("rk-hidden", which !== "history");
     };
+    tabOverview.onclick = () => selectTab("overview");
     tabAccept.onclick = () => {
-      tabAccept.classList.add("active");
-      tabOverview.classList.remove("active");
-      overviewPane.classList.add("rk-hidden");
-      acceptPane.classList.remove("rk-hidden");
+      selectTab("accept");
       if (!acceptLoaded) {
         acceptLoaded = true;
         loadAcceptanceWorkbench(item, acceptPane);
+      }
+    };
+    tabHistory.onclick = () => {
+      selectTab("history");
+      if (!historyLoaded) {
+        historyLoaded = true;
+        loadHistoryPane(item, historyPane);
       }
     };
 
@@ -572,12 +611,7 @@ function openDrawer(key) {
     estTitle.className = "rk-drawer-section-title";
     estTitle.textContent = "进度与用时预估";
     const estBox = document.createElement("div");
-    estBox.style.padding = "10px 12px";
-    estBox.style.borderRadius = "10px";
-    estBox.style.border = "1px solid var(--border)";
-    estBox.style.background = "var(--surface)";
-    estBox.style.fontSize = "13px";
-    estBox.style.lineHeight = "1.6";
+    estBox.className = "rk-info-box";
     estSec.append(estTitle, estBox);
     overviewPane.append(estSec);
 
@@ -605,7 +639,7 @@ function openDrawer(key) {
     docSec.append(docTitle, docChips, docPre);
     overviewPane.append(docSec);
 
-    drawer.append(tabs, overviewPane, acceptPane);
+    drawer.append(tabs, overviewPane, acceptPane, historyPane);
 
     const qs = new URLSearchParams({ repo: item.repo, feature: item.featureDir });
     fetch(CFG.apiBase + "/detail?" + qs.toString())
@@ -627,10 +661,8 @@ function openDrawer(key) {
           jointTitle.textContent = "联合开发仓库（" + joints.length + " 个）";
           for (const j of joints) {
             const card = document.createElement("div");
-            card.style.padding = "10px 12px";
-            card.style.borderRadius = "10px";
-            card.style.border = "1px solid var(--border)";
-            card.style.background = "var(--surface)";
+            card.className = "rk-info-box";
+            card.style.gap = "4px";
             const top = document.createElement("div");
             top.style.display = "flex";
             top.style.justifyContent = "space-between";
@@ -759,7 +791,7 @@ function loadAcceptanceWorkbench(item, pane) {
         const pre = document.createElement("pre");
         pre.className = "rk-doc-preview";
         pre.style.maxHeight = "140px";
-        pre.textContent = data.howTo.join("\n");
+        pre.textContent = data.howTo.join("\\n");
         trySec.append(pre);
       }
       pane.append(trySec);
@@ -867,6 +899,210 @@ function loadAcceptanceWorkbench(item, pane) {
       pane.append(acSec);
     })
     .catch((err) => { pane.textContent = "加载验收工作台失败：" + String(err); });
+}
+
+function loadHistoryPane(item, pane) {
+  const qs = new URLSearchParams({ repo: item.repo, feature: item.featureDir });
+  fetch(CFG.apiBase + "/history?" + qs.toString())
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("无法加载变更历史"))))
+    .then((data) => {
+      pane.textContent = "";
+
+      const summary = document.createElement("div");
+      summary.className = "rk-info-box";
+      const ownerLine = document.createElement("div");
+      const curOwner = data?.owner?.owner || item.owner || item.startedBy || "未指定";
+      ownerLine.textContent = "当前负责人：" + curOwner;
+      const verLine = document.createElement("div");
+      verLine.className = "rk-meta";
+      verLine.textContent = "需求说明版本：" + (data?.specVersion ? "v" + data.specVersion : "未标注");
+      summary.append(ownerLine, verLine);
+      const trail = data?.owner?.history || [];
+      if (trail.length > 0) {
+        const last = trail[trail.length - 1];
+        const trailLine = document.createElement("div");
+        trailLine.className = "rk-meta";
+        const when = last.at ? String(last.at).slice(0, 16).replace("T", " ") : "";
+        trailLine.textContent = "最近转交：" + (last.from || "未指定") + " → " + last.to + (when ? "（" + when + "）" : "") + (last.note ? " · " + last.note : "");
+        summary.append(trailLine);
+      }
+      pane.append(summary);
+
+      if (!CFG.readOnly) {
+        const changeSec = document.createElement("div");
+        changeSec.className = "rk-drawer-section";
+        const changeTitle = document.createElement("h3");
+        changeTitle.className = "rk-drawer-section-title";
+        changeTitle.textContent = "发起改需求";
+        const ta = document.createElement("textarea");
+        ta.className = "rk-textarea";
+        ta.placeholder = "描述要调整的功能、字段或验收标准…";
+        const changeRow = document.createElement("div");
+        changeRow.className = "rk-mark-row";
+        const changeBtn = document.createElement("button");
+        changeBtn.type = "button";
+        changeBtn.className = "rk-btn rk-btn-primary";
+        changeBtn.textContent = "发起改需求";
+        changeBtn.onclick = async () => {
+          const text = ta.value.trim();
+          if (!text) { showToast("请先填写要修改的需求内容", "err"); return; }
+          if (!window.confirm("把改动转给这个需求的对话：它会先停下流水线，和你确认变化并更新需求说明后继续。确定发送？")) return;
+          changeBtn.disabled = true;
+          try {
+            const resp = await fetch(CFG.apiBase + "/action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...(CFG.csrfToken ? { "X-Laoshi-Token": CFG.csrfToken } : {}) },
+              body: JSON.stringify({ action: "change", repo: item.repo, featureDir: item.featureDir, text }),
+            });
+            const body = await resp.json().catch(() => ({ ok: false, message: "请求解析失败" }));
+            showToast(body.message || (body.ok ? "已发送改需求通知" : "发送失败"), body.ok ? "ok" : "err");
+            if (body.ok) { ta.value = ""; setTimeout(() => window.location.reload(), 900); }
+          } catch (err) {
+            showToast("请求失败：" + String(err), "err");
+          } finally {
+            changeBtn.disabled = false;
+          }
+        };
+        changeRow.append(changeBtn);
+        changeSec.append(changeTitle, ta, changeRow);
+        pane.append(changeSec);
+
+        const hoSec = document.createElement("div");
+        hoSec.className = "rk-drawer-section";
+        const hoTitle = document.createElement("h3");
+        hoTitle.className = "rk-drawer-section-title";
+        hoTitle.textContent = "转交给同事";
+        const toInput = document.createElement("input");
+        toInput.type = "text";
+        toInput.className = "rk-note-input";
+        toInput.placeholder = "接手人姓名或账号";
+        const noteInput = document.createElement("input");
+        noteInput.type = "text";
+        noteInput.className = "rk-note-input";
+        noteInput.placeholder = "交接说明（可选，例如：请跟进验证环节）";
+        const hoBtn = document.createElement("button");
+        hoBtn.type = "button";
+        hoBtn.className = "rk-btn";
+        hoBtn.style.alignSelf = "flex-start";
+        hoBtn.textContent = "确认转交";
+        hoBtn.onclick = async () => {
+          const to = toInput.value.trim();
+          if (!to) { showToast("请填写接手人", "err"); return; }
+          hoBtn.disabled = true;
+          try {
+            const resp = await fetch(CFG.apiBase + "/action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...(CFG.csrfToken ? { "X-Laoshi-Token": CFG.csrfToken } : {}) },
+              body: JSON.stringify({ action: "handover", repo: item.repo, featureDir: item.featureDir, to, note: noteInput.value.trim() }),
+            });
+            const body = await resp.json().catch(() => ({ ok: false, message: "请求解析失败" }));
+            showToast(body.message || (body.ok ? "已转交" : "转交失败"), body.ok ? "ok" : "err");
+            if (body.ok) setTimeout(() => window.location.reload(), 900);
+          } catch (err) {
+            showToast("请求失败：" + String(err), "err");
+          } finally {
+            hoBtn.disabled = false;
+          }
+        };
+        hoSec.append(hoTitle, toInput, noteInput, hoBtn);
+        pane.append(hoSec);
+      }
+
+      const chSec = document.createElement("div");
+      chSec.className = "rk-drawer-section";
+      const chTitle = document.createElement("h3");
+      chTitle.className = "rk-drawer-section-title";
+      const changes = data?.changes || [];
+      chTitle.textContent = "变更记录（" + changes.length + " 项）";
+      chSec.append(chTitle);
+      if (changes.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "rk-meta";
+        empty.textContent = "暂无变更记录。";
+        chSec.append(empty);
+      } else {
+        for (const ch of changes) {
+          const box = document.createElement("div");
+          box.className = "rk-change-item";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "rk-change-head";
+          const tSpan = document.createElement("span");
+          tSpan.textContent = ch.title;
+          const hint = document.createElement("span");
+          hint.className = "rk-meta";
+          hint.textContent = "展开";
+          btn.append(tSpan, hint);
+          const bodyPre = document.createElement("pre");
+          bodyPre.className = "rk-change-body rk-hidden";
+          bodyPre.textContent = ch.body || "（无正文）";
+          btn.onclick = () => {
+            const hidden = bodyPre.classList.toggle("rk-hidden");
+            hint.textContent = hidden ? "展开" : "收起";
+          };
+          box.append(btn, bodyPre);
+          chSec.append(box);
+        }
+      }
+      pane.append(chSec);
+
+      const cmSec = document.createElement("div");
+      cmSec.className = "rk-drawer-section";
+      const cmTitle = document.createElement("h3");
+      cmTitle.className = "rk-drawer-section-title";
+      const commits = data?.commits || [];
+      cmTitle.textContent = "需求说明修改历史（" + commits.length + " 次提交）";
+      cmSec.append(cmTitle);
+      if (commits.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "rk-meta";
+        empty.textContent = "暂无 git 提交历史。";
+        cmSec.append(empty);
+      } else {
+        for (const cm of commits) {
+          const box = document.createElement("div");
+          box.className = "rk-change-item";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "rk-change-head";
+          const label = document.createElement("span");
+          const day = cm.date ? String(cm.date).slice(0, 16).replace("T", " ") : "";
+          label.textContent = (day ? day + " · " : "") + (cm.author ? cm.author + " · " : "") + (cm.subject || cm.commit.slice(0, 7));
+          const hint = document.createElement("span");
+          hint.className = "rk-meta";
+          hint.textContent = "查看差异";
+          btn.append(label, hint);
+          const diffBox = document.createElement("div");
+          diffBox.className = "rk-diff rk-hidden";
+          const rawLines = (cm.diff || "").split(/\\r?\\n/);
+          for (const line of rawLines) {
+            const row = document.createElement("div");
+            let cls = "rk-diff-line";
+            if (line.startsWith("+") && !line.startsWith("+++")) cls += " rk-diff-add";
+            else if (line.startsWith("-") && !line.startsWith("---")) cls += " rk-diff-del";
+            else if (line.startsWith("@@")) cls += " rk-diff-hunk";
+            row.className = cls;
+            row.textContent = line || " ";
+            diffBox.append(row);
+          }
+          if (cm.truncated) {
+            const tr = document.createElement("div");
+            tr.className = "rk-meta";
+            tr.style.padding = "6px 10px";
+            tr.textContent = "差异内容较长，已截断至 20000 字符。";
+            diffBox.append(tr);
+          }
+          btn.onclick = () => {
+            const hidden = diffBox.classList.toggle("rk-hidden");
+            hint.textContent = hidden ? "查看差异" : "收起差异";
+          };
+          box.append(btn, diffBox);
+          cmSec.append(box);
+        }
+      }
+      pane.append(cmSec);
+    })
+    .catch((err) => { pane.textContent = "加载变更历史失败：" + String(err); });
 }
 
 document.addEventListener("click", (e) => {

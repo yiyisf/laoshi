@@ -76,4 +76,6 @@ export const ACTION_TEXT = {
   reply: { label: "发送回复", confirm: "把回复转给这个需求的对话，由它更新需求说明并继续开发。" },
   try: { label: "一键试用", confirm: "启动这个需求的服务，生成访问地址和测试数据供试用？" },
   "try-stop": { label: "停止试用", confirm: "停止试用时启动的服务？" },
+  change: { label: "改需求", confirm: "把需求变更转给这个需求的对话：它会先停下流水线，和你确认变化并更新需求说明后继续。" },
+  handover: { label: "转交", confirm: "把当前需求的负责权转交给另一位同事。" },
 } as const;
