@@ -1,7 +1,7 @@
 // Data hooks: every read is an RPC to the daemon side (laoshi api), cached by React Query.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRpc, useSettings } from "@getpaseo/plugin/client";
-import { configRpc, fileRpc, listRpc, modelsRpc, preferences, reviewUrlRpc, runRpc, setAgentsRpc, statsRpc, statusRpc, versionRpc, type Action, type AgentProfileData } from "../shared/contracts";
+import { configRpc, fileRpc, historyRpc, listRpc, modelsRpc, preferences, reviewUrlRpc, runRpc, setAgentsRpc, statsRpc, statusRpc, versionRpc, type Action, type AgentProfileData } from "../shared/contracts";
 
 export function usePreferences(): { readOnly: boolean; refreshMs: number } {
   const settings = useSettings(preferences);
@@ -21,6 +21,17 @@ export function useRequirement(repo: string, featureDir: string) {
   return useQuery({
     queryKey: ["req", "status", repo, featureDir],
     queryFn: () => status({ repo, featureDir }),
+    refetchInterval: refreshMs,
+    enabled: Boolean(repo && featureDir),
+  });
+}
+
+export function useHistory(repo: string, featureDir: string) {
+  const history = useRpc(historyRpc);
+  const { refreshMs } = usePreferences();
+  return useQuery({
+    queryKey: ["req", "history", repo, featureDir],
+    queryFn: () => history({ repo, featureDir }),
     refetchInterval: refreshMs,
     enabled: Boolean(repo && featureDir),
   });
@@ -49,7 +60,7 @@ export function useAction() {
   const run = useRpc(runRpc);
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: (input: { action: Action; repo: string; featureDir: string; verifyEnv?: "local" | "deployed"; text?: string }) => run(input),
+    mutationFn: (input: { action: Action; repo: string; featureDir: string; verifyEnv?: "local" | "deployed"; text?: string; to?: string; note?: string }) => run(input),
     onSettled: () => queries.invalidateQueries({ queryKey: ["req"] }),
   });
 }

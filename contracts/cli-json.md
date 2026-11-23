@@ -24,10 +24,11 @@
 | `req api list [--repo <目录>]` | 这个仓库所有工作区中的需求，数组，每项见下面的"需求" |
 | `req api list --all` | 本机记录过的所有需求（[需求索引](usage-record.md)），同上；目录已不在的 `present: false`。1.14 起还包括：用 `--track` 登记、还在对齐中的需求（`stage` 为"对齐中"，没有 `spec.md` 时 `title` 取自 `alignment.md`），以及索引里出现过的项目中没登记的需求 |
 | `req api status <需求> [--repo <目录>]` | 一个需求的详情，见下面的"详情" |
+| `req api history <需求> [--repo <目录>]` | 需求的变更历史与负责人：`{ specVersion, changes: [{ title, body }], commits: [{ commit, date, author, subject, diff, truncated }], owner: { owner, history } }` |
 | `req api file <需求> <文件> [--repo <目录>]` | `{ featureDir, file, size, truncated, content }`；只能读取功能目录中的文档（见下），最多 512 KB |
 | `req api stats [--since 30d] [--month 2026-10]` | `req stats --json` 的内容，见 [使用记录](usage-record.md) |
 | `req api index [--rebuild <目录>…] [--prune]` | 不带选项：索引的全部条目；`--rebuild`：`{ scanned, registered, pruned, total }` |
-| `req api run <approve\|stop\|resume\|verify\|sync\|reply\|start> <需求> [--repo <目录>] [选项]` | `{ command, featureDir, ok, exitCode, message }`。在 `--repo`（默认当前目录）中执行与 `req <命令> <需求>` 完全相同的操作；`ok` 为 false 时退出码为 1。`start`（1.14）：在项目主目录中自动加 `--worktree`（上次已建好工作区的接着用），并把进展发回登记时的对话 |
+| `req api run <approve\|stop\|resume\|verify\|sync\|reply\|start\|try\|handover> <需求> [--repo <目录>] [选项]` | `{ command, featureDir, ok, exitCode, message }`。在 `--repo`（默认当前目录）中执行与 `req <命令> <需求>` 完全相同的操作；`ok` 为 false 时退出码为 1。`start`（1.14）：在项目主目录中自动加 `--worktree`（上次已建好工作区的接着用），并把进展发回登记时的对话；`reply --change <需求> <改动内容>`：从看板/插件发起改需求通知对话先停下再对齐变化；`handover <需求> <接手人> [--note <说明>]`：转交负责人到 `.pipeline/owner.json` |
 | `req api models` | 1.12 起。`{ current, choices, recommended }`：本机配置中现在的 `agents`；daemon 上能无人值守运行的选择（`{ id, label, provider, profile }`，Paseo profile 在前）；按推荐的 `agents`。连不上 daemon 时报错 |
 | `req api config [--repo <目录>] [--machine]` | 1.12 起。`{ sources, ignored, error, repo, groups }`：`sources` 是生效的配置文件（`layer` 为 `machine` / `team` / `project`，按叠加顺序）；`groups` 按主题分组，每项 `{ key, label, description, display, value, setBy, scope, changed }`：`display` 是用大白话写的值，`value` 中看起来像密钥的值和个人账号替换为 `••••`，`setBy` 是写了它的文件，`changed` 表示与默认值不同。配置有错误时 `error` 写明原因，值按各文件所写。`--machine` 不看项目配置 |
 | `req api set-agents --json <设置>` | 1.12 起。`{ ok, message }`。`<设置>` 是 `{ builder, reviewer, fallback }`（`fallback` 可以为 null），检查后写入本机配置的 `agents`，原文件备份 |
@@ -46,6 +47,7 @@
 | `project` | 项目名：对话所在目录的目录名 |
 | `codebase` | laoshi M2c 起。需求所属的代码库：`{ root, remote }`，`root` 是主检出目录（需求自己的 worktree 归属它的原仓库），`remote` 是 origin 的地址（去掉凭据），没有时为 null（ADR 0007） |
 | `startedBy` | laoshi 起。发起人：状态文件的 `startedBy`；还没运行过、或状态文件是更早的版本时为 null |
+| `owner` | 转交接手后的当前负责人（`.pipeline/owner.json` 中的 `owner`）；未转交过时为 null |
 | `repo` | 需求所在的目录（有自己的工作区时是那个工作区） |
 | `sourceRepo` / `workspaceId` | 有自己的工作区时：对话所在的目录、平台对这个工作区的引用（Paseo 上是工作区 ID）；否则 null |
 | `featureDir` / `name` / `title` | 功能目录、目录名、需求标题 |

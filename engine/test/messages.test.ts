@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { approvalMessage, blockedMessage, failedMessage, permissionMessage, phaseDoneMessage } from "../src/messages.js";
+import { approvalMessage, blockedMessage, changeRequestMessage, failedMessage, permissionMessage, phaseDoneMessage } from "../src/messages.js";
 import { NEUTRAL_WORDS } from "../src/words.js";
 
 test("所有停顿通知都包含统一的【停下原因】与【下一步请说】提示", () => {
@@ -11,10 +11,16 @@ test("所有停顿通知都包含统一的【停下原因】与【下一步请�
     ["等待批准", permissionMessage({ words: NEUTRAL_WORDS, stepTitle: "代码实现", agentTitle: "[demo] 代码实现", requests: ["执行构建"] })],
     ["分阶段待验证", phaseDoneMessage({ words: NEUTRAL_WORDS, featureDir: "docs/features/demo", handoffPath: "handoff.md", verifyCommand: "cmd --phase verify", environment: "local" })],
     ["中断失败", failedMessage({ words: NEUTRAL_WORDS, stepTitle: "代码实现", reason: "token 预算已用完", logPath: "pipeline.log", resumeCommand: "cmd --resume" })],
+    ["发起改需求", changeRequestMessage({ words: NEUTRAL_WORDS, featureDir: "docs/features/demo", text: "导出增加 Excel", stopCommand: "cmd stop", resumeCommand: "cmd resume", running: true })],
   ] as const;
 
   for (const [label, text] of cases) {
     assert.match(text, /【停下原因】.+/, `${label} 缺少【停下原因】`);
     assert.match(text, /【下一步请说】.+/, `${label} 缺少【下一步请说】`);
   }
+
+  const ch = changeRequestMessage({ words: NEUTRAL_WORDS, featureDir: "docs/features/demo", text: "导出增加 Excel", stopCommand: "node bin/req.mjs stop demo", resumeCommand: "node bin/req.mjs resume demo", running: true });
+  assert.match(ch, /stop demo/);
+  assert.match(ch, /resume demo/);
+  assert.match(ch, /changes\.md/);
 });

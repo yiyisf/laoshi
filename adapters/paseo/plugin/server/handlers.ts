@@ -1,13 +1,14 @@
 // The daemon side: each RPC is one `laoshi api` call. Management actions are refused here too
 // when the plugin is set to read-only, not only hidden in the app.
 import type { RpcInput } from "@getpaseo/plugin";
-import type { configRpc, ConfigViewData, fileRpc, KitInfo, ModelsData, Requirement, RequirementDetail, reviewUrlRpc, runRpc, setAgentsRpc, statsRpc, StatsSummary, statusRpc } from "../shared/contracts";
+import type { configRpc, ConfigViewData, fileRpc, historyRpc, KitInfo, ModelsData, Requirement, RequirementDetail, RequirementHistory, reviewUrlRpc, runRpc, setAgentsRpc, statsRpc, StatsSummary, statusRpc } from "../shared/contracts";
 import { coalesce, type ReqRunner } from "./req";
 
 export interface Handlers {
   version(): Promise<KitInfo>;
   list(): Promise<Requirement[]>;
   status(input: RpcInput<typeof statusRpc>): Promise<RequirementDetail>;
+  history(input: RpcInput<typeof historyRpc>): Promise<RequirementHistory>;
   file(input: RpcInput<typeof fileRpc>): Promise<{ file: string; size: number; truncated: boolean; content: string }>;
   stats(input: RpcInput<typeof statsRpc>): Promise<StatsSummary>;
   run(input: RpcInput<typeof runRpc>): Promise<{ ok: boolean; message: string }>;
@@ -30,6 +31,9 @@ export function createHandlers(input: { req: ReqRunner; kitHome: () => string; r
     async status({ repo, featureDir }) {
       return (await req(["status", featureDir, "--repo", repo])) as RequirementDetail;
     },
+    async history({ repo, featureDir }) {
+      return (await req(["history", featureDir, "--repo", repo])) as RequirementHistory;
+    },
     async file({ repo, featureDir, file }) {
       return (await req(["file", featureDir, file, "--repo", repo])) as { file: string; size: number; truncated: boolean; content: string };
     },
@@ -39,18 +43,24 @@ export function createHandlers(input: { req: ReqRunner; kitHome: () => string; r
       else if (since) args.push("--since", since);
       return (await req(args)) as StatsSummary;
     },
-    async run({ action, repo, featureDir, verifyEnv, text }) {
+    async run({ action, repo, featureDir, verifyEnv, text, to, note }) {
       if (await input.readOnly()) return { ok: false, message: "插件设置为只读：不能在这里操作需求。可以在插件设置中关闭只读，或在终端用 req 命令。" };
       if (action === "reply" && !text?.trim()) return { ok: false, message: "回复是空的" };
-      const cmd = action === "try-stop" ? "try" : action;
+      if (action === "change" && !text?.trim()) return { ok: false, message: "改动内容是空的" };
+      if (action === "handover" && !to?.trim()) return { ok: false, message: "接手人不能为空" };
+      const cmd = action === "try-stop" ? "try" : action === "change" ? "reply" : action;
       const extra =
         action === "verify" && verifyEnv
           ? ["--verify-env", verifyEnv]
           : action === "reply"
             ? [text!.trim()]
-            : action === "try-stop"
-              ? ["--stop"]
-              : [];
+            : action === "change"
+              ? ["--change", text!.trim()]
+              : action === "handover"
+                ? [to!.trim(), ...(note?.trim() ? ["--note", note.trim()] : [])]
+                : action === "try-stop"
+                  ? ["--stop"]
+                  : [];
       const result = (await req(["run", cmd, featureDir, "--repo", repo, ...extra], { timeoutMs: 200_000 })) as { ok: boolean; message: string };
       return { ok: result.ok, message: result.message };
     },

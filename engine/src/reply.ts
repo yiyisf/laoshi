@@ -1,33 +1,54 @@
 // `req reply <需求> <回复>` (1.12): passes an answer written in the plugin's inbox to the
 // requirement's chat, which handles it as if the user had typed it there. Nothing else changes:
 // the chat updates the requirement and continues the pipeline itself.
+import path from "node:path";
 import { locate } from "./api.js";
 import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
-import { defaultConfigPath } from "./locations.js";
-import { pluginReplyMessage } from "./messages.js";
+import { defaultConfigPath, KIT_ROOT } from "./locations.js";
+import { changeRequestMessage, pluginReplyMessage } from "./messages.js";
 import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import { readIndex } from "./records.js";
-import { readState, statePath } from "./state.js";
+import { engineAlive, readState, statePath } from "./state.js";
 
 async function main(argvIn: string[]): Promise<number> {
   // 1.14 --acceptance: the checklist page found problems; the text is the whole notice.
   // 1.14 --notice: a notice of the background check (no run needed: the chat it was aligned in).
+  // X5 --change: requester submitted a requirement change from the board or plugin.
   const acceptance = argvIn.includes("--acceptance");
   const notice = argvIn.includes("--notice");
-  const argv = argvIn.filter((a) => a !== "--acceptance" && a !== "--notice");
+  const change = argvIn.includes("--change");
+  const argv = argvIn.filter((a) => a !== "--acceptance" && a !== "--notice" && a !== "--change");
   const [feature, ...words] = argv;
   const text = words.join(" ").trim();
   if (!feature || !text) {
-    console.error("用法：req reply <需求> <回复内容>");
+    console.error("用法：req reply [--change] <需求> <回复或改动内容>");
     return 2;
   }
   const { repo, featureDir } = locate(process.cwd(), feature);
   const state = readState(statePath(repo, featureDir));
-  if (notice) {
+  if (notice || change) {
     const chat = state?.originSessionId ?? readIndex().find((e) => e.featureDir === featureDir && [e.repo, e.sourceRepo].includes(repo))?.chatAgentId ?? null;
     if (!chat) {
       console.error("这个需求没有登记过对话，没有可以转达的对话。");
       return 1;
+    }
+    if (change) {
+      const reqBin = path.join(KIT_ROOT, "bin", "req.mjs");
+      const stopCommand = `node "${reqBin}" stop ${featureDir}`;
+      const resumeCommand = `node "${reqBin}" resume ${featureDir}`;
+      const running = Boolean(state && state.status === "running" && engineAlive(state));
+      return deliver(
+        repo,
+        chat,
+        changeRequestMessage({
+          featureDir,
+          text: text.slice(0, 8000),
+          stopCommand,
+          resumeCommand,
+          running,
+        }),
+        "已转给这个需求的对话，它会和你确认变化、更新需求说明后继续开发。",
+      );
     }
     return deliver(repo, chat, text.slice(0, 8000), "已转给这个需求的对话。");
   }

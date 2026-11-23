@@ -6,6 +6,7 @@
 //   req api version
 //   req api list [--all] [--repo <dir>]
 //   req api status <需求> [--repo <dir>]
+//   req api history <需求> [--repo <dir>]
 //   req api file <需求> <文件> [--repo <dir>]
 //   req api stats [--since 30d] [--month 2026-10]
 //   req api index [--rebuild <dir>...] [--prune]
@@ -23,6 +24,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { resultText, stepName } from "./control.js";
 import { FEATURES_DIR, findWorktreeRun, listFeatures, resolveFeatureArg, summarize } from "./features.js";
+import { readOwner } from "./handover.js";
+import { apiHistory } from "./history.js";
 import { defaultConfigPath, KIT_ROOT, kitVersion } from "./locations.js";
 import { configView } from "./config-view.js";
 import { pruneIndex, readIndex, registerRequirement, requirementKey } from "./records.js";
@@ -115,6 +118,8 @@ export interface ListItem {
   codebase: Codebase;
   /** Who started its pipeline (the state file's startedBy); null before it ran or in older state files. */
   startedBy: string | null;
+  /** Current owner after handover (X5); null if not transferred yet. */
+  owner?: string | null;
   repo: string;
   sourceRepo: string | null;
   workspaceId: string | null;
@@ -205,6 +210,7 @@ function item(repo: string, branch: string | null, featureDir: string, extra: { 
     project: extra.project,
     codebase: codebaseOf(extra.sourceRepo ?? repo),
     startedBy: state?.startedBy ?? null,
+    owner: readOwner(path.join(repo, featureDir)).owner,
     repo,
     sourceRepo: extra.sourceRepo,
     workspaceId: extra.workspaceId ?? state?.worktree?.workspaceRef ?? null,
@@ -271,6 +277,7 @@ export function apiList(input: { repo: string; all: boolean }): ListItem[] {
         project: e.project,
         codebase: codebaseOf(e.sourceRepo ?? e.repo),
         startedBy: null,
+        owner: null,
         repo: e.repo,
         sourceRepo: e.sourceRepo,
         workspaceId: e.workspaceId,
@@ -457,7 +464,7 @@ export function apiIndex(input: { rebuild: string[]; prune: boolean }) {
   return { scanned: [...dirs], registered, pruned, total: readIndex().length };
 }
 
-const RUNNABLE = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try"] as const;
+const RUNNABLE = ["approve", "stop", "resume", "verify", "sync", "reply", "start", "try", "handover"] as const;
 
 /** Runs `req <command> <需求>` where people would, and reports what it said. */
 /**
@@ -566,6 +573,8 @@ export function apiMain(argvIn: string[], cwd = process.cwd()): unknown {
       return apiList({ repo, all: flag(argv, "--all") });
     case "status":
       return apiStatus(repo, need("需求"));
+    case "history":
+      return apiHistory(repo, need("需求"));
     case "file": {
       const feature = need("需求");
       return apiFile(repo, feature, need("文件名"));
@@ -638,7 +647,7 @@ export function apiMain(argvIn: string[], cwd = process.cwd()): unknown {
       });
     }
     default:
-      throw new ApiError("bad_arguments", `没有 "${command ?? ""}" 这个 api 命令。可用：version、list、status、file、stats、index、run、models、set-agents、config、review-url`);
+      throw new ApiError("bad_arguments", `没有 "${command ?? ""}" 这个 api 命令。可用：version、list、status、history、file、stats、index、run、models、set-agents、config、review-url`);
   }
 }
 
