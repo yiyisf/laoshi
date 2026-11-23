@@ -48,15 +48,16 @@
 
 ## 原型的范围
 
-已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息和取消、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量。M2b 起，在新建的工作区中开发（`--worktree`）和由 laoshi 管理的服务使用 laoshi 的内置实现（`git worktree`，以及 `.laoshi/services.json` 中定义的服务，见 [builtin-capabilities](../../docs/design/builtin-capabilities.md)）。
+已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息（支持 `expiresAt` 到期由插件自动取消）和取消、定时新建独立会话（`scheduleNewAgent`）、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量、`providerStatus`（列出已配置模型提供方）以及托管 Web 需求看板（`laoshi board --no-open`）。M2b 起，在新建的工作区中开发（`--worktree`）和由 laoshi 管理的服务使用 laoshi 的内置实现（`git worktree`，以及 `.laoshi/services.json` 中定义的服务，见 [builtin-capabilities](../../docs/design/builtin-capabilities.md)）。
 
 还没有实现：
 
 | 能力 | 现在的行为 | 计划 |
 | --- | --- | --- |
-| 联合需求（几个仓库各建工作区） | 用内置 worktree，单元测试覆盖了新建工作区，但还没有端到端检查 | — |
-| 定时任务的截止时间（`expiresAt`） | 忽略，在日志里说明 | — |
-| 额度、profile、provider 状态 | 返回 `null` | — |
+| 联合需求（几个仓库各建工作区） | 用内置 worktree，单元测试覆盖了新建工作区，但还没有真实 dsh 端到端检查 | 内网实机验证 |
+| 额度、平台 agent profile | 返回 `null` | — |
+| 事件流替代轮询 | 轮询 `session/list` 等待步骤完成 | 需在真实 dsh 上确认插件事件流 API 后实现 |
+| 浏览器能力检测（`capabilities`） | 返回 `null` | 需在真实 dsh 上确认插件探测 API 后实现 |
 | Windows | 运行时和插件按 Windows 写好（命名管道），但没有在 Windows 上跑过端到端检查；dsh 在 Windows 上的 shell 见[摸底报告](../../docs/discovery/dsh/report.md#内网-windows-自测结果2026-10-30) | 内网验证 |
 
 ## 端到端检查

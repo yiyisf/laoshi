@@ -18,6 +18,7 @@ export const dshAdapter: PlatformAdapter = {
     services: "builtin",
     worktree: "builtin",
     scheduling: "plugin",
+    scheduleAgent: "plugin",
     sessionAgent: "plugin",
     activity: "plugin",
     runningTool: "plugin",
