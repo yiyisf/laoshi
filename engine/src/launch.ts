@@ -21,7 +21,7 @@ import { describeFeatures, featuresWithRuns, findWorktreeRun, listFeatures, reso
 import { checkChatCwd, normalizeFeatureDir, preflight, type PreflightResult, specProfile, verifyPhaseProblem } from "./preflight.js";
 import { adapterFor, loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
 import type { AgentRuntime } from "./runtime.js";
-import { remainingLine, typical, typicalLine } from "./estimate.js";
+import { budgetWarnLine, remainingLine, typical, typicalLine } from "./estimate.js";
 import { ensurePipelineDir, hashFile, isAlive, pipelineDir, readState, statePath } from "./state.js";
 
 function fail(message: string): never {
@@ -436,6 +436,7 @@ console.log(
         : null,
     `功能目录：${checked.featureDir}`,
     checked.mode.kind === "fresh" && !checked.entersVerify ? typicalLine(typical(profile)) : null,
+    checked.mode.kind === "fresh" && !checked.entersVerify ? budgetWarnLine(typical(profile), loaded.config.budget) : null,
     checked.branch ? `工作分支：${checked.branch}` : "不是 git 仓库：步骤不会提交代码。",
     loaded.sources.length > 1 ? `使用了项目配置：${loaded.sources[1]}` : null,
     `运行日志：${logPath}`,

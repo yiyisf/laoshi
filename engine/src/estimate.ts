@@ -66,6 +66,17 @@ export function typicalLine(t: Typical | null): string | null {
   return `参考：本机最近 ${t.basis} 个${PROFILE_NAMES[t.profile] ?? t.profile}需求，agent 合计用时中位数约 ${minutesText(t.agentMinutes)}${t.tokens !== null ? `，约 ${tokenText(t.tokens)} tokens` : ""}（不含等人确认的时间）。`;
 }
 
+/** Pre-run budget heads-up when historical median tokens already approach or exceed budget.tokens. */
+export function budgetWarnLine(
+  t: Typical | null,
+  budget: { tokens: number | null; warnPercent: number },
+): string | null {
+  if (!t || t.tokens === null || budget.tokens === null || budget.tokens <= 0) return null;
+  const pct = Math.round((t.tokens / budget.tokens) * 100);
+  if (pct < budget.warnPercent) return null;
+  return `预算提醒：同类${PROFILE_NAMES[t.profile] ?? t.profile}需求中位数约 ${tokenText(t.tokens)} tokens，已达当前单需求预算（${tokenText(budget.tokens)}）的 ${pct}%；运行中到达预算上限会暂停确认是否继续。`;
+}
+
 export interface Progress {
   usedAgentMinutes: number;
   usedTokens: number | null;

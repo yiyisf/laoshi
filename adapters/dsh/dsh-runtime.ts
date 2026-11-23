@@ -103,7 +103,7 @@ function parseScheduleId(id: string): { sessionId: string; id: string } | null {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function createRuntimeWithClient(call: PluginCall, log: (message: string) => void, pollMs = 1000): AgentRuntime {
+export function createRuntimeWithClient(call: PluginCall, _log: (message: string) => void, pollMs = 1000): AgentRuntime {
   const stepAgent = (id: string): StepAgent => ({
     id,
     async wait(timeoutMs: number): Promise<WaitOutcome> {
@@ -205,12 +205,12 @@ export function createRuntimeWithClient(call: PluginCall, log: (message: string)
     },
 
     async scheduleMessage(input) {
-      if (input.expiresAt) log("dsh 的定时任务不能设截止时间：这条定时消息会一直有效，直到被取消");
       const { id } = await call<{ id: string }>("schedule", {
         sessionId: input.agentId,
         title: input.name,
         prompt: input.prompt,
         ...(input.cron ? { cron: input.cron, timeZone: localTimeZone() } : { at: input.at?.toISOString() }),
+        ...(input.expiresAt ? { expiresAt: input.expiresAt.toISOString() } : {}),
       });
       return scheduleId(input.agentId, id);
     },

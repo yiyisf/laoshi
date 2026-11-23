@@ -116,6 +116,12 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
     if (panel.enabled) {
       report("ok", `评审小组：${panel.members.length} 位成员，用于 ${panel.steps.join("、")}（${panel.profiles.join("、")}档，首轮）`);
       if (panel.members.length === 1) report("warn", "评审小组只有 1 位成员，效果接近单人评审", "建议配置 2–3 位，使用不同厂商的模型");
+      else {
+        const providers = new Set(panel.members.map((m) => (m.provider ? m.provider.split("/")[0] : m.platformProfile ?? "")).filter(Boolean));
+        if (providers.size === 1) {
+          report("warn", `评审小组 ${panel.members.length} 位成员来自同一提供方（${[...providers][0]}），盲区容易重叠`, "建议混配不同厂商的模型以提升互补性");
+        }
+      }
     }
     const proposals = loaded.config.designProposals;
     if (proposals.enabled) {

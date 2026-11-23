@@ -566,6 +566,21 @@ function openDrawer(key) {
       }
     };
 
+    const estSec = document.createElement("div");
+    estSec.className = "rk-drawer-section rk-hidden";
+    const estTitle = document.createElement("h3");
+    estTitle.className = "rk-drawer-section-title";
+    estTitle.textContent = "进度与用时预估";
+    const estBox = document.createElement("div");
+    estBox.style.padding = "10px 12px";
+    estBox.style.borderRadius = "10px";
+    estBox.style.border = "1px solid var(--border)";
+    estBox.style.background = "var(--surface)";
+    estBox.style.fontSize = "13px";
+    estBox.style.lineHeight = "1.6";
+    estSec.append(estTitle, estBox);
+    overviewPane.append(estSec);
+
     const jointSec = document.createElement("div");
     jointSec.className = "rk-drawer-section rk-hidden";
     const jointTitle = document.createElement("h3");
@@ -596,6 +611,16 @@ function openDrawer(key) {
     fetch(CFG.apiBase + "/detail?" + qs.toString())
       .then((r) => (r.ok ? r.json() : null))
       .then((detail) => {
+        const est = detail?.estimate;
+        if (est) {
+          estSec.classList.remove("rk-hidden");
+          const fmtMin = (m) => { const n = Math.max(0, Math.round(m)); return n < 60 ? n + " 分钟" : Math.floor(n / 60) + " 小时" + (n % 60 ? " " + (n % 60) + " 分" : ""); };
+          const fmtTok = (n) => (n >= 10000 ? (Math.round(n / 1000) / 10) + " 万" : String(Math.round(n)));
+          const used = "已用 " + fmtMin(est.usedAgentMinutes) + (est.usedTokens != null ? " · " + fmtTok(est.usedTokens) + " tokens" : "");
+          const med = "同类中位数约 " + fmtMin(est.typicalAgentMinutes) + (est.typicalTokens != null ? " · " + fmtTok(est.typicalTokens) + " tokens" : "") + "（参考最近 " + est.basis + " 个）";
+          const tail = est.over ? "已超过常规中位数用时，复杂需求可能更久。" : "预计还需约 " + fmtMin(Math.max(5, est.leftMinutes)) + "（不含等待人工确认时间）。";
+          estBox.textContent = used + " ｜ " + tail + " " + med;
+        }
         const joints = detail?.joint || [];
         if (joints.length > 0) {
           jointSec.classList.remove("rk-hidden");
