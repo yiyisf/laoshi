@@ -15,16 +15,29 @@ export class ReqError extends Error {
   }
 }
 
+function defaultHere(): string | undefined {
+  // Paseo bundles server code to CJS and runs it via eval(), where import.meta.url is undefined.
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.url) return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    // No module URL in bundled runtime; fall back to LAOSHI_HOME or ~/.laoshi.
+  }
+  return undefined;
+}
+
 /**
  * laoshi's install root: the plugin setting, else LAOSHI_HOME, else the root the plugin is
  * installed in (`laoshi plugin install` copies it to <install root>/paseo-plugin), else ~/.laoshi.
  */
-export function kitHomeOf(configured: string, here: string = path.dirname(fileURLToPath(import.meta.url))): string {
-  if (configured.trim()) return path.resolve(configured.trim().replace(/^~(?=$|[\\/])/, os.homedir()));
+export function kitHomeOf(configured: string, here: string | undefined = defaultHere()): string {
+  const manual = (configured ?? "").trim();
+  if (manual) return path.resolve(manual.replace(/^~(?=$|[\\/])/, os.homedir()));
   const env = process.env.LAOSHI_HOME?.trim();
   if (env) return path.resolve(env);
-  const root = path.resolve(here, "..", "..");
-  if (path.basename(path.resolve(here, "..")) === "paseo-plugin" && fs.existsSync(path.join(root, "install.json"))) return root;
+  if (here) {
+    const root = path.resolve(here, "..", "..");
+    if (path.basename(path.resolve(here, "..")) === "paseo-plugin" && fs.existsSync(path.join(root, "install.json"))) return root;
+  }
   return path.join(os.homedir(), ".laoshi");
 }
 

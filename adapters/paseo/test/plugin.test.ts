@@ -87,8 +87,13 @@ test("插件后台：用本机安装的 laoshi 运行 laoshi api；找不到 lao
   delete process.env.LAOSHI_HOME;
   try {
     assert.equal(kitHomeOf("", path.join(home, "paseo-plugin", "server")), home);
+    // Bundled server runtimes (esbuild CJS eval in Paseo) have no import.meta.url, so here can be undefined.
+    assert.equal(kitHomeOf("", undefined), path.join(os.homedir(), ".laoshi"));
+    process.env.LAOSHI_HOME = home;
+    assert.equal(kitHomeOf(undefined as unknown as string, undefined), home);
   } finally {
     if (saved !== undefined) process.env.LAOSHI_HOME = saved;
+    else delete process.env.LAOSHI_HOME;
   }
 });
 
