@@ -4,14 +4,15 @@
 
 laoshi 是从 [paseo-req-kit](https://github.com/yiyisf/paseo-req-kit)（req-kit）中抽取出来的、与 agent 平台无关的需求开发体系：用对话对齐需求，由一组分工明确的 agent 完成方案设计、实现、评审和验证，每一步都有产出文件和验收门，流程由程序保证，而不是由 AI 或人即兴发挥。
 
-> **状态：准备发布 0.1.0。** 支持 Paseo 和 DeepSeek Harness（dsh）。核心从 req-kit 1.15.0 抽取，平台相关的部分都在 `adapters/` 下（见[移植记录](docs/porting-log.md)、[实施计划](docs/extraction/plan.md)）。Paseo 的需求插件界面暂时仍由 paseo-req-kit 提供。
+> 支持 **Paseo（`0.11–0.17`，优先 Web 端，内置 Paseo 需求插件）**、**DeepSeek Harness（`dsh 0.2.x`，内置 `laoshi-dsh-plugin` 与托管 Web 看板）**、**命令行 agent（`cli`）**与**摸高（`mogao`）**；全平台共用本地 Web 需求看板（`laoshi board`）。核心从 req-kit 抽取并持续演进（见[移植记录](docs/porting-log.md)、[架构文档](docs/design/architecture.md)）。
 
 ## 安装
 
 与 paseo-req-kit 一样从 npm 分发，一步安装：
 
 ```bash
-npx -y @yiyi_zhang/laoshi@latest install --platform dsh          # 或 --platform paseo
+npx -y @yiyi_zhang/laoshi@latest install --platform dsh                   # dsh（默认开启托管看板）
+npx -y @yiyi_zhang/laoshi@latest install --platform paseo --with-plugin   # Paseo（同时安装需求插件）
 # 公司内网只有 npm 镜像时：
 npx -y --registry=https://npm.example.internal/ @yiyi_zhang/laoshi@latest install --platform dsh
 laoshi doctor --no-project

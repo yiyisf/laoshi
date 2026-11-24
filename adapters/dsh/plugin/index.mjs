@@ -84,8 +84,12 @@ export function apply(ctx, config = {}) {
     return items.find((i) => i.sessionId === sessionId) ?? null;
   }
 
+  const modernSubagents = typeof ctx.subagents.interrupt === "function" || typeof ctx.subagents.interruptByUser === "function";
+  const modernSchedule = typeof ctx.schedule.edit === "function" && typeof ctx.schedule.delete !== "function";
+
   async function events(sessionId) {
-    const page = await sessions.page({ address: address(sessionId), maxMessages: 1000 }, timeout());
+    const req = { address: address(sessionId), maxMessages: 1000 };
+    const page = sessions.events ? await sessions.events(req, timeout()) : await sessions.page(req, timeout());
     return page.records.filter((r) => r.type === "event").map((r) => r.event);
   }
 
@@ -94,12 +98,41 @@ export function apply(ctx, config = {}) {
     const requestId = `laoshi-${crypto.randomUUID()}`;
     if (sessionId in children) {
       await ctx.subagents.prompt(
-        { requestId, parentSessionId: children[sessionId], childSessionId: sessionId, mode: "continuable", delivery: mode, content },
+        {
+          requestId,
+          ...(modernSubagents ? {} : { parentSessionId: children[sessionId], mode: "continuable" }),
+          childSessionId: sessionId,
+          delivery: mode,
+          content,
+        },
         timeout(),
       );
     } else {
       await sessions.prompt({ requestId, sessionId, mode, content }, timeout());
     }
+  }
+
+  async function createScheduleTask({ sessionId, title, prompt: text, at, cron, timeZone }) {
+    if (!modernSchedule) {
+      const timing = cron ? { cron: { expression: cron, time_zone: timeZone } } : { at };
+      return ctx.schedule.create(sessionId, { title, prompt: text, ...timing });
+    }
+    const resolvedTz = typeof timeZone === "string" && timeZone.trim() ? timeZone.trim() : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const timing = cron ? { kind: "cron", cron: { expression: cron, time_zone: resolvedTz } } : { kind: "at", at };
+    return ctx.schedule.create(
+      {
+        title: typeof title === "string" && title.trim() ? title.trim() : "laoshi",
+        prompt: text,
+        timing,
+        target: { kind: "session", sessionId },
+      },
+      sessionId,
+    );
+  }
+
+  async function deleteScheduleTask({ sessionId, id }) {
+    if (modernSchedule) return ctx.schedule.edit({ id, action: "delete" }, undefined);
+    return ctx.schedule.delete({ sessionId, id });
   }
 
   async function liveAgent(sessionId) {
@@ -128,13 +161,26 @@ export function apply(ctx, config = {}) {
       const provider = config.subagentProvider ?? "spawn";
       // The step's own model (the role's provider/model in laoshi's config); without it, the chat's.
       const agentOptions = model?.provider && model?.model ? { provider: model.provider, model: model.model, ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}) } : null;
-      const activation = await ctx.subagents.startActivation({
-        provider,
-        label,
-        request: { prompt: [{ type: "text", text }], parent: parentAgent, cwd, ...(agentOptions ? { agentOptions } : {}) },
-        signal: new AbortController().signal,
-        delivery: "caller",
-      });
+      const content = [{ type: "text", text }];
+      const spec = modernSubagents
+        ? {
+            provider,
+            label,
+            parent: parentAgent,
+            prompt: content,
+            cwd,
+            ...(agentOptions ? { agentOptions } : {}),
+            signal: new AbortController().signal,
+            delivery: "caller",
+          }
+        : {
+            provider,
+            label,
+            request: { prompt: content, parent: parentAgent, cwd, ...(agentOptions ? { agentOptions } : {}) },
+            signal: new AbortController().signal,
+            delivery: "caller",
+          };
+      const activation = await ctx.subagents.startActivation(spec);
       const childId = activation.childId;
       children[childId] = parent;
       saveChildren();
@@ -218,8 +264,13 @@ export function apply(ctx, config = {}) {
 
     /** Stop the session's current turn, then give it text. */
     interrupt: async ({ sessionId, text }) => {
-      if (sessionId in children) ctx.subagents.interruptByParent(sessionId, children[sessionId], "continuable");
-      else sessions.cancel({ sessionId });
+      if (sessionId in children) {
+        if (typeof ctx.subagents.interrupt === "function") ctx.subagents.interrupt(sessionId, { kind: "user" });
+        else if (typeof ctx.subagents.interruptByUser === "function") ctx.subagents.interruptByUser(sessionId);
+        else ctx.subagents.interruptByParent(sessionId, children[sessionId], "continuable");
+      } else {
+        sessions.cancel({ sessionId });
+      }
       if (text) await prompt(sessionId, text, "queue");
       return {};
     },
@@ -233,8 +284,7 @@ export function apply(ctx, config = {}) {
 
     /** A message into the session at a time (`at`, ISO) or on a five-field cron in a time zone. */
     schedule: async ({ sessionId, title, prompt: text, at, cron, timeZone, expiresAt }) => {
-      const timing = cron ? { cron: { expression: cron, time_zone: timeZone } } : { at };
-      const record = await ctx.schedule.create(sessionId, { title, prompt: text, ...timing });
+      const record = await createScheduleTask({ sessionId, title, prompt: text, at, cron, timeZone });
       if (typeof expiresAt === "string" && expiresAt.trim()) {
         const ms = Date.parse(expiresAt) - Date.now();
         if (Number.isFinite(ms)) {
@@ -242,7 +292,7 @@ export function apply(ctx, config = {}) {
           const delay = Math.min(2_147_483_647, Math.max(0, ms));
           const timer = setTimeout(() => {
             scheduleTimers.delete(key);
-            ctx.schedule.delete({ sessionId, id: record.id }).catch(() => {});
+            deleteScheduleTask({ sessionId, id: record.id }).catch(() => {});
             log({ scheduleExpired: record.id, sessionId });
           }, delay);
           timer.unref?.();
@@ -259,10 +309,12 @@ export function apply(ctx, config = {}) {
       if (typeof text !== "string" || !text.trim()) throw new Error("scheduleAgent: prompt is required");
       if (typeof cron !== "string" || !cron.trim()) throw new Error("scheduleAgent: cron is required");
       const { sessionId } = await sessions.create({ cwd });
-      const record = await ctx.schedule.create(sessionId, {
+      const record = await createScheduleTask({
+        sessionId,
         title: typeof title === "string" && title.trim() ? title.trim() : "laoshi",
         prompt: text,
-        cron: { expression: cron, time_zone: timeZone },
+        cron,
+        timeZone,
       });
       log({ scheduleAgent: record.id, sessionId, title, cron });
       return { id: record.id, sessionId };
@@ -275,7 +327,7 @@ export function apply(ctx, config = {}) {
         clearTimeout(timer);
         scheduleTimers.delete(key);
       }
-      await ctx.schedule.delete({ sessionId, id });
+      await deleteScheduleTask({ sessionId, id });
       return {};
     },
 

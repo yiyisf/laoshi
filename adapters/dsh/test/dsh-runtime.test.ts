@@ -298,3 +298,130 @@ test("dsh scheduleNewAgent 通过插件新建定时会话并可取消", async ()
     host.dispose();
   }
 });
+
+test("dsh 0.2.2-rc.5 宿主接口适配：扁平 startActivation、subagents.interrupt、schedule.create/edit 与 sessions.events", async () => {
+  const calls: Array<{ method: string; args: unknown }> = [];
+  const listeners = new Map<string, Listener[]>();
+  const sessions = new Map<string, { cwd: string; running: boolean; polls: number }>([["chat-1", { cwd: "/repo", running: false, polls: 0 }]]);
+  let childCount = 0;
+  let resolveFirst: (v: unknown) => void = () => {};
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-dsh-modern-"));
+  const ctx = {
+    on(event: string, fn: Listener) {
+      const list = listeners.get(event) ?? [];
+      list.push(fn);
+      listeners.set(event, list);
+    },
+    llm: { listProviders: () => [], listModels: async () => [] },
+    agents: { get: (id: string) => (sessions.has(id) ? { id } : undefined), resume: async () => ({ agent: { id: "resumed" } }) },
+    subagents: {
+      async startActivation(spec: { provider: string; label: string; parent: { id: string }; prompt: unknown[]; cwd: string; agentOptions?: unknown; delivery: string }) {
+        assert.ok(spec.parent?.id, "0.2.2-rc.5 expects top-level spec.parent");
+        const childId = `child-${++childCount}`;
+        calls.push({ method: "startActivation", args: { label: spec.label, parentId: spec.parent.id, cwd: spec.cwd, delivery: spec.delivery, ...(spec.agentOptions ? { agentOptions: spec.agentOptions } : {}) } });
+        sessions.set(childId, { cwd: spec.cwd, running: true, polls: 0 });
+        return { childId, result: new Promise((resolve) => (resolveFirst = resolve)) };
+      },
+      async prompt(req: unknown) {
+        calls.push({ method: "subagents.prompt", args: req });
+      },
+      interrupt(child: string, authority: { kind: string }) {
+        calls.push({ method: "subagents.interrupt", args: { child, authority } });
+      },
+    },
+    schedule: {
+      async create(request: unknown, actorSessionId: string) {
+        calls.push({ method: "schedule.create", args: { request, actorSessionId } });
+        return { id: "schedule-modern-1" };
+      },
+      async edit(request: unknown, actorSessionId: unknown) {
+        calls.push({ method: "schedule.edit", args: { request, actorSessionId } });
+        return { deleted: true };
+      },
+    },
+    sessionController: {
+      async list() {
+        return {
+          items: [...sessions.entries()].map(([sessionId, s]) => {
+            if (s.running && ++s.polls > 1) {
+              s.running = false;
+              resolveFirst({ stopReason: "completed" });
+            }
+            return { sessionId, cwd: s.cwd, running: s.running, projections: { values: { inbox: {} } } };
+          }),
+        };
+      },
+      async events() {
+        return {
+          records: [{ type: "event", event: { type: "assistant/message", time: 0, data: { message: { content: [{ type: "text", text: "新接口完成" }] } } } }],
+        };
+      },
+      async prompt() {},
+      cancel() {},
+      async create(req: { cwd: string }) {
+        sessions.set("session-modern", { cwd: req.cwd, running: false, polls: 0 });
+        return { sessionId: "session-modern" };
+      },
+    },
+  };
+  apply(ctx, { home });
+  const token = channelPaths(home).token;
+  for (let i = 0; i < 100 && !fs.existsSync(token); i++) await new Promise((r) => setTimeout(r, 20));
+  const call = pluginClient({ ...process.env, DSH_HOME: home }, 5_000);
+  try {
+    const runtime = createRuntimeWithClient(call, () => {}, 10);
+    const agent = await runtime.startAgent({
+      role: "reviewer",
+      title: "代码评审",
+      prompt: "评审",
+      cwd: "/repo",
+      labels: {},
+      parentAgentId: "chat-1",
+      profile: { provider: "deepseek/deepseek-v4" },
+    });
+    assert.deepEqual(calls[0], {
+      method: "startActivation",
+      args: { label: "代码评审", parentId: "chat-1", cwd: "/repo", delivery: "caller", agentOptions: { provider: "deepseek", model: "deepseek-v4" } },
+    });
+    const settled = await agent.wait(5_000);
+    assert.equal(settled.lastMessage, "新接口完成");
+
+    await runtime.interruptAgent(agent.id, "停");
+    assert.deepEqual(calls.find((c) => c.method === "subagents.interrupt"), {
+      method: "subagents.interrupt",
+      args: { child: agent.id, authority: { kind: "user" } },
+    });
+
+    await runtime.scheduleMessage({
+      agentId: "chat-1",
+      name: "自动继续",
+      prompt: "继续",
+      cron: "*/5 * * * *",
+      expiresAt: new Date(Date.now() + 40),
+    });
+    const createdAt = calls.find((c) => c.method === "schedule.create") as {
+      method: string;
+      args: { request: { title: string; timing: { kind: string; cron: { expression: string; time_zone: string } }; target: { kind: string; sessionId: string } }; actorSessionId: string };
+    };
+    assert.equal(createdAt.args.request.timing.kind, "cron");
+    assert.equal(createdAt.args.request.timing.cron.expression, "*/5 * * * *");
+    assert.ok(createdAt.args.request.timing.cron.time_zone.length > 0);
+    assert.deepEqual(createdAt.args.request.target, { kind: "session", sessionId: "chat-1" });
+
+    await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(calls.find((c) => c.method === "schedule.edit"), {
+      method: "schedule.edit",
+      args: { request: { id: "schedule-modern-1", action: "delete" }, actorSessionId: undefined },
+    });
+
+    const newSchedId = await runtime.scheduleNewAgent({ name: "定期巡检", prompt: "跑 digest", cron: "0 9 * * 1", cwd: "/repo", profile: { provider: "deepseek/deepseek-v4" } });
+    assert.equal(newSchedId, "dsh:session-modern/schedule-modern-1");
+    await runtime.cancelSchedule(newSchedId!);
+    assert.deepEqual(calls.at(-1), {
+      method: "schedule.edit",
+      args: { request: { id: "schedule-modern-1", action: "delete" }, actorSessionId: undefined },
+    });
+  } finally {
+    for (const fn of listeners.get("dispose") ?? []) fn();
+  }
+});
