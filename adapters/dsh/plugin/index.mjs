@@ -8,8 +8,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { channelPaths, dshHome } from "./channel.mjs";
 
 export const name = "laoshi-dsh";
@@ -18,6 +20,10 @@ export const inject = ["agents", "subagents", "schedule", "approval", "sessionCo
 const VERSION = "0.3.1-dev";
 const SHELL_TOOLS = new Set(["bash", "pwsh"]);
 const SEARCH_TOOLS = new Set(["grep", "glob"]);
+const LAOSHI_WEB_PREFIX = "/laoshi";
+
+const escapeHtmlText = (text) =>
+  String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /**
  * @param {any} ctx dsh's Cordis context.
@@ -333,27 +339,42 @@ export function apply(ctx, config = {}) {
 
     /** Status (and optional on-demand start) of the hosted requirement board web UI. */
     board: async ({ start = false } = {}) => {
-      if (start && !boardState.running) await startBoard();
-      return { enabled: boardEnabled, running: boardState.running, url: boardState.url, error: boardState.error };
+      if (start && !boardState.running && boardEnabled) await startBoard();
+      return {
+        enabled: boardEnabled,
+        running: boardState.running,
+        url: boardState.url,
+        webPath: webServerMounted ? `${LAOSHI_WEB_PREFIX}/` : null,
+        error: boardState.error,
+      };
     },
   };
 
   const scheduleTimers = new Map();
 
   // ---- optional hosted Web requirement board (`laoshi board --no-open`)
-  const boardEnabled = Boolean(config.board);
+  const defaultKitRoot = (() => {
+    const candidate = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    return fs.existsSync(path.join(candidate, "bin", "req.mjs")) ? candidate : null;
+  })();
+  const boardEnabled = config.board !== false;
   const boardPort = Number(config.boardPort ?? 0) || 0;
   const boardReadOnly = Boolean(config.boardReadOnly);
-  const kitRoot = typeof config.kitRoot === "string" && config.kitRoot.trim() ? path.resolve(config.kitRoot.trim()) : null;
+  const kitRoot = typeof config.kitRoot === "string" && config.kitRoot.trim() ? path.resolve(config.kitRoot.trim()) : defaultKitRoot;
   const boardState = { running: false, url: null, error: null };
   let boardChild = null;
   let boardStartPromise = null;
+  let boardStartTimer = null;
+  let webServerMounted = false;
+  let disposed = false;
 
   function startBoard() {
+    if (disposed || !boardEnabled) return Promise.resolve(boardState);
     if (boardStartPromise) return boardStartPromise;
     const reqBin = kitRoot ? path.join(kitRoot, "bin", "req.mjs") : null;
     if (!reqBin || !fs.existsSync(reqBin)) {
       boardState.error = "未配置有效的 kitRoot，请重新运行 laoshi install --platform dsh";
+      log({ boardError: boardState.error });
       return Promise.resolve(boardState);
     }
     boardStartPromise = new Promise((resolve) => {
@@ -365,9 +386,14 @@ export function apply(ctx, config = {}) {
       const finish = () => {
         if (settled) return;
         settled = true;
+        if (boardStartTimer) {
+          clearTimeout(boardStartTimer);
+          boardStartTimer = null;
+        }
         resolve(boardState);
       };
-      const timer = setTimeout(finish, 8_000);
+      boardStartTimer = setTimeout(finish, 8_000);
+      boardStartTimer.unref?.();
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk) => {
         const m = /(http:\/\/127\.0\.0\.1:\d+\/)/.exec(chunk);
@@ -375,7 +401,6 @@ export function apply(ctx, config = {}) {
           boardState.running = true;
           boardState.url = m[1];
           log({ board: m[1] });
-          clearTimeout(timer);
           finish();
         }
       });
@@ -391,16 +416,112 @@ export function apply(ctx, config = {}) {
           boardState.url = null;
           if (!settled && code !== 0) boardState.error = boardState.error || `看板进程退出（${code}）`;
         }
-        clearTimeout(timer);
         finish();
       });
       child.on("error", (err) => {
         boardState.error = String(err?.message ?? err);
-        clearTimeout(timer);
+        log({ boardError: boardState.error });
         finish();
       });
     });
     return boardStartPromise;
+  }
+
+  function renderUnavailablePage(message) {
+    return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="light dark" />
+<title>laoshi · 需求看板不可用</title>
+<style>
+body { margin: 0; font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+.box { max-width: 520px; padding: 20px 24px; border-radius: 12px; border: 1px solid rgba(128,128,128,.28); }
+h2 { margin: 0 0 8px; font-size: 16px; }
+p { margin: 0 0 14px; opacity: .82; word-break: break-word; }
+button { padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>需求看板暂时不可用</h2>
+  <p>${escapeHtmlText(message)}</p>
+  <button type="button" onclick="location.reload()">刷新重试</button>
+</div>
+</body>
+</html>`;
+  }
+
+  async function handleBoardHttp(req, res, scope) {
+    const conn = typeof scope?.get === "function" ? scope.get("connection") : typeof ctx.get === "function" ? ctx.get("connection") : null;
+    if (typeof conn?.requestRejection === "function") {
+      const rejection = conn.requestRejection(req);
+      if (rejection !== undefined) {
+        res.statusCode = rejection;
+        res.end();
+        return;
+      }
+    }
+    if (!boardEnabled) {
+      res.writeHead(503, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(renderUnavailablePage("dsh 插件配置中已设置 board: false（托管需求看板已关闭）。可在命令行运行 laoshi board，或改回 board: true 后重启 dsh。"));
+      return;
+    }
+    if (!boardState.running) await startBoard();
+    if (!boardState.url) {
+      res.writeHead(503, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(renderUnavailablePage(boardState.error || "需求看板尚未就绪，请稍后刷新或重启 dsh。"));
+      return;
+    }
+    const rawUrl = String(req.url || "/");
+    const stripped = rawUrl.replace(/^\/laoshi(?=\/|\?|$)/, "");
+    const upstreamPath = !stripped ? "/" : stripped.startsWith("?") ? `/${stripped}` : stripped;
+    const upstreamUrl = new URL(upstreamPath, boardState.url);
+    const headers = { ...req.headers };
+    delete headers.host;
+    headers["x-laoshi-prefix"] = LAOSHI_WEB_PREFIX;
+    headers["x-laoshi-host"] = "dsh";
+    await new Promise((resolve) => {
+      const proxyReq = http.request(upstreamUrl, { method: req.method, headers }, (proxyRes) => {
+        if (!res.headersSent) res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+        proxyRes.pipe(res);
+        proxyRes.on("end", resolve);
+        proxyRes.on("error", resolve);
+      });
+      res.on("close", () => {
+        if (!res.writableEnded) proxyReq.destroy();
+      });
+      proxyReq.on("error", (err) => {
+        log({ boardProxyError: String(err?.message ?? err), url: req.url });
+        if (!res.headersSent) {
+          res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+          res.end(`需求看板代理失败：${err?.message ?? err}`);
+        } else {
+          res.destroy();
+        }
+        resolve();
+      });
+      if (req.method === "GET" || req.method === "HEAD") proxyReq.end();
+      else req.pipe(proxyReq);
+    });
+  }
+
+  if (typeof ctx.inject === "function") {
+    ctx.inject(["webServer"], (scope) => {
+      const disposeRoute = scope.webServer.register({
+        kind: "prefix",
+        path: LAOSHI_WEB_PREFIX,
+        handler: (req, res) => handleBoardHttp(req, res, scope),
+      });
+      webServerMounted = true;
+      log({ webRoute: LAOSHI_WEB_PREFIX });
+      const cleanup = () => {
+        webServerMounted = false;
+        disposeRoute();
+      };
+      if (typeof scope.on === "function") scope.on("dispose", cleanup);
+      else if (typeof scope.effect === "function") scope.effect(() => cleanup);
+    });
   }
 
   if (boardEnabled) startBoard().catch(() => {});
@@ -450,6 +571,11 @@ export function apply(ctx, config = {}) {
   server.on("error", (e) => log({ serverError: String(e?.message ?? e) }));
 
   ctx.on("dispose", () => {
+    disposed = true;
+    if (boardStartTimer) {
+      clearTimeout(boardStartTimer);
+      boardStartTimer = null;
+    }
     for (const timer of scheduleTimers.values()) clearTimeout(timer);
     scheduleTimers.clear();
     if (boardChild?.pid) {

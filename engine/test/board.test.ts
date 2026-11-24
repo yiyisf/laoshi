@@ -277,3 +277,44 @@ test("createBoardServer /api/history 返回变更记录、commit 与负责人信
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test("createBoardServer 支持代理前缀、dsh 内嵌标记、主题参数与执行记录跳转脚本", async () => {
+  const vm = await import("node:vm");
+  const { server } = createBoardServer({
+    platformName: "dsh",
+    handlers: {
+      list: () => SAMPLE,
+      detail: () => ({ files: ["spec.md"], run: { originAgentId: "sess-origin-1" }, steps: [{ key: "spec", stepId: "spec", title: "需求分析", attempt: 1, agentId: "sess-child-1", startedAt: "2026-11-24T01:00:00.000Z", minutes: 1.5, outcome: "completed", result: "通过" }] }),
+      file: () => ({ content: "" }),
+      run: () => ({ ok: true, message: "ok" }),
+    },
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  assert.ok(addr && typeof addr === "object");
+  try {
+    const res = await fetch(`http://127.0.0.1:${addr.port}/?theme=light`, {
+      headers: { "x-laoshi-prefix": "/laoshi/", "x-laoshi-host": "dsh" },
+    });
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /data-theme="light"/);
+    assert.match(html, /"apiBase":"\/laoshi\/api"/);
+    assert.match(html, /"embedHost":"dsh"/);
+    assert.match(html, /laoshi:open-session/);
+    assert.match(html, /查看执行记录 ↗/);
+    assert.match(html, /打开需求对话 ↗/);
+
+    const m = /<script>([\s\S]*?)<\/script>/.exec(html);
+    assert.ok(m, "看板 HTML 包含内联脚本");
+    assert.doesNotThrow(() => new vm.Script(m[1]), "内联脚本语法应合法");
+
+    const bad = await fetch(`http://127.0.0.1:${addr.port}/`, {
+      headers: { "x-laoshi-prefix": "//evil.example" },
+    });
+    const badHtml = await bad.text();
+    assert.match(badHtml, /"apiBase":"\/api"/, "非法前缀被忽略");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

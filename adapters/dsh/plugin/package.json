@@ -6,11 +6,23 @@
   "type": "module",
   "main": "index.mjs",
   "exports": {
-    ".": "./index.mjs"
+    ".": "./index.mjs",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ],
+      "platform": "web"
+    }
   },
   "files": [
     "index.mjs",
     "index.d.mts",
+    "client.js",
     "channel.mjs",
     "channel.d.mts"
   ],

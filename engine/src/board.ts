@@ -106,6 +106,21 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
   res.end(JSON.stringify(body));
 }
 
+const SAFE_PREFIX = /^\/[a-zA-Z0-9/_-]+$/;
+const SAFE_HOST = /^[a-zA-Z0-9_-]{1,32}$/;
+
+function proxyPrefixOf(req: http.IncomingMessage): string {
+  const raw = req.headers["x-laoshi-prefix"];
+  const val = (Array.isArray(raw) ? raw[0] : raw ?? "").trim().replace(/\/+$/, "");
+  return SAFE_PREFIX.test(val) ? val : "";
+}
+
+function embedHostOf(req: http.IncomingMessage): string | undefined {
+  const raw = req.headers["x-laoshi-host"];
+  const val = (Array.isArray(raw) ? raw[0] : raw ?? "").trim().toLowerCase();
+  return SAFE_HOST.test(val) ? val : undefined;
+}
+
 /** Creates an HTTP server for the shared requirement board and its local JSON API. */
 export function createBoardServer(options: BoardServerOptions): { server: http.Server; csrfToken: string } {
   const csrfToken = options.csrfToken ?? crypto.randomBytes(16).toString("hex");
@@ -117,12 +132,17 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
     try {
       if (req.method === "GET" && url.pathname === "/") {
         const items = options.handlers.list();
+        const prefix = proxyPrefixOf(req);
+        const themeParam = url.searchParams.get("theme");
+        const initialTheme = themeParam === "light" || themeParam === "dark" ? themeParam : undefined;
         const html = renderBoardHtml(items, {
           title: "laoshi · 需求看板",
           platformName,
           readOnly,
-          apiBase: "/api",
+          apiBase: prefix ? `${prefix}/api` : "/api",
           csrfToken,
+          embedHost: embedHostOf(req),
+          initialTheme,
         });
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(html);
