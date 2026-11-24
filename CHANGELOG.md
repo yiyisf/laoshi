@@ -2,6 +2,27 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
+## 0.3.0 - 2026-11-24
+
+正式版（npm `latest` 标签）：新增共享 Web 需求看板与验收工作台、全链路变更历史与转交、受控流程扩展、多仓库联合开发增强、预算预估与多模型评审检查，并将 Paseo（`0.11–0.17`）需求插件与 DeepSeek Harness（`dsh 0.2.2-alpha.2` / `0.2.2-rc.5`）宿主适配及文档补齐。安装：`npx -y @yiyi_zhang/laoshi@latest install --platform <平台>`。
+
+### 使用者会看到的变化
+
+- **共享 Web 需求看板与验收工作台（`laoshi board`）**：任意平台均可运行 `laoshi board` 打开本机实时中文 Bento 需求看板；支持总览分组、「需要你处理」置顶、需求详情 6 站放行轨，以及验收工作台（一键试用启停、逐条 AC 勾选与提交 `acceptance.md` 结论、证据预览）。安装时可通过 `dsh` 自动托管看板（默认启用 `board: true`，`--no-board` / `--board-port` 可选配置，`laoshi doctor` 直接显示访问地址）。
+- **改需求、变更历史与转交接手**：Web 看板「变更与接手」页签、Paseo 插件详情页及 CLI（`laoshi reply --change`、`laoshi handover`）支持在需求推进中发起改需求、倒序查看 `changes.md` 变更历史与 `spec.md` 提交 diff（绿增/红删高亮），并支持转交接手及完整交接记录（`.pipeline/owner.json`）。
+- **受控流程扩展（`extensions`）**：支持在项目配置 `.laoshi.json` 中向固定主阶段后挂载受控的 AI/skill 或脚本扩展步骤（注入 `LAOSHI_*` 环境变量，日志保留在 `.pipeline/extensions/`），并保持 Windows 下 `cmd.exe` 兼容。
+- **多仓库联合开发增强**：支持配置 `maxJointRepos`（1–10），`/laoshi-setup` 自动发现同级 Git 仓库辅助配置，需求详情页直观展示各关联仓库分支、工作区路径与质量门状态。
+- **预算预估与多模型评审检查**：开工前与看板详情提供历史同档位耗时 / token 预算预估及超预算提醒；启用多模型评审小组但配置缺失或仅单个提供方时由 `laoshi doctor` 提前告警。
+- **Paseo `0.11–0.17` 实机适配与插件体验**：支持 `laoshi install --platform paseo --with-plugin` 一步部署并加载 Paseo 插件，插件与 Web 看板共享状态分组与文案，修复 Paseo 0.17 下服务端打包运行时缺少 `import.meta.url` 导致的插件 RPC 报错。
+- **dsh `0.2.2-rc.5` 适配与定时能力补齐**：插件实现 `schedule` 的 `expiresAt` 到期自动取消及 `scheduleNewAgent` 独立定时会话；双版本兼容 `dsh 0.2.2-alpha.2` 与 `0.2.2-rc.5` 的 `startActivation`、`subagents.interrupt`、`schedule.create`/`edit`（含 `cron.time_zone`）与 `sessions.events`。
+- **摸高与通知体验打磨**：摸高超长追问/打断消息写入文件兜底，同主机中断轮次自动续接；全部停顿通知统一附上【停下原因】与【下一步请说】提示；新增《Paseo Web 与 dsh 真实环境插件走查清单》及版本范围守护。
+
+### 升级须知
+
+- **Paseo**：运行 `laoshi upgrade` 升级到 `0.3.0`（支持 Paseo `0.11–0.17`；安装过插件时自动同步刷新并重载）。如果使用了非默认 `--home`，请在守护进程中设置 `LAOSHI_HOME` 或在 Paseo「设置 → 插件 → `laoshi 需求`」填写安装根路径。
+- **DeepSeek Harness（dsh）**：运行 `laoshi upgrade` 升级到 `0.3.0`，同步更新 `laoshi-dsh-plugin`（同时兼容 `0.2.2-alpha.2` 与 `0.2.2-rc.5+`），并默认随宿主开启托管看板（可通过 `--no-board` 关闭）。
+- **摸高**：替换为本版本 Release 附带的 `laoshi-expert-0.3.0.zip`（或运行 `node adapters/mogao/make-expert.mjs` 重新生成）。
+
 ## 0.2.0 - 2026-11-21
 
 正式版（npm `latest` 标签）：汇总 0.2.0-beta.1～beta.3 的全部功能（摸高适配器与专家包、Paseo 需求插件迁入、`laoshi migrate`、`laoshi permission`），并补充摸高版本自检、进程组清理、上下文控制、`laoshi diagnose` 脱敏诊断包与 Release 自动附带摸高专家包。安装：`npx -y @yiyi_zhang/laoshi@latest install --platform <平台>`。
