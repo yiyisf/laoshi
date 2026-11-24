@@ -2,6 +2,20 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
+## 0.3.1-beta.1 - 2026-11-24
+
+测试版（npm `beta` 标签，GitHub Pre-release）：将共享 Web 需求看板直接内嵌到 DeepSeek Harness（`dsh`）Web 界面左侧导航栏，并支持从任务各阶段执行记录快捷跳回对应子 agent 对话或原需求对话。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform dsh`。
+
+### 使用者会看到的变化
+
+- **dsh 内嵌「需求看板」面板（`/laoshi/`）**：`laoshi-dsh-plugin` 新增浏览器端界面模块（`adapters/dsh/plugin/client.js`）并在 `dsh` Web 服务端口挂载 `/laoshi` 代理，重启 `dsh` 后直接在左侧导航栏点击 **「需求看板」** 即可内嵌打开（自动同步 `dsh` 深浅主题、复用 `dsh` 登录认证校验，无需再单独打开页面）。
+- **任务阶段执行记录与原对话快捷跳转**：共享看板详情抽屉新增 **「执行记录」**（展示各阶段状态、尝试次数、用时与错误信息，超过 12 步可切换查看全部）；在 `dsh` 中内嵌打开时，点击某一步的 **「查看执行记录 ↗」** 或顶部的 **「打开需求对话 ↗」** 可直接切回对应子 agent 或原需求对话。
+- **安装升级自动补齐与诊断增强**：从旧版升级 `laoshi install --platform dsh` / `laoshi upgrade` 时，如 `cordis.patch.yml` 已挂载 `laoshi-dsh-plugin` 但缺少 `kitRoot` 或 `board`，会自动补齐并保留原有 `approvals` 等配置；`laoshi doctor` 同步提示 `/laoshi/` 左侧栏挂载状态。
+
+### 升级须知
+
+- **内网 Windows / dsh 测试**：运行 `npx -y @yiyi_zhang/laoshi@beta install --platform dsh`（或使用本版本 Release 附带的 Windows 离线安装包运行安装脚本），完成后重启 `dsh --profile web`，即可在左侧导航栏看到 **「需求看板」**。
+
 ## 0.3.0 - 2026-11-24
 
 正式版（npm `latest` 标签）：新增共享 Web 需求看板与验收工作台、全链路变更历史与转交、受控流程扩展、多仓库联合开发增强、预算预估与多模型评审检查，并将 Paseo（`0.11–0.17`）需求插件与 DeepSeek Harness（`dsh 0.2.2-alpha.2` / `0.2.2-rc.5`）宿主适配及文档补齐。安装：`npx -y @yiyi_zhang/laoshi@latest install --platform <平台>`。
