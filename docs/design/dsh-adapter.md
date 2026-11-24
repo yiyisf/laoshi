@@ -44,21 +44,21 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 | AgentRuntime | dsh 上的做法 | 来源 | 验证 |
 | --- | --- | --- | --- |
 | `verifyOrigin` | 用 `session/list` 找到 `DSH_SESSION_ID` 对应的会话，核对 `cwd` | platform | 部分（字段已确认） |
-| `startAgent` | 插件调用 `ctx.subagents.startActivation`：`parent` 为发起会话，`delivery: "caller"`，`label` 为步骤名，`cwd` 为仓库或 worktree，`agentPreset` 按角色选择。没有插件时退回 `session/create`，创建顶层会话，不显示在对话下 | plugin | 是 |
+| `startAgent` | 插件调用 `ctx.subagents.startActivation`：`parent` 为发起会话，`delivery: "caller"`，`label` 为步骤名，`cwd` 为仓库或 worktree，`agentPreset` / `agentOptions` 按角色选择（插件同时兼容 `0.2.2-alpha.2` 的嵌套 `request` 与 `0.2.2-rc.5+` 的扁平顶层参数）。没有插件时退回 `session/create`，创建顶层会话，不显示在对话下 | plugin | 是 |
 | `StepAgent.wait` | 轮询 `session/list` 中子会话的 `running`；"在等审批"由插件报告（见 §5）。之后可以换成订阅事件流 | platform + plugin | 是（轮询） |
-| `StepAgent.followUp` | `subagents/prompt`，`mode: "continuable"`，`delivery: "queue"` | platform | 是 |
+| `StepAgent.followUp` | `subagents/prompt`，`delivery: "queue"`（旧版附带 `parentSessionId`、`mode: "continuable"`） | platform | 是 |
 | `StepAgent.archive` | `workspaces` 的 `archiveSession` | platform | 否 |
 | `attachAgent` | 按会话 ID 继续；host 会冷恢复已持久化的会话 | platform | 是（顶层会话和子会话都已验证，见摸底包自测 P12） |
 | `notifyAgent` | `session/prompt`，`mode: "queue"` | platform | 是 |
-| `interruptAgent` | 子会话用 `subagents/interruptByParent` 或 `session/cancel`，再用 queue 模式发送新指令 | platform | `session/cancel` 已验证 |
+| `interruptAgent` | 子会话优先调用 `ctx.subagents.interrupt(sessionId, { kind: "user" })`（或 `interruptByUser`，旧版回退 `interruptByParent`）；普通会话用 `session/cancel`，再用 queue 模式发送新指令 | platform | `0.2.2-rc.5` 与 `session/cancel` 均已验证 |
 | `listPaseoProfiles`（将改名，见 ADR 0008） | `agentPresets` 的列表，以及模型目录 | platform | 否 |
 | `listServices` / `startServices` / `stopServices` | dsh 没有服务定义。由 laoshi 内置的服务管理读取代码库配置中的服务，分配端口，做健康检查，保留输出 | builtin | — |
 | `createWorktree` / `waitForWorkspaceSetup` | laoshi 内置的 `git worktree`。可选启用 `dsh-experimental-worktree`，但它会改变会话的工作目录，和"步骤在 worktree、对话在原目录"的做法需要先对齐 | builtin | — |
-| `scheduleMessage` / `cancelSchedule` | 插件调用 `ctx.schedule.create(sessionId, …)`，支持 `expiresAt` 到期由插件定时取消；`ctx.schedule.delete` 取消 | plugin | 创建、取消与到期取消已单元测试（mock host） |
-| `scheduleNewAgent` | 插件为定时任务创建一个专用会话，再预约到它（使用 dsh 默认模型） | plugin | 单元测试（mock host） |
+| `scheduleMessage` / `cancelSchedule` | 插件调用 `ctx.schedule.create`（兼容 `0.2.2-alpha.2` 与 `0.2.2-rc.5+` 的 `{ title, prompt, timing, target }` 对象格式及必填 `cron.time_zone`），支持 `expiresAt` 到期由插件定时取消；`0.2.2-rc.5+` 通过 `ctx.schedule.edit({ action: "delete" })` 取消（旧版 `ctx.schedule.delete`） | plugin | `0.2.2-rc.5` 实机创建、取消与 `expiresAt` 到期取消均已验证 |
+| `scheduleNewAgent` | 插件为定时任务创建一个专用会话，再预约到它（使用 dsh 默认模型） | plugin | `0.2.2-rc.5` 实机已验证 |
 | `startSessionAgent` | `session/create`，再 `session/prompt` | platform | 是 |
 | `providerQuota` | 没有订阅额度；只能拿到每个会话的 `tokenUsage` | none | — |
-| `recentActivity` / `runningTool` / `toolCalls` | `session/page` 中的 `tool/call`、`tool/result` 事件 | platform | 事件已确认 |
+| `recentActivity` / `runningTool` / `toolCalls` | 优先通过 `sessions.events`（旧版回退 `session/page`）读取 `tool/call`、`tool/result` 事件 | platform | 事件已确认 |
 | `capabilities` | 看是否挂载了 `browser-use` 等插件 | platform | 否 |
 | `providerStatus` | 模型目录与凭据状态 | platform | 否 |
 | 用量（`WaitOutcome.usage`） | `projections.tokenUsage` | platform | 是 |
@@ -139,7 +139,7 @@ M2b 起，`--worktree` 和服务改用 laoshi 的内置实现（[builtin-capabil
 
 ## 10. 正式版的进展（M4b，2026-11-04）
 
-- **按角色选择模型**：agent 的 `provider` 写成 `<dsh 的提供方>/<模型>`，插件在 `startActivation` 的 `request.agentOptions` 中传入 `provider`、`model`，以及来自 `thinkingOptionId` 的 `reasoningEffort`。dsh 的 spawn 后端支持这一项，子 agent 默认继承父 agent 的模型，这里可以覆盖。`dsh/chat-model` 表示用对话的模型。
+- **按角色选择模型**：agent 的 `provider` 写成 `<dsh 的提供方>/<模型>`，插件在 `startActivation` 中通过 `agentOptions`（`0.2.2-alpha.2` 为 `request.agentOptions`，`0.2.2-rc.5+` 为顶层 `agentOptions`）传入 `provider`、`model`，以及来自 `thinkingOptionId` 的 `reasoningEffort`。dsh 的 spawn 后端支持这一项，子 agent 默认继承父 agent 的模型，这里可以覆盖。`dsh/chat-model` 表示用对话的模型。
 - **列出模型**：插件新增 `models` 操作（`ctx.llm.listProviders()` / `listModels()`）。`doctor` 显示可用的模型并逐个角色检查；运行时的 `providerStatus` 也由它提供，接单器的自检因此能用。插件因此多注入一个 `llm` 服务。
-- 在真实 dsh（0.2.2-alpha.2）上验证：reviewer 的三个步骤用自己的模型，builder 的步骤用对话的模型；`doctor` 列出模型、逐个角色检查通过（`adapters/dsh/e2e`）。
-- 能力表中还是"无"的：平台的 agent profile（dsh 的 agent 预设可以对应，暂不做）、定时启动 agent（需求总览定时发送）、额度、平台工具信息。按契约，这几项缺失只影响对应的附加功能。
+- 在真实 dsh（`0.2.2-alpha.2` 与 `0.2.2-rc.5`）上验证：reviewer 的三个步骤用自己的模型，builder 的步骤用对话的模型；`doctor` 列出模型、逐个角色检查通过（`adapters/dsh/e2e`）。
+- 能力表中后续已补齐 `scheduleAgent`（见 [adapters/dsh/README.md](../../adapters/dsh/README.md)）与托管 Web 需求看板 `board` RPC；目前仍未接入或待后续确认的仅剩：平台的 agent profile（dsh 的 agent 预设可以对应，暂不做）、额度、平台工具信息、事件流替代轮询，以及浏览器能力探测。

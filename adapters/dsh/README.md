@@ -30,6 +30,8 @@
          name: 'laoshi-dsh-plugin'
          config:
            approvals: ask   # ask：步骤的审批请求交给人（默认）；allow：直接批准一次
+           kitRoot: '<laoshi>'
+           board: true      # 默认随 dsh 启动托管 Web 需求看板；laoshi doctor 会输出访问地址
    ```
 
 2. laoshi 的配置里选择 dsh 适配器：
@@ -73,3 +75,5 @@ LAOSHI_E2E_DSH=<装有 @deepseek-ai/dsh 的目录> node adapters/dsh/e2e/run-e2e
 模拟模型对每个步骤，通过 dsh 的 bash 工具写出产出文件和合格的结果文件，所以这个检查验证的是"引擎 → 插件 → dsh 子 agent → 文件 → 引擎"整条链路是否接通，不代表模型的能力。
 
 最近一次结果（2026-11-01，Linux，dsh 0.2.2-alpha.2）：不加参数时 8 项检查全部通过（M4b 时 Node 24.22 和 22.20 各跑一次，M2b 时 Node 24.22）；加 `--worktree` 时 14 项全部通过（M2b，Node 24.22）。7 个步骤（方案设计 → 方案审核 → 代码实现 → 代码评审 → 提测说明 → 功能验证 → 完成报告）都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知都发回了对话。
+
+实机适配补充（2026-11-24，macOS，Node 24.10.0，`@deepseek-ai/dsh@0.2.2-rc.5`）：插件已针对 `0.2.2-rc.5` 调整的 `subagents.startActivation`（扁平顶层参数）、`subagents.interrupt`、`schedule.create`/`edit`（含 `cron.time_zone`）与 `sessions.events` 做了双版本兼容；重跑 `run-e2e.mjs --worktree` 跑通 16/17 项核心链路（全部 7 个步骤、worktree、`setup`、内置服务启动/健康检查/停服务、按角色选用 `e2e/step-1` 与对话结束通知；仅环境日志检查因测试机 `~/.agents/skills/` 中遗留旧版 `req-setup` 描述含 Paseo 字样而提示），另在隔离宿主实机验证了 `board: true` 托管看板网页渲染、主题交互、`schedule`（含 `expiresAt`）、`scheduleAgent`、`cancelSchedule` 与 `laoshi doctor` 全部正常。
