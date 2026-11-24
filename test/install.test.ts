@@ -48,6 +48,7 @@ test("安装到 dsh：安装级配置、按 dsh 渲染的 skill、插件和挂�
   assert.doesNotMatch(skill, /\{\{/);
   assert.ok(fs.existsSync(path.join(dshHome, "skills", "laoshi", ".laoshi-install.json")));
   assert.ok(fs.existsSync(path.join(profile, "node_modules", "laoshi-dsh-plugin", "index.mjs")));
+  assert.ok(fs.existsSync(path.join(profile, "node_modules", "laoshi-dsh-plugin", "client.js")));
   const patch = fs.readFileSync(path.join(profile, "cordis.patch.yml"), "utf8");
   assert.doesNotMatch(patch, /^\s*\[\]\s*$/m, "dsh 写的 [] 换成了列表写法");
   assert.match(patch, /name: 'laoshi-dsh-plugin'/);
@@ -57,6 +58,19 @@ test("安装到 dsh：安装级配置、按 dsh 渲染的 skill、插件和挂�
   const again = install(home, args);
   assert.equal(again.code, 0, again.out);
   assert.equal(fs.readFileSync(path.join(profile, "cordis.patch.yml"), "utf8").match(/laoshi-dsh-plugin/g)?.length, 1, "不重复挂载");
+
+  // Upgrading from an older cordis.patch.yml missing kitRoot & board fills them in while preserving approvals and sibling plugins.
+  fs.writeFileSync(
+    path.join(profile, "cordis.patch.yml"),
+    "- insert:\n    - id: laoshi-dsh\n      name: 'laoshi-dsh-plugin'\n      config:\n        approvals: allow\n- insert:\n    - id: other\n      name: 'other-plugin'\n",
+  );
+  const upgraded = install(home, args);
+  assert.equal(upgraded.code, 0, upgraded.out);
+  const upgradedPatch = fs.readFileSync(path.join(profile, "cordis.patch.yml"), "utf8");
+  assert.match(upgradedPatch, /approvals: allow/);
+  assert.match(upgradedPatch, /kitRoot: '/);
+  assert.match(upgradedPatch, /board: true/);
+  assert.match(upgradedPatch, /name: 'other-plugin'/);
 
   const removed = install(home, ["--uninstall", "--dsh-home", dshHome]);
   assert.equal(removed.code, 0, removed.out);

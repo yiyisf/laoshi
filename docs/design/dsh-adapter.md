@@ -106,7 +106,7 @@ laoshi 引擎（外部的确定性进程，状态在 .pipeline/state.json）
 | 预约、自动继续 | 有（Paseo 定时任务） | 有（插件 + dsh 定时任务） |
 | 审批 | 人在 Paseo 界面里批准 | 先按策略处理，其余由人在 dsh 界面里批准 |
 | 服务、端口 | Paseo 管理 | laoshi 内置 |
-| 需求总览界面 | Paseo 插件 | `laoshi api` 加本机网页；以后可以做 dsh 的界面插件（dsh 支持在 web 界面里加插件） |
+| 需求总览界面 | Paseo 插件 | dsh 插件已注册前端 `client.js`（`sidebar.panellist`「需求看板」+ `main` 面板）并在 host `webServer` 挂载 `/laoshi/` 代理，在 dsh 中直接内嵌打开共享 Web 看板并支持跳回阶段执行记录与原对话 |
 | 额度提醒 | 有 | 没有（只有用量） |
 
 ## 8. 待定
@@ -142,4 +142,4 @@ M2b 起，`--worktree` 和服务改用 laoshi 的内置实现（[builtin-capabil
 - **按角色选择模型**：agent 的 `provider` 写成 `<dsh 的提供方>/<模型>`，插件在 `startActivation` 中通过 `agentOptions`（`0.2.2-alpha.2` 为 `request.agentOptions`，`0.2.2-rc.5+` 为顶层 `agentOptions`）传入 `provider`、`model`，以及来自 `thinkingOptionId` 的 `reasoningEffort`。dsh 的 spawn 后端支持这一项，子 agent 默认继承父 agent 的模型，这里可以覆盖。`dsh/chat-model` 表示用对话的模型。
 - **列出模型**：插件新增 `models` 操作（`ctx.llm.listProviders()` / `listModels()`）。`doctor` 显示可用的模型并逐个角色检查；运行时的 `providerStatus` 也由它提供，接单器的自检因此能用。插件因此多注入一个 `llm` 服务。
 - 在真实 dsh（`0.2.2-alpha.2` 与 `0.2.2-rc.5`）上验证：reviewer 的三个步骤用自己的模型，builder 的步骤用对话的模型；`doctor` 列出模型、逐个角色检查通过（`adapters/dsh/e2e`）。
-- 能力表中后续已补齐 `scheduleAgent`（见 [adapters/dsh/README.md](../../adapters/dsh/README.md)）与托管 Web 需求看板 `board` RPC；目前仍未接入或待后续确认的仅剩：平台的 agent profile（dsh 的 agent 预设可以对应，暂不做）、额度、平台工具信息、事件流替代轮询，以及浏览器能力探测。
+- 能力表中后续已补齐 `scheduleAgent`（见 [adapters/dsh/README.md](../../adapters/dsh/README.md)）、托管 Web 需求看板 `board` RPC 与内嵌 Web 界面插件（`adapters/dsh/plugin/client.js` + `webServer` `/laoshi/` 代理 + 阶段执行记录/原对话快捷跳转）；目前仍未接入或待后续确认的仅剩：平台的 agent profile（dsh 的 agent 预设可以对应，暂不做）、额度、平台工具信息、事件流替代轮询，以及浏览器能力探测。

@@ -61,13 +61,15 @@ export const dshAdapter: PlatformAdapter = {
         if (satisfies(dshVer, dshRange)) tools.report("ok", `dsh 版本 ${dshVer} 在支持范围内（${dshRange}）`);
         else tools.report("warn", `dsh 版本 ${dshVer} 不在已验证的支持范围（${dshRange}）内`, "dsh 处于快速迭代期，如接口行为异常请检查适配更新");
       }
-      const board = await call<{ enabled: boolean; running: boolean; url: string | null; error: string | null }>("board").catch(() => null);
+      const board = await call<{ enabled: boolean; running: boolean; url: string | null; webPath?: string | null; error: string | null }>("board").catch(() => null);
       if (board?.running && board.url) {
-        tools.report("ok", `需求看板运行中：${board.url}`);
+        const embedded = board.webPath ? `，已在 dsh 左侧导航栏「需求看板」中挂载（${board.webPath}）` : "";
+        tools.report("ok", `需求看板运行中：${board.url}${embedded}`);
       } else if (board?.enabled) {
-        tools.report("warn", `需求看板已启用但未运行${board.error ? `（${board.error}）` : ""}`, "重启 dsh，或直接运行 laoshi board 打开本机看板");
+        const hint = board.webPath ? `，已挂载页面路径 ${board.webPath}` : "";
+        tools.report("warn", `需求看板已启用但未运行${hint}${board.error ? `（${board.error}）` : ""}`, "重启 dsh，或直接运行 laoshi board 打开本机看板");
       } else if (board) {
-        tools.info("dsh 插件未开启托管需求看板；可随时运行 laoshi board 打开，或在 cordis.patch.yml 中设置 board: true");
+        tools.info("dsh 插件未开启托管需求看板；可随时运行 laoshi board 打开，或在 cordis.patch.yml 中去掉 board: false");
       }
       const listed = await call<DshModels>("models").catch(() => null);
       if (!listed) {

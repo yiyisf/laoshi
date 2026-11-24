@@ -72,10 +72,17 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
   const patchFile = path.join(profileDir, "cordis.patch.yml");
   // dsh writes the file with an empty flow list ("[]"); entries go into a block list instead.
   const current = (fs.existsSync(patchFile) ? fs.readFileSync(patchFile, "utf8") : "").replace(/^\s*\[\]\s*$/m, "");
-  if (current.includes("laoshi-dsh-plugin")) report("ok", `${patchFile} 中已挂载插件，不改动（审批与看板配置以文件中的为准）`);
-  else {
-    const enableBoard = !args["no-board"];
-    const boardPort = args["board-port"] ? Number(args["board-port"]) || 0 : 0;
+  const enableBoard = !args["no-board"];
+  const boardPort = args["board-port"] ? Number(args["board-port"]) || 0 : 0;
+  if (current.includes("laoshi-dsh-plugin")) {
+    const upgraded = upgradeCordisPatch(current, { kitRoot: slash(kit), enableBoard, boardPort });
+    if (upgraded === null) {
+      report("ok", `${patchFile} 中已挂载插件，不改动（审批与看板配置以文件中的为准）`);
+    } else {
+      if (!dry) fs.writeFileSync(patchFile, upgraded.text);
+      report("ok", `已为 ${patchFile} 中的插件配置补齐 kitRoot${upgraded.addedBoard ? ` 与 board: ${enableBoard}` : ""}（保留原有审批设置）`);
+    }
+  } else {
     if (!dry) {
       fs.mkdirSync(profileDir, { recursive: true });
       const extraLines = [
@@ -89,9 +96,76 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
     report("ok", `在 ${patchFile} 末尾挂载插件（审批策略 ${approvals}，需求看板${enableBoard ? "已启用" : "已关闭"}）`);
   }
   return [
-    `重启 dsh（profile ${profile}），让插件与需求看板生效`,
-    "运行 laoshi doctor 可查看需求看板地址；也可随时运行 laoshi board 打开",
+    `重启 dsh（profile ${profile}），即可在 dsh 左侧导航栏看到「需求看板」`,
+    "运行 laoshi doctor 可检查插件、托管看板与页面挂载状态；也可随时运行 laoshi board 单独打开",
   ];
+}
+
+function upgradeCordisPatch(current, { kitRoot, enableBoard, boardPort }) {
+  const eol = current.includes("\r\n") ? "\r\n" : "\n";
+  const lines = current.replace(/\r\n/g, "\n").split("\n");
+  const nameIdx = lines.findIndex((l) => /^\s*(?:-\s*)?name\s*:\s*['"]?laoshi-dsh-plugin['"]?\s*(?:#.*)?$/.test(l));
+  if (nameIdx < 0) return null;
+  const nameIndent = lines[nameIdx].match(/^\s*/)[0].length;
+  const isDashName = /^\s*-\s*name\s*:/.test(lines[nameIdx]);
+  let itemStart = nameIdx;
+  if (!isDashName && nameIdx > 0 && /^\s*-\s/.test(lines[nameIdx - 1])) itemStart = nameIdx - 1;
+  const entryIndent = lines[itemStart].match(/^\s*/)[0].length;
+  const keyIndent = isDashName ? nameIndent + 2 : nameIndent;
+
+  let itemEnd = lines.length;
+  for (let i = nameIdx + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (!l.trim()) continue;
+    if (l.match(/^\s*/)[0].length <= entryIndent) {
+      itemEnd = i;
+      break;
+    }
+  }
+  while (itemEnd > nameIdx + 1 && !lines[itemEnd - 1].trim()) itemEnd--;
+
+  const block = lines.slice(itemStart, itemEnd);
+  if (block.some((l) => /^\s*kitRoot\s*:/.test(l))) return null;
+  const hasBoard = block.some((l) => /^\s*board\s*:/.test(l));
+  const hasBoardPort = block.some((l) => /^\s*boardPort\s*:/.test(l));
+  const relCfg = block.findIndex((l) => /^\s*config\s*:/.test(l));
+
+  if (relCfg >= 0) {
+    const cfgIdx = itemStart + relCfg;
+    const cfgIndent = lines[cfgIdx].match(/^\s*/)[0].length;
+    if (/^\s*config\s*:\s*\{\s*\}\s*(?:#.*)?$/.test(lines[cfgIdx])) lines[cfgIdx] = `${" ".repeat(cfgIndent)}config:`;
+    let cfgEnd = itemEnd;
+    let childIndent = cfgIndent + 2;
+    let sawChild = false;
+    for (let i = cfgIdx + 1; i < itemEnd; i++) {
+      const l = lines[i];
+      if (!l.trim()) continue;
+      const ind = l.match(/^\s*/)[0].length;
+      if (ind <= cfgIndent) {
+        cfgEnd = i;
+        break;
+      }
+      if (!sawChild) {
+        childIndent = ind;
+        sawChild = true;
+      }
+    }
+    while (cfgEnd > cfgIdx + 1 && !lines[cfgEnd - 1].trim()) cfgEnd--;
+    const pad = " ".repeat(childIndent);
+    const add = [`${pad}kitRoot: '${kitRoot}'`];
+    if (!hasBoard) add.push(`${pad}board: ${enableBoard}`);
+    if (!hasBoardPort && boardPort > 0) add.push(`${pad}boardPort: ${boardPort}`);
+    lines.splice(cfgEnd, 0, ...add);
+  } else {
+    const cfgPad = " ".repeat(keyIndent);
+    const childPad = " ".repeat(keyIndent + 2);
+    const add = [`${cfgPad}config:`, `${childPad}kitRoot: '${kitRoot}'`];
+    if (!hasBoard) add.push(`${childPad}board: ${enableBoard}`);
+    if (!hasBoardPort && boardPort > 0) add.push(`${childPad}boardPort: ${boardPort}`);
+    lines.splice(itemEnd, 0, ...add);
+  }
+  const nextText = lines.join(eol);
+  return { text: nextText, addedBoard: !hasBoard };
 }
 
 /** Removes laoshi's dsh plugin and its mount. */

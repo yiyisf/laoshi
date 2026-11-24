@@ -27,6 +27,10 @@ export interface BoardRenderOptions {
   apiBase?: string;
   /** CSRF token required in X-Laoshi-Token header for POST actions when apiBase is set. */
   csrfToken?: string;
+  /** Optional host shell identifier (e.g. "dsh") enabling host session navigation. */
+  embedHost?: string;
+  /** Initial color theme when hosted inside an iframe. */
+  initialTheme?: "dark" | "light";
 }
 
 const GROUP_SUBTITLES: Record<string, string> = {
@@ -157,14 +161,16 @@ export function renderBoardHtml(items: RequirementView[], options: BoardRenderOp
       actions: readOnly ? [] : actionsFor(i).map((a) => ({ id: a, ...ACTION_TEXT[a] })),
     })),
   ).replace(/</g, "\\u003c");
+  const initialTheme = options.initialTheme === "light" ? "light" : "dark";
   const runtimeCfg = JSON.stringify({
     apiBase: options.apiBase ?? null,
     csrfToken: options.csrfToken ?? null,
     readOnly,
+    embedHost: options.embedHost ?? null,
   }).replace(/</g, "\\u003c");
 
   return `<!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="${initialTheme}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -237,6 +243,7 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-card-title { margin: 0; font-size: 15px; font-weight: 600; }
 .rk-badge { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
 .rk-tone-needs { background: var(--rk-brand-tint); color: var(--rk-brand); }
+.rk-tone-data { background: var(--rk-data-tint); color: var(--rk-data); }
 .rk-tone-danger { background: var(--rk-danger-tint); color: var(--rk-danger); }
 .rk-tone-success { background: var(--rk-success-tint); color: var(--rk-success); }
 .rk-tone-muted { background: var(--rk-surface-2); color: var(--rk-muted); }
@@ -308,6 +315,15 @@ body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
 .rk-vstop { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--rk-surface-2); font-size: 13px; }
 .rk-vstop-left { display: flex; align-items: center; gap: 8px; }
 .rk-vstop-who { font-size: 12px; color: var(--rk-muted); }
+.rk-step-list { display: flex; flex-direction: column; gap: 8px; }
+.rk-step-item { width: 100%; text-align: left; font: inherit; color: inherit; background: var(--rk-surface-2); border: 1px solid var(--rk-border); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; }
+.rk-step-link { cursor: pointer; transition: border-color .15s, background .15s; }
+.rk-step-link:hover, .rk-step-link:focus-visible { border-color: var(--rk-brand); background: var(--rk-surface-1); outline: none; }
+.rk-step-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; width: 100%; }
+.rk-step-title { font-size: 13px; font-weight: 600; color: var(--rk-fg); }
+.rk-step-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--rk-muted); width: 100%; }
+.rk-step-jump { font-size: 11px; font-weight: 600; color: var(--rk-brand); white-space: nowrap; }
+.rk-step-error { font-size: 12px; color: var(--rk-danger); white-space: pre-wrap; word-break: break-word; }
 .rk-hidden { display: none !important; }
 @media (max-width: 900px) {
   .rk-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -457,6 +473,44 @@ document.getElementById("rk-theme-toggle")?.addEventListener("click", () => {
   root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
 });
 
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin) return;
+  const msg = event.data;
+  if (!msg || typeof msg !== "object") return;
+  if (msg.type === "laoshi:theme" && (msg.theme === "light" || msg.theme === "dark")) {
+    document.documentElement.dataset.theme = msg.theme;
+  }
+});
+
+function openHostSession(sessionId, parentSessionId, label) {
+  if (!CFG.embedHost || !sessionId || window.parent === window) return;
+  window.parent.postMessage({
+    type: "laoshi:open-session",
+    sessionId,
+    parentSessionId: parentSessionId || null,
+    label: label || null,
+  }, window.location.origin);
+}
+
+function fmtStepDuration(m) {
+  const n = Math.max(0, Number(m) || 0);
+  if (n > 0 && n < 1) return "<1 分钟";
+  const r = Math.round(n);
+  return r < 60 ? r + " 分钟" : Math.floor(r / 60) + " 小时" + (r % 60 ? " " + (r % 60) + " 分" : "");
+}
+
+function fmtStartedAgo(iso) {
+  if (!iso) return "";
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "刚刚开始";
+  if (mins < 60) return mins + " 分钟前开始";
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + " 小时前开始";
+  return Math.floor(hrs / 24) + " 天前开始";
+}
+
 function openDrawer(key) {
   const item = byKey.get(key);
   if (!item || !drawer) return;
@@ -488,7 +542,11 @@ function openDrawer(key) {
   dir.className = "rk-meta";
   const whoLabel = item.owner ? " · 负责人：" + item.owner : item.startedBy ? " · 发起人：" + item.startedBy : "";
   dir.textContent = "功能目录：" + item.featureDir + whoLabel;
-  info.append(stageBadge, meta, dir);
+  const originBar = document.createElement("div");
+  originBar.className = "rk-card-actions rk-hidden";
+  originBar.style.marginTop = "2px";
+  originBar.style.paddingTop = "0";
+  info.append(stageBadge, meta, dir, originBar);
 
   const trackSec = document.createElement("div");
   trackSec.className = "rk-drawer-section";
@@ -627,6 +685,27 @@ function openDrawer(key) {
     jointSec.append(jointTitle, jointList);
     overviewPane.append(jointSec);
 
+    const stepsSec = document.createElement("div");
+    stepsSec.className = "rk-drawer-section rk-hidden";
+    const stepsHead = document.createElement("div");
+    stepsHead.style.display = "flex";
+    stepsHead.style.alignItems = "center";
+    stepsHead.style.justifyContent = "space-between";
+    stepsHead.style.gap = "8px";
+    const stepsTitle = document.createElement("h3");
+    stepsTitle.className = "rk-drawer-section-title";
+    stepsTitle.textContent = "执行记录";
+    const stepsMore = document.createElement("button");
+    stepsMore.type = "button";
+    stepsMore.className = "rk-btn rk-btn-ghost rk-hidden";
+    stepsMore.style.padding = "3px 8px";
+    stepsMore.style.fontSize = "11px";
+    stepsHead.append(stepsTitle, stepsMore);
+    const stepsList = document.createElement("div");
+    stepsList.className = "rk-step-list";
+    stepsSec.append(stepsHead, stepsList);
+    overviewPane.append(stepsSec);
+
     const docSec = document.createElement("div");
     docSec.className = "rk-drawer-section";
     const docTitle = document.createElement("h3");
@@ -645,6 +724,16 @@ function openDrawer(key) {
     fetch(CFG.apiBase + "/detail?" + qs.toString())
       .then((r) => (r.ok ? r.json() : null))
       .then((detail) => {
+        const originAgentId = detail?.run?.originAgentId || null;
+        if (CFG.embedHost && originAgentId) {
+          originBar.classList.remove("rk-hidden");
+          const originBtn = document.createElement("button");
+          originBtn.type = "button";
+          originBtn.className = "rk-btn";
+          originBtn.textContent = "打开需求对话 ↗";
+          originBtn.onclick = () => openHostSession(originAgentId, null, item.title);
+          originBar.append(originBtn);
+        }
         const est = detail?.estimate;
         if (est) {
           estSec.classList.remove("rk-hidden");
@@ -686,6 +775,68 @@ function openDrawer(key) {
             card.append(top, sub);
             jointList.append(card);
           }
+        }
+        const allSteps = Array.isArray(detail?.steps) ? detail.steps : [];
+        if (allSteps.length > 0) {
+          stepsSec.classList.remove("rk-hidden");
+          stepsTitle.textContent = "执行记录（" + allSteps.length + " 步）";
+          let showAllSteps = false;
+          const STEP_OUTCOME = { running: "运行中", completed: "完成", failed: "失败" };
+          const renderStepRows = () => {
+            stepsList.innerHTML = "";
+            const slice = showAllSteps ? allSteps : allSteps.slice(-12);
+            if (allSteps.length > 12) {
+              stepsMore.classList.remove("rk-hidden");
+              stepsMore.textContent = showAllSteps ? "只看最近 12 步" : "显示全部";
+            }
+            for (const st of slice) {
+              const canJump = Boolean(CFG.embedHost && st.agentId);
+              const row = document.createElement(canJump ? "button" : "div");
+              if (canJump) {
+                row.type = "button";
+                row.className = "rk-step-item rk-step-link";
+                row.onclick = () => openHostSession(st.agentId, originAgentId, st.title);
+              } else {
+                row.className = "rk-step-item";
+              }
+              const top = document.createElement("div");
+              top.className = "rk-step-top";
+              const stTitle = document.createElement("span");
+              stTitle.className = "rk-step-title";
+              stTitle.textContent = st.title || st.stepId || "步骤";
+              const badge = document.createElement("span");
+              const tone = st.outcome === "failed" ? "danger" : st.outcome === "running" ? "data" : "muted";
+              badge.className = "rk-badge rk-tone-" + tone;
+              badge.textContent = st.outcome === "completed" && st.result ? st.result : (STEP_OUTCOME[st.outcome] || st.outcome || "完成");
+              top.append(stTitle, badge);
+
+              const metaRow = document.createElement("div");
+              metaRow.className = "rk-step-meta";
+              const leftMeta = document.createElement("span");
+              const agoText = fmtStartedAgo(st.startedAt);
+              leftMeta.textContent = "第 " + (st.attempt || 1) + " 次尝试 · " + fmtStepDuration(st.minutes) + (agoText ? " · " + agoText : "");
+              metaRow.append(leftMeta);
+              if (canJump) {
+                const jump = document.createElement("span");
+                jump.className = "rk-step-jump";
+                jump.textContent = "查看执行记录 ↗";
+                metaRow.append(jump);
+              }
+              row.append(top, metaRow);
+              if (st.error) {
+                const err = document.createElement("div");
+                err.className = "rk-step-error";
+                err.textContent = st.error;
+                row.append(err);
+              }
+              stepsList.append(row);
+            }
+          };
+          stepsMore.onclick = () => {
+            showAllSteps = !showAllSteps;
+            renderStepRows();
+          };
+          renderStepRows();
         }
         const files = detail?.files || [];
         if (files.length === 0) { docTitle.textContent = "相关产物（暂无）"; return; }

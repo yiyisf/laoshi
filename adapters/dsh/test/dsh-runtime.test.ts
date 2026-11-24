@@ -104,10 +104,10 @@ function fakeHost(script: { runningPolls?: number } = {}) {
   return { ctx, calls, sessions, dispose, approve };
 }
 
-async function started(config: { approvals?: "ask" | "allow" } = {}, script = {}) {
+async function started(config: { approvals?: "ask" | "allow"; board?: boolean; kitRoot?: string } = {}, script = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-dsh-"));
   const host = fakeHost(script);
-  apply(host.ctx, { home, ...config });
+  apply(host.ctx, { home, board: false, ...config });
   const token = channelPaths(home).token;
   for (let i = 0; i < 100 && !fs.existsSync(token); i++) await new Promise((r) => setTimeout(r, 20));
   const env = { ...process.env, DSH_HOME: home };
@@ -424,4 +424,174 @@ test("dsh 0.2.2-rc.5 宿主接口适配：扁平 startActivation、subagents.int
   } finally {
     for (const fn of listeners.get("dispose") ?? []) fn();
   }
+});
+
+test("dsh 插件 webServer 挂载 /laoshi 代理看板并默认开启，支持 connection 鉴权拦截", async () => {
+  const http = await import("node:http");
+  const kitRoot = path.resolve(import.meta.dirname, "..", "..", "..");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-dsh-web-"));
+  const host = fakeHost();
+  let registeredRoute: { kind: string; path: string; handler: (req: any, res: any) => Promise<void> } | undefined;
+  let routeDisposed = false;
+  let rejectStatus: number | undefined;
+  const ctx: any = {
+    ...host.ctx,
+    get: (name: string) => (name === "connection" ? { requestRejection: () => rejectStatus } : undefined),
+    inject: (deps: string[], fn: (scope: any) => void) => {
+      assert.deepEqual(deps, ["webServer"]);
+      fn({
+        get: (name: string) => (name === "connection" ? { requestRejection: () => rejectStatus } : undefined),
+        on: host.ctx.on.bind(host.ctx),
+        webServer: {
+          register: (route: { kind: string; path: string; handler: (req: any, res: any) => Promise<void> }) => {
+            registeredRoute = route;
+            return () => {
+              routeDisposed = true;
+            };
+          },
+        },
+      });
+    },
+  };
+  apply(ctx, { home, kitRoot });
+  const token = channelPaths(home).token;
+  for (let i = 0; i < 100 && !fs.existsSync(token); i++) await new Promise((r) => setTimeout(r, 20));
+  const call = pluginClient({ ...process.env, DSH_HOME: home }, 10_000);
+  let proxyServer: import("node:http").Server | null = null;
+  try {
+    const route = registeredRoute as { kind: string; path: string; handler: (req: any, res: any) => Promise<void> } | undefined;
+    assert.ok(route);
+    assert.equal(route.kind, "prefix");
+    assert.equal(route.path, "/laoshi");
+
+    const status = await call<{ enabled: boolean; running: boolean; url: string | null; webPath: string | null }>("board", { start: true });
+    assert.equal(status.enabled, true);
+    assert.equal(status.running, true);
+    assert.ok(status.url?.startsWith("http://127.0.0.1:"));
+    assert.equal(status.webPath, "/laoshi/");
+
+    proxyServer = http.createServer((req, res) => {
+      void route.handler(req, res);
+    });
+    await new Promise<void>((resolve) => proxyServer!.listen(0, "127.0.0.1", resolve));
+    const port = (proxyServer.address() as import("node:net").AddressInfo).port;
+
+    const homeRes = await fetch(`http://127.0.0.1:${port}/laoshi/?theme=light`);
+    assert.equal(homeRes.status, 200);
+    const html = await homeRes.text();
+    assert.match(html, /laoshi · 需求看板/);
+    assert.match(html, /"apiBase":"\/laoshi\/api"/);
+    assert.match(html, /"embedHost":"dsh"/);
+    assert.match(html, /data-theme="light"/);
+
+    const listRes = await fetch(`http://127.0.0.1:${port}/laoshi/api/list`);
+    assert.equal(listRes.status, 200);
+    assert.ok(Array.isArray(((await listRes.json()) as { items: unknown[] }).items));
+
+    rejectStatus = 403;
+    const rejected = await fetch(`http://127.0.0.1:${port}/laoshi/api/list`);
+    assert.equal(rejected.status, 403);
+  } finally {
+    if (proxyServer) await new Promise<void>((resolve) => proxyServer!.close(() => resolve()));
+    host.dispose();
+  }
+  assert.equal(routeDisposed, true);
+});
+
+test("dsh client.js 声明 dsh.client，注册左侧菜单与主面板并转发打开会话消息", async () => {
+  const vm = await import("node:vm");
+  const pluginDir = path.resolve(import.meta.dirname, "..", "plugin");
+  const pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, "package.json"), "utf8")) as {
+    exports: Record<string, string>;
+    dsh?: { client?: { platform?: string; inject?: string[] } };
+    files?: string[];
+  };
+  assert.equal(pkg.exports["./client"], "./client.js");
+  assert.equal(pkg.dsh?.client?.platform, "web");
+  assert.ok(pkg.files?.includes("client.js"));
+  assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-sidebar"));
+  assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-layout"));
+  assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-workspace"));
+
+  const listeners: Record<string, Array<(ev: any) => void>> = {};
+  const fakeWindow: Record<string, any> = {
+    location: { origin: "http://127.0.0.1:3000" },
+    addEventListener: (ev: string, fn: (e: any) => void) => {
+      (listeners[ev] ??= []).push(fn);
+    },
+    removeEventListener: (ev: string, fn: (e: any) => void) => {
+      listeners[ev] = (listeners[ev] ?? []).filter((f) => f !== fn);
+    },
+  };
+  type LoadedClientModule = { id: string; factory: (req: (id: string) => unknown) => { inject: string[]; apply: (ctx: unknown) => void } };
+  let registered: LoadedClientModule | undefined;
+  fakeWindow.__ModuleLoader__ = {
+    load: (entry: LoadedClientModule) => {
+      registered = entry;
+    },
+  };
+  const fakeDocument = {
+    body: { hasAttribute: () => true },
+    documentElement: { style: { colorScheme: "dark" }, getAttribute: () => "dark" },
+  };
+  const effectCleanups: Array<() => void> = [];
+  const fakeReact = {
+    createElement: (type: unknown, props: Record<string, unknown>, ...children: unknown[]) => ({ type, props, children }),
+    useRef: (init: unknown) => ({ current: init }),
+    useCallback: (fn: unknown) => fn,
+    useEffect: (fn: () => void | (() => void)) => {
+      const cleanup = fn();
+      if (typeof cleanup === "function") effectCleanups.push(cleanup);
+    },
+  };
+  const vmContext = vm.createContext({ window: fakeWindow, document: fakeDocument, fakeReact });
+  const code = fs.readFileSync(path.join(pluginDir, "client.js"), "utf8");
+  vm.runInContext(code, vmContext);
+  const entry = registered as LoadedClientModule | undefined;
+  assert.ok(entry);
+  assert.equal(entry.id, "laoshi-dsh-plugin");
+
+  const exportsObj = vm.runInContext(
+    `(function(reg){ return reg.factory(function(id){ return id === "react" ? fakeReact : {}; }); })`,
+    vmContext,
+  )(entry) as { inject: string[]; apply: (ctx: any) => void };
+  assert.deepEqual([...exportsObj.inject], ["slots", "uiWorkspace"]);
+
+  const slots: Array<{ opts: Record<string, unknown>; component: (p: any) => any }> = [];
+  const opened: unknown[] = [];
+  exportsObj.apply({
+    slots: {
+      inject: (_key: string, cb: () => unknown) => cb(),
+      register: (opts: Record<string, unknown>, component: (p: any) => any) => {
+        slots.push({ opts, component });
+        return () => {};
+      },
+    },
+    uiWorkspace: {
+      openSession: (target: unknown) => opened.push(target),
+    },
+  });
+  const nav = slots.find((s) => s.opts.name === "sidebar.panellist");
+  const main = slots.find((s) => s.opts.name === "main");
+  assert.equal(nav?.opts.id, "laoshi");
+  assert.equal((nav?.opts.label as () => string)(), "需求看板");
+  assert.equal(main?.opts.key, "laoshi");
+
+  const iframeEl = vm.runInContext(
+    `(function(comp){ return comp({}); })`,
+    vmContext,
+  )(main!.component);
+  assert.equal(iframeEl.type, "iframe");
+  assert.equal(iframeEl.props.src, "/laoshi/?theme=dark");
+
+  for (const fn of listeners.message ?? []) {
+    fn({ origin: "http://127.0.0.1:3000", data: { type: "laoshi:open-session", sessionId: "child-1", parentSessionId: "parent-1" } });
+    fn({ origin: "http://127.0.0.1:3000", data: { type: "laoshi:open-session", sessionId: "parent-1", parentSessionId: "parent-1" } });
+    fn({ origin: "http://evil.example", data: { type: "laoshi:open-session", sessionId: "evil-1", parentSessionId: null } });
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(opened)), [
+    { parentSessionId: "parent-1", childSessionId: "child-1", mode: "continuable" },
+    "parent-1",
+  ]);
+  for (const c of effectCleanups) c();
 });

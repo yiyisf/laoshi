@@ -6,7 +6,7 @@
 
 | 部分 | 位置 | 做什么 |
 | --- | --- | --- |
-| 插件 | `plugin/`（npm 包 `laoshi-dsh-plugin`） | 运行在 dsh host 里：在对话下创建步骤 agent、向对话发定时消息、按策略回答步骤的审批请求，并把会话的创建、发送消息、取消、状态、历史转给 dsh 的会话控制器。不含流程逻辑 |
+| 插件（服务端 + 前端面板） | `plugin/`（npm 包 `laoshi-dsh-plugin`，含 `index.mjs` 与 `client.js`） | 运行在 dsh host 与 Web 界面中：在对话下创建步骤 agent、向对话发定时消息、按策略回答步骤的审批请求，把会话的创建、发送消息、取消、状态、历史转给 dsh 的会话控制器；同时在 dsh 左侧导航栏挂载 **「需求看板」** 入口并在 `/laoshi/` 代理托管 Web 看板（复用 dsh 登录校验，支持从看板抽屉直接跳转回对应阶段执行记录和原需求对话）。不含流程逻辑 |
 | 运行时 | `dsh-runtime.ts` | 引擎一侧的 `AgentRuntime` 实现，只通过插件做事，不调用 dsh 的 `/api` |
 | 本地通道 | `plugin/channel.mjs` | 两边共用的约定：插件在 `$DSH_HOME/laoshi/` 下监听本地 socket（Windows 上是命名管道），并写一个随机令牌，只有同一用户能读到，调用时必须带上 |
 | 测试 | `test/` | 插件配上模拟的 dsh 服务，运行时通过真实的 socket 调用插件；属于 `npm test` |
@@ -31,8 +31,10 @@
          config:
            approvals: ask   # ask：步骤的审批请求交给人（默认）；allow：直接批准一次
            kitRoot: '<laoshi>'
-           board: true      # 默认随 dsh 启动托管 Web 需求看板；laoshi doctor 会输出访问地址
+           board: true      # 默认随 dsh 启动托管 Web 需求看板，并在 dsh 左侧导航栏「需求看板」（/laoshi/）内嵌打开；传 --no-board 时关闭
    ```
+
+   重启 `dsh` 后，直接在 dsh Web 界面左侧导航栏点击 **「需求看板」** 即可使用（无需再单独开浏览器标签页）；详情抽屉「执行记录」支持一键跳回各阶段子 agent 执行对话及原需求对话。从旧版 `cordis.patch.yml`（缺少 `kitRoot` / `board`）升级时，重新运行 `laoshi install --platform dsh` 或 `laoshi upgrade` 会自动补齐并保留原有 `approvals` 设置。
 
 2. laoshi 的配置里选择 dsh 适配器：
 
@@ -50,7 +52,7 @@
 
 ## 原型的范围
 
-已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息（支持 `expiresAt` 到期由插件自动取消）和取消、定时新建独立会话（`scheduleNewAgent`）、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量、`providerStatus`（列出已配置模型提供方）以及托管 Web 需求看板（`laoshi board --no-open`）。M2b 起，在新建的工作区中开发（`--worktree`）和由 laoshi 管理的服务使用 laoshi 的内置实现（`git worktree`，以及 `.laoshi/services.json` 中定义的服务，见 [builtin-capabilities](../../docs/design/builtin-capabilities.md)）。
+已实现：`AgentRuntime` 的全部必需能力（核对发起的对话，创建、等待、追问、打断步骤 agent，续接，向对话发消息），以及定时消息（支持 `expiresAt` 到期由插件自动取消）和取消、定时新建独立会话（`scheduleNewAgent`）、审批（等人时 `wait` 返回 `permission`）、工具调用记录（危险命令拦截、大目录搜索打断、最近活动）、用量、`providerStatus`（列出已配置模型提供方），以及**内嵌于 dsh 左侧导航栏「需求看板」的共享 Web 需求看板**（`/laoshi/` 代理，支持从详情抽屉一键跳回阶段执行记录和原需求对话；也可用 `laoshi board` 独立打开）。M2b 起，在新建的工作区中开发（`--worktree`）和由 laoshi 管理的服务使用 laoshi 的内置实现（`git worktree`，以及 `.laoshi/services.json` 中定义的服务，见 [builtin-capabilities](../../docs/design/builtin-capabilities.md)）。
 
 还没有实现：
 
