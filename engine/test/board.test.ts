@@ -305,10 +305,42 @@ test("createBoardServer 支持代理前缀、dsh 内嵌标记、主题参数与�
     assert.match(html, /查看执行记录 ↗/);
     assert.match(html, /打开需求对话 ↗/);
     assert.match(html, /laoshi:open-requirement/);
+    assert.match(html, /id="rk-detail-view"/);
+    assert.match(html, /返回需求列表/);
+    assert.match(html, /data-nav="stats"/);
+    assert.match(html, /data-nav="config"/);
+    assert.match(html, /renderMarkdownHtml/);
+    assert.match(html, /renderTsvTableNode/);
 
     const m = /<script>([\s\S]*?)<\/script>/.exec(html);
     assert.ok(m, "看板 HTML 包含内联脚本");
     assert.doesNotThrow(() => new vm.Script(m[1]), "内联脚本语法应合法");
+
+    // Extract and execute the Markdown renderer helpers in isolation to verify regex escaping and XSS sanitization.
+    const declEnd = m[1].indexOf("let activeGroup");
+    const escStart = m[1].indexOf("function escHtml(");
+    const escEnd = m[1].indexOf("function fmtMinutes(");
+    const mdStart = m[1].indexOf("function formatInlineMd(");
+    const mdEnd = m[1].indexOf("function renderTsvTableNode(");
+    const mdScript = `${m[1].slice(0, declEnd)}
+${m[1].slice(escStart, escEnd)}
+${m[1].slice(mdStart, mdEnd)}
+globalThis.__mdOut = renderMarkdownHtml("# 标题\\n\\n**粗体**与 \`code\` 与 <script>alert(1)</script>\\n\\n| A | B |\\n| --- | --- |\\n| 1 | 2 |\\n\\n\`\`\`ts\\nconst x = 1;\\n\`\`\`");`;
+    const mdCtx = vm.createContext({ globalThis: {} });
+    vm.runInContext(mdScript, mdCtx);
+    const mdHtml = String((mdCtx.globalThis as Record<string, unknown>).__mdOut);
+    assert.match(mdHtml, /<h1>标题<\/h1>/);
+    assert.match(mdHtml, /<strong>粗体<\/strong>/);
+    assert.match(mdHtml, /<code>code<\/code>/);
+    assert.match(mdHtml, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+    assert.match(mdHtml, /<table class="rk-table"><thead><tr><th>A<\/th><th>B<\/th><\/tr><\/thead>/);
+    assert.match(mdHtml, /<pre><code>const x = 1;<\/code><\/pre>/);
+
+    // Optional handlers return 404 when unconfigured.
+    assert.equal((await fetch(`http://127.0.0.1:${addr.port}/api/stats`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${addr.port}/api/config`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${addr.port}/api/review-url?repo=/r&feature=f&page=code`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${addr.port}/api/review-url?repo=/r&feature=f&page=bogus`)).status, 400);
 
     const missingSession = await fetch(`http://127.0.0.1:${addr.port}/api/session-requirement`);
     assert.equal(missingSession.status, 400);
@@ -330,6 +362,40 @@ test("createBoardServer 支持代理前缀、dsh 内嵌标记、主题参数与�
     });
     const badHtml = await bad.text();
     assert.match(badHtml, /"apiBase":"\/api"/, "非法前缀被忽略");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("createBoardServer /api/stats、/api/config 与 /api/review-url 返回正确数据与参数校验", async () => {
+  const { server } = createBoardServer({
+    readOnly: true,
+    handlers: {
+      list: () => SAMPLE,
+      detail: () => ({}),
+      file: () => ({ content: "" }),
+      run: () => ({ ok: true, message: "ok" }),
+      stats: ({ since, month }) => ({ active: 3, period: since ?? month ?? "30d" }),
+      config: (repo) => ({ repo: repo ?? null, groups: [] }),
+      reviewUrl: async ({ repo, featureDir, page, readOnly }) => ({ url: `http://127.0.0.1:6781/${page}/${featureDir}?ro=${readOnly}&repo=${encodeURIComponent(repo)}` }),
+    },
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  assert.ok(addr && typeof addr === "object");
+  try {
+    const st = await fetch(`http://127.0.0.1:${addr.port}/api/stats?month=2026-11`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(st.active, 3);
+    assert.equal(st.period, "2026-11");
+
+    const cfg = await fetch(`http://127.0.0.1:${addr.port}/api/config?repo=/tmp/demo`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(cfg.repo, "/tmp/demo");
+
+    const revBad = await fetch(`http://127.0.0.1:${addr.port}/api/review-url?feature=f`);
+    assert.equal(revBad.status, 400);
+
+    const revOk = await fetch(`http://127.0.0.1:${addr.port}/api/review-url?repo=/tmp/demo&feature=feat-1&page=code`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(revOk.url, "http://127.0.0.1:6781/code/feat-1?ro=true&repo=%2Ftmp%2Fdemo");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
