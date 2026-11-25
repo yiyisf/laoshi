@@ -2,6 +2,22 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
+## 0.3.1-beta.2 - 2026-11-25
+
+测试版（npm `beta` 标签，GitHub Pre-release）：修复 `dsh` 插件覆盖升级不生效、支持 `paseo` 与 `dsh` 同机多平台并存、在 `dsh` 会话顶部栏增加直达需求详情的快捷入口，并将 Web 看板升级为全宽详情与 Paseo 一致化视图。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform dsh`。
+
+### 使用者会看到的变化
+
+- **dsh 插件直接覆盖升级生效**：再次运行 `laoshi install --platform dsh` 或 `laoshi upgrade` 时，会先清理旧的 `laoshi-dsh-plugin` 并按文件比对确保新版本文件完整覆盖，同时保留 `cordis.patch.yml` 中的 `approvals`、`board`、`boardPort` 并自动刷新 `kitRoot` 路径，无需再手工卸载旧版插件。
+- **Paseo 与 dsh 多平台并存（同份 `~/.laoshi/config.json`）**：可在同一台机器先装一个平台后再装另一个平台（例如先装 `paseo` 再装 `dsh`）；运行时按 `LAOSHI_PLATFORM` 或平台对话环境变量（`DSH_SESSION_ID`、`PASEO_AGENT_ID`）自动切换适配器与 `platform.<id>.agents`；`laoshi doctor` 与 `laoshi install --platform <id> --uninstall` 支持分平台检查与单独卸载。
+- **dsh 对话顶部栏快捷直达需求详情**：在发起需求的对话或步骤子对话中，顶部工具栏新增 **「需求：<标题>」** 快捷按钮，点击即可切换到 **「需求看板」** 面板并自动打开对应需求详情（新增 `/api/session-requirement` 与看板 `?open=` / `laoshi:open-requirement` 联动）。
+- **Web 需求看板全宽详情与 Paseo 体验对齐**：顶部新增 **需求 / 使用统计 / 配置** 导航切换；需求详情由 460px 右侧抽屉改为全宽页面（带 `← 返回需求列表`、关键决策高亮按钮、代码审查 / 审查原型外链、位置/用量/质量门/外部系统 2 列元数据卡片、Markdown 渲染与 TSV 表格文档弹窗、完整执行记录与全宽验收/变更子页）。
+
+### 升级须知
+
+- **直接升级 dsh 插件**：无需卸载旧版，直接执行 `npx -y @yiyi_zhang/laoshi@beta install --platform dsh`（内网离线包运行对应安装脚本），完成后重启 `dsh --profile web`。
+- **与 Paseo 共存**：如本机已安装 `paseo`，直接再执行 `laoshi install --platform dsh` 即可保留 `paseo` 默认配置并添加 `dsh` 并存配置。
+
 ## 0.3.1-beta.1 - 2026-11-24
 
 测试版（npm `beta` 标签，GitHub Pre-release）：将共享 Web 需求看板直接内嵌到 DeepSeek Harness（`dsh`）Web 界面左侧导航栏，并支持从任务各阶段执行记录快捷跳回对应子 agent 对话或原需求对话。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform dsh`。
