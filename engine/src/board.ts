@@ -11,9 +11,14 @@ import { fileURLToPath } from "node:url";
 import { apiFile, apiList, apiRun, apiStatus, type ListItem } from "./api.js";
 import { acceptanceText, type Answer, buildChecklist, type Checklist, recordAcceptance, verdictOf } from "./checklist.js";
 import { DEFAULT_CONFIG, loadConfig, type PipelineConfig } from "./config.js";
+import { configView } from "./config-view.js";
 import { apiHistory, type RequirementHistory } from "./history.js";
 import { defaultConfigPath } from "./locations.js";
+import { scanOutcomes } from "./outcomes.js";
+import { readEvents, readRuns, runsFile } from "./records.js";
+import { ensureReviewServer, keyOf, reviewUrl } from "./review.js";
 import { loadRuntimeFactory, wordsFor } from "./runtime-loader.js";
+import { parsePeriod, summarizeRuns } from "./stats.js";
 import { howToTry, tryRequirement, type TryResult } from "./try.js";
 import type { RequirementView } from "../../ui/shared/view-model.js";
 import { renderBoardHtml } from "../../ui/web/board.js";
@@ -67,6 +72,9 @@ export interface BoardHandlers {
   acceptance?: (repo: string, feature: string) => AcceptanceView;
   submitAcceptance?: (input: { repo: string; featureDir: string; reviewer: string; answers: Answer[] }) => AcceptanceSubmitResult;
   tryRun?: (input: { repo: string; featureDir: string; stop?: boolean }) => Promise<TryResult>;
+  stats?: (input: { since?: string | null; month?: string | null }) => unknown;
+  config?: (repo?: string | null) => unknown;
+  reviewUrl?: (input: { repo: string; featureDir: string; page: "prototype" | "code" | "check"; readOnly: boolean }) => Promise<{ url: string }>;
 }
 
 export interface BoardServerOptions {
@@ -232,6 +240,46 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
           return;
         }
         sendJson(res, 200, options.handlers.history(repo, feature));
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/stats") {
+        if (!options.handlers.stats) {
+          sendJson(res, 404, { error: "当前看板未启用使用统计" });
+          return;
+        }
+        const since = url.searchParams.get("since");
+        const month = url.searchParams.get("month");
+        sendJson(res, 200, options.handlers.stats({ since, month }));
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/config") {
+        if (!options.handlers.config) {
+          sendJson(res, 404, { error: "当前看板未启用配置查看" });
+          return;
+        }
+        const repo = url.searchParams.get("repo");
+        sendJson(res, 200, options.handlers.config(repo || null));
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/review-url") {
+        const repo = url.searchParams.get("repo") ?? "";
+        const feature = url.searchParams.get("feature") ?? "";
+        const page = url.searchParams.get("page") ?? "prototype";
+        if (!repo || !feature || !["prototype", "code", "check"].includes(page)) {
+          sendJson(res, 400, { error: "缺少或无效的 repo、feature 或 page 参数" });
+          return;
+        }
+        if (!options.handlers.reviewUrl) {
+          sendJson(res, 404, { error: "当前看板未启用审查页面跳转" });
+          return;
+        }
+        const result = await options.handlers.reviewUrl({
+          repo,
+          featureDir: feature,
+          page: page as "prototype" | "code" | "check",
+          readOnly,
+        });
+        sendJson(res, 200, result);
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/try") {
@@ -452,6 +500,20 @@ async function main(argv: string[]): Promise<number> {
       } finally {
         await runtime.close().catch(() => undefined);
       }
+    },
+    stats: (input) => {
+      scanOutcomes(process.env);
+      const file = runsFile(process.env);
+      return summarizeRuns(readRuns(file), parsePeriod(input), readEvents(file));
+    },
+    config: (repo) => configView(defaultConfigPath(), repo ?? args.repo ?? null),
+    reviewUrl: async ({ repo, featureDir, page, readOnly }) => {
+      const key = keyOf(repo, featureDir);
+      if (!key) {
+        throw new Error(`${featureDir} 不在本机的需求列表中，先运行一次 laoshi index --rebuild`);
+      }
+      const base = reviewUrl(await ensureReviewServer(), key, readOnly);
+      return { url: `${base}${page === "code" ? "code/" : page === "check" ? "check/" : ""}` };
     },
   };
 
