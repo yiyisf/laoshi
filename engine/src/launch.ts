@@ -394,7 +394,7 @@ const child = spawn(process.execPath, [...process.execArgv, path.join(ENGINE_DIR
   detached: !inChat,
   windowsHide: true,
   stdio: ["ignore", out, out],
-  env: inChat ? { ...process.env, LAOSHI_CHAT_OUT: chatOut } : process.env,
+  env: { ...(inChat ? { ...process.env, LAOSHI_CHAT_OUT: chatOut } : process.env), LAOSHI_PLATFORM: adapterFor(loaded.config).id },
 });
 if (!inChat) child.unref();
 

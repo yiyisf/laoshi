@@ -152,6 +152,39 @@ export function createBoardServer(options: BoardServerOptions): { server: http.S
         sendJson(res, 200, { items: options.handlers.list() });
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/session-requirement") {
+        const sessionId = (url.searchParams.get("sessionId") ?? "").trim();
+        if (!sessionId) {
+          sendJson(res, 400, { error: "缺少 sessionId 参数" });
+          return;
+        }
+        const items = options.handlers.list();
+        for (const item of items) {
+          try {
+            const detail = options.handlers.detail(item.repo, item.featureDir) as {
+              run?: { originAgentId?: string | null } | null;
+              steps?: Array<{ agentId?: string | null }> | null;
+            } | null;
+            const matchedOrigin = detail?.run?.originAgentId === sessionId;
+            const matchedStep = Boolean(detail?.steps?.some((s) => s.agentId === sessionId));
+            if (matchedOrigin || matchedStep) {
+              sendJson(res, 200, {
+                matched: true,
+                key: item.key || `${item.repo}::${item.featureDir}`,
+                repo: item.repo,
+                featureDir: item.featureDir,
+                title: item.title,
+                stage: item.stage,
+              });
+              return;
+            }
+          } catch {
+            // One unreadable or deleted worktree must not block session lookup for others.
+          }
+        }
+        sendJson(res, 200, { matched: false });
+        return;
+      }
       if (req.method === "GET" && url.pathname === "/api/detail") {
         const repo = url.searchParams.get("repo") ?? "";
         const feature = url.searchParams.get("feature") ?? "";

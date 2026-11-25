@@ -1,10 +1,11 @@
 // laoshi M2a: the core reaches a platform only through its adapter (engine/src/platform.ts).
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CONFIG } from "../src/config.js";
+import { DEFAULT_CONFIG, loadConfig } from "../src/config.js";
 import { CAPABILITIES, describeProfileDefault, sourceOf, withCapabilities } from "../src/platform.js";
 import { ADAPTER_IDS, adapterFor, adapterIdOf, describeProfile, originEnvNames, originFromEnv, resolveProfiles, scrubOriginEnv, wordsFor } from "../src/runtime-loader.js";
 import { fill, renderWords } from "../src/words.js";
@@ -141,4 +142,59 @@ test("词汇表：每个适配器的说法覆盖中性说法；平台没有的�
   const text = "开头\n可以用 {{platform.browser}}。\n{{platform.managedServices}}由 {{platform.servicesBy}} 启动\n{{platform.unknown}}";
   assert.equal(renderWords(text, dsh), "开头\nlaoshi 管理的服务由 laoshi 启动\n{{platform.unknown}}");
   assert.equal(renderWords(text, paseo).split("\n")[1], "可以用 Paseo 内置的浏览器（`browser_*` 工具）。");
+});
+
+test("多平台并存：按 LAOSHI_PLATFORM 或对话来源环境变量自动切换平台与平台级 agents，不改写磁盘配置", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-multiplatform-"));
+  const cfgPath = path.join(dir, "config.json");
+  const coexisting = {
+    platform: {
+      adapter: "paseo",
+      dsh: {
+        home: path.join(dir, ".dsh"),
+        profile: "web",
+        agents: { builder: { provider: "dsh/chat-model" }, reviewer: { provider: "dsh/chat-model" } },
+      },
+    },
+    agents: { builder: { provider: "claude/sonnet" }, reviewer: { provider: "codex/o3" } },
+  };
+  fs.writeFileSync(cfgPath, JSON.stringify(coexisting));
+
+  assert.equal(adapterIdOf(coexisting, {}), "paseo");
+  assert.equal(adapterIdOf(coexisting, { DSH_SESSION_ID: "chat-1" }), "dsh");
+  assert.equal(adapterIdOf(coexisting, { LAOSHI_PLATFORM: "dsh" }), "dsh");
+
+  const defaultLoaded = loadConfig(cfgPath);
+  assert.equal(defaultLoaded.config.platform.adapter, "paseo");
+  assert.equal(defaultLoaded.config.agents.builder.provider, "claude/sonnet");
+
+  const prevDshSession = process.env.DSH_SESSION_ID;
+  const prevPlatform = process.env.LAOSHI_PLATFORM;
+  try {
+    process.env.DSH_SESSION_ID = "chat-2";
+    const byOrigin = loadConfig(cfgPath);
+    assert.equal(byOrigin.config.platform.adapter, "dsh");
+    assert.equal(byOrigin.config.agents.builder.provider, "dsh/chat-model");
+    delete process.env.DSH_SESSION_ID;
+
+    // Inactive platform placeholder CHANGE-ME does not block the active platform, while selecting it triggers validation.
+    const dshPrimary = {
+      platform: {
+        adapter: "dsh",
+        dsh: { home: path.join(dir, ".dsh"), profile: "web" },
+        paseo: { agents: { builder: { provider: "CHANGE-ME/model" }, reviewer: { provider: "CHANGE-ME/model" } } },
+      },
+      agents: { builder: { provider: "dsh/chat-model" }, reviewer: { provider: "dsh/chat-model" } },
+    };
+    fs.writeFileSync(cfgPath, JSON.stringify(dshPrimary));
+    assert.equal(loadConfig(cfgPath).config.platform.adapter, "dsh");
+    process.env.LAOSHI_PLATFORM = "paseo";
+    assert.throws(() => loadConfig(cfgPath), /CHANGE-ME|示例值/);
+  } finally {
+    if (prevDshSession === undefined) delete process.env.DSH_SESSION_ID;
+    else process.env.DSH_SESSION_ID = prevDshSession;
+    if (prevPlatform === undefined) delete process.env.LAOSHI_PLATFORM;
+    else process.env.LAOSHI_PLATFORM = prevPlatform;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

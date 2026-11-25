@@ -304,10 +304,26 @@ test("createBoardServer 支持代理前缀、dsh 内嵌标记、主题参数与�
     assert.match(html, /laoshi:open-session/);
     assert.match(html, /查看执行记录 ↗/);
     assert.match(html, /打开需求对话 ↗/);
+    assert.match(html, /laoshi:open-requirement/);
 
     const m = /<script>([\s\S]*?)<\/script>/.exec(html);
     assert.ok(m, "看板 HTML 包含内联脚本");
     assert.doesNotThrow(() => new vm.Script(m[1]), "内联脚本语法应合法");
+
+    const missingSession = await fetch(`http://127.0.0.1:${addr.port}/api/session-requirement`);
+    assert.equal(missingSession.status, 400);
+
+    const originMatch = await fetch(`http://127.0.0.1:${addr.port}/api/session-requirement?sessionId=sess-origin-1`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(originMatch.matched, true);
+    assert.equal(originMatch.key, SAMPLE[0].key);
+    assert.equal(originMatch.featureDir, SAMPLE[0].featureDir);
+
+    const stepMatch = await fetch(`http://127.0.0.1:${addr.port}/api/session-requirement?sessionId=sess-child-1`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(stepMatch.matched, true);
+    assert.equal(stepMatch.key, SAMPLE[0].key);
+
+    const unknownMatch = await fetch(`http://127.0.0.1:${addr.port}/api/session-requirement?sessionId=sess-none`).then((r) => r.json()) as Record<string, unknown>;
+    assert.equal(unknownMatch.matched, false);
 
     const bad = await fetch(`http://127.0.0.1:${addr.port}/`, {
       headers: { "x-laoshi-prefix": "//evil.example" },

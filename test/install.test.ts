@@ -72,6 +72,45 @@ test("安装到 dsh：安装级配置、按 dsh 渲染的 skill、插件和挂�
   assert.match(upgradedPatch, /board: true/);
   assert.match(upgradedPatch, /name: 'other-plugin'/);
 
+  // Upgrading with an existing stale plugin copy + stale kitRoot removes/re-adds, overwrites stale client.js, and refreshes kitRoot.
+  const cliLog = path.join(base, "dsh-cli.log");
+  const trackingDsh = path.join(base, "tracking-dsh.mjs");
+  const installedPlugin = path.join(profile, "node_modules", "laoshi-dsh-plugin");
+  fs.writeFileSync(
+    trackingDsh,
+    [
+      'import fs from "node:fs";',
+      'import path from "node:path";',
+      `const logFile = ${JSON.stringify(cliLog)};`,
+      `const pluginDir = ${JSON.stringify(installedPlugin)};`,
+      'fs.appendFileSync(logFile, process.argv.slice(2).join(" ") + "\\n");',
+      'if (process.argv.includes("add")) {',
+      '  fs.mkdirSync(pluginDir, { recursive: true });',
+      '  fs.writeFileSync(path.join(pluginDir, "package.json"), JSON.stringify({ name: "laoshi-dsh-plugin", version: "0.0.1" }));',
+      '  fs.writeFileSync(path.join(pluginDir, "client.js"), "// stale cached plugin");',
+      '}',
+    ].join("\n"),
+  );
+  fs.writeFileSync(path.join(installedPlugin, "package.json"), JSON.stringify({ name: "laoshi-dsh-plugin", version: "0.0.1" }));
+  fs.writeFileSync(path.join(installedPlugin, "client.js"), "// stale old version");
+  fs.writeFileSync(
+    path.join(profile, "cordis.patch.yml"),
+    "- insert:\n    - id: laoshi-dsh\n      name: 'laoshi-dsh-plugin'\n      config:\n        approvals: allow\n        kitRoot: '/stale/old/kit'\n        board: false\n        boardPort: 19999\n",
+  );
+  const upgraded2 = install(home, ["--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", trackingDsh]);
+  assert.equal(upgraded2.code, 0, upgraded2.out);
+  const calls = fs.readFileSync(cliLog, "utf8").trim().split("\n");
+  assert.ok(calls.length >= 2, calls.join(" | "));
+  assert.match(calls[0], /remove laoshi-dsh-plugin$/);
+  assert.match(calls[1], /add file:/);
+  const srcClient = fs.readFileSync(path.join(ROOT, "adapters", "dsh", "plugin", "client.js"), "utf8");
+  assert.equal(fs.readFileSync(path.join(installedPlugin, "client.js"), "utf8"), srcClient, "stale plugin files overwritten by fresh source");
+  const patch2 = fs.readFileSync(path.join(profile, "cordis.patch.yml"), "utf8");
+  assert.doesNotMatch(patch2, /\/stale\/old\/kit/);
+  assert.match(patch2, /approvals: allow/);
+  assert.match(patch2, /board: false/);
+  assert.match(patch2, /boardPort: 19999/);
+
   const removed = install(home, ["--uninstall", "--dsh-home", dshHome]);
   assert.equal(removed.code, 0, removed.out);
   assert.equal(fs.existsSync(path.join(dshHome, "skills", "laoshi")), false);
@@ -80,8 +119,8 @@ test("安装到 dsh：安装级配置、按 dsh 渲染的 skill、插件和挂�
   assert.ok(fs.existsSync(path.join(laoshiHome, "config.json")), "安装根保留");
 });
 
-test("安装到 Paseo 用的 skill 目录：别人的和 req-kit 装的同名 skill 不覆盖，--force 时覆盖；平台不一致时停下", () => {
-  const { home } = machine();
+test("安装到 Paseo 用的 skill 目录：别人的和 req-kit 装的同名 skill 不覆盖，--force 时覆盖；支持与 dsh 并存并可单独卸载", () => {
+  const { base, home } = machine();
   const skills = path.join(home, ".agents", "skills");
   fs.mkdirSync(path.join(skills, "spec-writing"), { recursive: true });
   fs.writeFileSync(path.join(skills, "spec-writing", "SKILL.md"), "someone else's");
@@ -98,9 +137,35 @@ test("安装到 Paseo 用的 skill 目录：别人的和 req-kit 装的同名 sk
   assert.equal(forced.code, 0, forced.out);
   assert.notEqual(fs.readFileSync(path.join(skills, "spec-writing", "SKILL.md"), "utf8"), "someone else's");
 
-  const other = install(home, ["--platform", "dsh"]);
-  assert.equal(other.code, 1);
-  assert.match(other.out, /用的平台是 paseo，这次要装的是 dsh/);
+  const dshHome = path.join(base, "dsh");
+  const dshProfile = path.join(dshHome, "profiles", "web");
+  fs.mkdirSync(dshProfile, { recursive: true });
+  fs.writeFileSync(path.join(dshProfile, "cordis.patch.yml"), "[]\n");
+  const fakeDsh = path.join(base, "fake-dsh.mjs");
+  fs.writeFileSync(fakeDsh, "process.exit(1);\n");
+
+  const other = install(home, ["--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh]);
+  assert.equal(other.code, 0, other.out);
+  assert.match(other.out, /保留默认平台 paseo，并添加并存平台 dsh/);
+
+  const laoshiHome = path.join(home, ".laoshi");
+  const coConfig = JSON.parse(fs.readFileSync(path.join(laoshiHome, "config.json"), "utf8"));
+  assert.equal(coConfig.platform.adapter, "paseo");
+  assert.equal(coConfig.platform.dsh.agents.builder.provider, "dsh/chat-model");
+  assert.match(fs.readFileSync(path.join(skills, "laoshi", "SKILL.md"), "utf8"), /Paseo 提供的 `PASEO_AGENT_ID`/);
+  assert.match(fs.readFileSync(path.join(dshHome, "skills", "laoshi", "SKILL.md"), "utf8"), /dsh 提供的 `DSH_SESSION_ID`/);
+  const coRecord = JSON.parse(fs.readFileSync(path.join(laoshiHome, "install.json"), "utf8"));
+  assert.ok(coRecord.platforms?.paseo && coRecord.platforms?.dsh);
+
+  const uninstallDsh = install(home, ["--platform", "dsh", "--uninstall", "--dsh-home", dshHome, "--dsh-bin", fakeDsh]);
+  assert.equal(uninstallDsh.code, 0, uninstallDsh.out);
+  assert.equal(fs.existsSync(path.join(dshHome, "skills", "laoshi")), false);
+  assert.equal(fs.existsSync(path.join(dshProfile, "node_modules", "laoshi-dsh-plugin")), false);
+  assert.ok(fs.existsSync(path.join(skills, "laoshi", "SKILL.md")), "paseo skill kept");
+  assert.ok(fs.existsSync(path.join(laoshiHome, "bin", "laoshi")), "shared bin shims kept");
+  const afterConfig = JSON.parse(fs.readFileSync(path.join(laoshiHome, "config.json"), "utf8"));
+  assert.equal(afterConfig.platform.adapter, "paseo");
+  assert.equal(afterConfig.platform.dsh, undefined);
 });
 
 test("安装到摸高：安装根在工作区，按摸高渲染的 skill 放在安装根的 skills 目录（专家的 skill 包）", () => {
