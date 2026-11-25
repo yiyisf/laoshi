@@ -75,9 +75,9 @@ function newer(a: string, b: string): boolean {
   return pa.pre.localeCompare(pb.pre, "en", { numeric: true }) > 0;
 }
 
-function installation(offline: boolean): void {
+function installation(offline: boolean, adapterId: string): void {
   section("安装");
-  const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "install.mjs"), "--check"], {
+  const result = spawnSync(process.execPath, [path.join(KIT_ROOT, "bin", "install.mjs"), "--check", "--platform", adapterId], {
     encoding: "utf8",
     windowsHide: true,
   });
@@ -111,6 +111,17 @@ function configuration(configPath: string, repo: string | null): PipelineConfig 
     }
     const { builder, reviewer } = loaded.config.agents;
     report("ok", `builder：${describeProfile(loaded.config, builder)}；reviewer：${describeProfile(loaded.config, reviewer)}`);
+    const configuredPlatforms = [
+      ...new Set([
+        loaded.config.platform.adapter,
+        ...Object.entries(loaded.config.platform)
+          .filter(([k, v]) => k !== "adapter" && typeof v === "object" && v !== null)
+          .map(([k]) => k),
+      ]),
+    ];
+    if (configuredPlatforms.length > 1) {
+      info(`并存平台：${configuredPlatforms.join("、")}（当前按 ${loaded.config.platform.adapter} 检查；切换检查可设 LAOSHI_PLATFORM=<平台> laoshi doctor）`);
+    }
     report("ok", `默认档位：${loaded.config.defaultProfile}`);
     const panel = loaded.config.reviewPanel;
     if (panel.enabled) {
@@ -412,7 +423,7 @@ async function main(): Promise<number> {
 
   console.log(`laoshi ${kitVersion()} 体检（程序目录 ${KIT_ROOT}）`);
   identity(repo);
-  installation(values.offline ?? false);
+  installation(values.offline ?? false, adapter.id);
   const config = configuration(configPath, repo);
   section(adapter.doctorTitle);
   if (values.offline) console.log("（已跳过：--offline）");

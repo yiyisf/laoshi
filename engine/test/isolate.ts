@@ -17,6 +17,7 @@ if (process.platform === "win32") {
   }
 }
 
-// LAOSHI_HOME would win over the REQ_KIT_HOME that tests set for the processes they start.
+// LAOSHI_HOME and LAOSHI_PLATFORM would win over the isolated environment tests expect.
 delete process.env.LAOSHI_HOME;
+delete process.env.LAOSHI_PLATFORM;
 if (!process.env.REQ_KIT_HOME) process.env.REQ_KIT_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "req-kit-test-home-"));

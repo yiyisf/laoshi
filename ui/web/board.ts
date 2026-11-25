@@ -473,12 +473,43 @@ document.getElementById("rk-theme-toggle")?.addEventListener("click", () => {
   root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
 });
 
+function resolveTargetKey(target) {
+  if (typeof target?.key === "string" && target.key && byKey.has(target.key)) {
+    return target.key;
+  }
+  const repo = typeof target?.repo === "string" ? target.repo : "";
+  const feature = typeof target?.featureDir === "string" ? target.featureDir : (typeof target?.feature === "string" ? target.feature : "");
+  if (repo && feature) {
+    const match = ITEMS.find((i) => i.repo === repo && i.featureDir === feature);
+    if (match) return match.key;
+    return repo + "::" + feature;
+  }
+  return typeof target?.key === "string" ? target.key : "";
+}
+
+function openRequirementOrReload(target) {
+  const key = resolveTargetKey(target);
+  if (!key) return;
+  if (byKey.has(key)) {
+    openDrawer(key);
+    return;
+  }
+  const u = new URL(window.location.href);
+  u.searchParams.set("open", key);
+  if (target?.repo) u.searchParams.set("repo", target.repo);
+  if (target?.featureDir || target?.feature) u.searchParams.set("feature", target.featureDir || target.feature);
+  window.location.replace(u.toString());
+}
+
 window.addEventListener("message", (event) => {
   if (event.origin !== window.location.origin) return;
   const msg = event.data;
   if (!msg || typeof msg !== "object") return;
   if (msg.type === "laoshi:theme" && (msg.theme === "light" || msg.theme === "dark")) {
     document.documentElement.dataset.theme = msg.theme;
+  }
+  if (msg.type === "laoshi:open-requirement") {
+    openRequirementOrReload(msg);
   }
 });
 
@@ -1271,6 +1302,23 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/" && document.activeElement !== searchEl) { e.preventDefault(); searchEl?.focus(); }
   if (e.key === "Escape") closeDrawer();
 });
+
+const initParams = new URLSearchParams(window.location.search);
+const initOpenKey = resolveTargetKey({
+  key: initParams.get("open") || "",
+  repo: initParams.get("repo") || "",
+  featureDir: initParams.get("feature") || "",
+});
+if (initOpenKey && byKey.has(initOpenKey)) {
+  openDrawer(initOpenKey);
+  if (typeof window.history?.replaceState === "function") {
+    initParams.delete("open");
+    initParams.delete("repo");
+    initParams.delete("feature");
+    const qs = initParams.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
+  }
+}
 </script>
 </body>
 </html>`;

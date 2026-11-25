@@ -6,7 +6,7 @@ import { dshAdapter } from "../../adapters/dsh/adapter.js";
 import { mogaoAdapter } from "../../adapters/mogao/adapter.js";
 import { paseoAdapter } from "../../adapters/paseo/adapter.js";
 import { withBuiltins } from "./builtin/index.js";
-import type { AgentProfile, PipelineConfig } from "./config.js";
+import { type AgentProfile, detectActiveAdapter, type PipelineConfig, registerPlatformOriginEnvs } from "./config.js";
 import { describeProfileDefault, type PlatformAdapter, withCapabilities } from "./platform.js";
 import type { AgentRuntime, RuntimeFactory } from "./runtime.js";
 import { BUILTIN_SERVICE_WORDS, NEUTRAL_WORDS, type PlatformWords } from "./words.js";
@@ -23,34 +23,33 @@ const ADAPTERS: Record<string, PlatformAdapter> = {
 };
 
 registerUserEnvs(Object.values(ADAPTERS).flatMap((a) => (a.userEnv ? [a.userEnv] : [])));
+registerPlatformOriginEnvs(Object.values(ADAPTERS).map((a) => ({ adapter: a.id, idEnv: a.originEnv.id })));
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);
 export const DEFAULT_ADAPTER = "paseo";
 
-/** The adapter id a config (or a raw config file's contents) names; the default when it names none. */
-export function adapterIdOf(config: unknown): string {
-  const platform = (config as { platform?: unknown } | null | undefined)?.platform;
-  const id = platform && typeof platform === "object" ? (platform as { adapter?: unknown }).adapter : undefined;
-  return typeof id === "string" && id ? id : DEFAULT_ADAPTER;
+/** The adapter id a config (or a raw config file's contents) names or the current environment selects. */
+export function adapterIdOf(config: unknown, env: NodeJS.ProcessEnv = process.env): string {
+  return detectActiveAdapter(config, env) || DEFAULT_ADAPTER;
 }
 
 /** The adapter a config names; throws for an unknown one. */
-export function adapterFor(config: unknown): PlatformAdapter {
-  const id = adapterIdOf(config);
+export function adapterFor(config: unknown, env: NodeJS.ProcessEnv = process.env): PlatformAdapter {
+  const id = adapterIdOf(config, env);
   const adapter = ADAPTERS[id];
   if (!adapter) throw new Error(`没有名为「${id}」的平台适配器（platform.adapter），可用：${ADAPTER_IDS.join("、")}`);
   return adapter;
 }
 
 /** The adapter a config file names, read leniently: the default when the file is missing or broken. */
-export function adapterForFile(configPath: string): PlatformAdapter {
+export function adapterForFile(configPath: string, env: NodeJS.ProcessEnv = process.env): PlatformAdapter {
   let raw: unknown = null;
   try {
     raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
   } catch {
     // Missing or not JSON: the config checks report it.
   }
-  return ADAPTERS[adapterIdOf(raw)] ?? ADAPTERS[DEFAULT_ADAPTER];
+  return ADAPTERS[adapterIdOf(raw, env)] ?? ADAPTERS[DEFAULT_ADAPTER];
 }
 
 /** Every adapter's chat environment names, so processes started outside a chat can drop them all. */

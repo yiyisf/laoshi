@@ -569,7 +569,7 @@ function merge(base: PipelineConfig, raw: Record<string, unknown>): PipelineConf
   return merged;
 }
 
-function validateProvider(label: string, profile: unknown): void {
+function validateProvider(label: string, profile: unknown, opts?: { allowPlaceholder?: boolean }): void {
   if (isRecord(profile) && profile.platformProfile !== undefined) {
     if (typeof profile.platformProfile !== "string" || profile.platformProfile.trim() === "") {
       throw new ConfigError(`${label}.platformProfile 必须是平台中 agent profile 的名称`);
@@ -583,7 +583,7 @@ function validateProvider(label: string, profile: unknown): void {
   if (slash <= 0 || slash === profile.provider.length - 1) {
     throw new ConfigError(`${label}.provider 必须是 "provider/model" 格式，当前为 "${profile.provider}"`);
   }
-  if (profile.provider.includes("CHANGE-ME")) {
+  if (!opts?.allowPlaceholder && profile.provider.includes("CHANGE-ME")) {
     throw new ConfigError(`${label}.provider 还是示例值，请在终端运行配置向导 laoshi configure，也可以手工填写真实的 provider/model`);
   }
 }
@@ -771,6 +771,15 @@ function validate(config: PipelineConfig): void {
   if (isRecord(config.platform)) {
     for (const [key, value] of Object.entries(config.platform)) {
       if (key !== "adapter" && !isRecord(value)) throw new ConfigError(`platform.${key} 必须是对象：适配器 ${key} 自己的设置`);
+      if (key !== "adapter" && isRecord(value) && "agents" in value) {
+        if (!isRecord(value.agents)) throw new ConfigError(`platform.${key}.agents 必须是对象`);
+        const isActive = key === config.platform.adapter;
+        for (const role of ["builder", "reviewer", "fallback"] as const) {
+          if (value.agents[role] !== undefined && value.agents[role] !== null) {
+            validateProvider(`platform.${key}.agents.${role}`, value.agents[role], { allowPlaceholder: !isActive });
+          }
+        }
+      }
     }
   }
   if (!isRecord(config.platform) || typeof config.platform.adapter !== "string" || !/^[a-z][a-z0-9-]*$/.test(config.platform.adapter)) {
@@ -842,6 +851,28 @@ function stripMachineKeys(
   return raw;
 }
 
+let platformOriginEnvs: Array<{ adapter: string; idEnv: string }> = [];
+
+/** Registers each adapter's chat-origin environment variable so config resolution can switch platforms without importing adapters. */
+export function registerPlatformOriginEnvs(entries: Array<{ adapter: string; idEnv: string }>): void {
+  platformOriginEnvs = [...entries];
+}
+
+/**
+ * Resolves the active adapter id for a raw or loaded config:
+ * LAOSHI_PLATFORM wins, else a chat origin env whose platform section exists, else platform.adapter.
+ */
+export function detectActiveAdapter(config: unknown, env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.LAOSHI_PLATFORM?.trim();
+  if (explicit) return explicit;
+  const platform = isRecord(config) && isRecord(config.platform) ? config.platform : null;
+  const configured = platform && typeof platform.adapter === "string" && platform.adapter ? platform.adapter : DEFAULT_CONFIG.platform.adapter;
+  for (const entry of platformOriginEnvs) {
+    if (env[entry.idEnv] && isRecord(platform?.[entry.adapter])) return entry.adapter;
+  }
+  return configured;
+}
+
 /**
  * Layers, later wins: machine file (~/.req-kit/config.json by default) → team file named by
  * the machine file's teamConfig → the project's own file at the repository root when `repo`
@@ -854,7 +885,23 @@ export function loadConfig(configPath: string, repo?: string): LoadedConfig {
       `找不到配置文件 ${configPath}。请运行 laoshi install --platform <平台>，它会生成这个文件；然后用 laoshi configure 选择两个 agent。`,
     );
   }
-  let config = merge(DEFAULT_CONFIG, resolveNotifiers(readJson(configPath, "配置文件"), configPath));
+  const rawMachine = resolveNotifiers(readJson(configPath, "配置文件"), configPath);
+  let config = merge(DEFAULT_CONFIG, rawMachine);
+  const rawPlatform = rawMachine.platform;
+  const explicitPlatformValid =
+    rawPlatform === undefined ||
+    (isRecord(rawPlatform) && (rawPlatform.adapter === undefined || (typeof rawPlatform.adapter === "string" && rawPlatform.adapter !== "")));
+  if (explicitPlatformValid) {
+    const activeAdapter = detectActiveAdapter(rawMachine);
+    config = { ...config, platform: { ...config.platform, adapter: activeAdapter } };
+    const activeSection = config.platform[activeAdapter];
+    if (isRecord(activeSection) && "agents" in activeSection) {
+      if (!isRecord(activeSection.agents)) {
+        throw new ConfigError(`platform.${activeAdapter}.agents 必须是对象`);
+      }
+      config = { ...config, agents: merge(DEFAULT_CONFIG, { agents: activeSection.agents }).agents };
+    }
+  }
   const sources = [configPath];
   const ignored: string[] = [];
 

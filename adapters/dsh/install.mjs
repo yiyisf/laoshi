@@ -38,6 +38,39 @@ export function skillTargets(args, config, env = process.env) {
   return [{ dir, label: `dsh 的 skill 目录 ${dir}` }];
 }
 
+function runDsh(args, env, dshHome, cli) {
+  const childEnv = { ...env, DSH_HOME: dshHome };
+  if (args["dsh-bin"]) execFileSync(process.execPath, [path.resolve(args["dsh-bin"]), ...cli], { env: childEnv, stdio: "pipe", windowsHide: true });
+  else if (process.platform === "win32") execFileSync(env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", ["dsh", ...cli].join(" ")], { env: childEnv, stdio: "pipe", windowsHide: true });
+  else execFileSync("dsh", cli, { env: childEnv, stdio: "pipe" });
+}
+
+function hasProfileDep(profileDir) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(profileDir, "package.json"), "utf8"));
+    return Boolean(pkg?.dependencies?.["laoshi-dsh-plugin"] || pkg?.devDependencies?.["laoshi-dsh-plugin"]);
+  } catch {
+    return false;
+  }
+}
+
+function pluginMatches(srcDir, dstDir) {
+  try {
+    const srcPkg = JSON.parse(fs.readFileSync(path.join(srcDir, "package.json"), "utf8"));
+    const dstPkg = JSON.parse(fs.readFileSync(path.join(dstDir, "package.json"), "utf8"));
+    if (!srcPkg.version || srcPkg.version !== dstPkg.version) return false;
+    for (const file of ["package.json", "index.js", "client.js"]) {
+      const s = path.join(srcDir, file);
+      if (!fs.existsSync(s)) continue;
+      const d = path.join(dstDir, file);
+      if (!fs.existsSync(d) || !fs.readFileSync(s).equals(fs.readFileSync(d))) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Installs and mounts laoshi's dsh plugin. */
 export function setup({ kit, args, config, env = process.env, dry, report }) {
   const dshHome = dshHomeOf(args, config, env);
@@ -50,18 +83,24 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
   const installed = path.join(profileDir, "node_modules", "laoshi-dsh-plugin");
   let added = false;
   if (!dry) {
+    if (fs.existsSync(installed) || hasProfileDep(profileDir)) {
+      try {
+        runDsh(args, env, dshHome, ["plugin", "--profile", profile, "remove", "laoshi-dsh-plugin"]);
+      } catch {
+        // Previous install may have been copied directly or profile has no pnpm state.
+      }
+      fs.rmSync(installed, { recursive: true, force: true });
+    }
     const cli = ["plugin", "--profile", profile, "add", `file:${slash(plugin)}`];
-    const childEnv = { ...env, DSH_HOME: dshHome };
     try {
-      if (args["dsh-bin"]) execFileSync(process.execPath, [path.resolve(args["dsh-bin"]), ...cli], { env: childEnv, stdio: "pipe", windowsHide: true });
-      else if (process.platform === "win32") execFileSync(env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", ["dsh", ...cli].join(" ")], { env: childEnv, stdio: "pipe", windowsHide: true });
-      else execFileSync("dsh", cli, { env: childEnv, stdio: "pipe" });
+      runDsh(args, env, dshHome, cli);
       added = true;
     } catch (error) {
       const reason = String(error.stderr || error.message || "").trim().split("\n").at(-1) || `退出码 ${error.status ?? "未知"}`;
       report("info", `dsh plugin add 没有成功（${reason}），改为直接复制到 profile`);
     }
-    if (!added) {
+    if (!added || !pluginMatches(plugin, installed)) {
+      if (added) report("info", "dsh plugin add 后的插件文件与当前版本不一致，强制覆盖为最新插件文件");
       fs.rmSync(installed, { recursive: true, force: true });
       fs.mkdirSync(path.dirname(installed), { recursive: true });
       fs.cpSync(plugin, installed, { recursive: true });
@@ -80,7 +119,12 @@ export function setup({ kit, args, config, env = process.env, dry, report }) {
       report("ok", `${patchFile} 中已挂载插件，不改动（审批与看板配置以文件中的为准）`);
     } else {
       if (!dry) fs.writeFileSync(patchFile, upgraded.text);
-      report("ok", `已为 ${patchFile} 中的插件配置补齐 kitRoot${upgraded.addedBoard ? ` 与 board: ${enableBoard}` : ""}（保留原有审批设置）`);
+      report(
+        "ok",
+        upgraded.updatedKitRoot
+          ? `已更新 ${patchFile} 中的插件 kitRoot（保留原有审批与看板配置）`
+          : `已为 ${patchFile} 中的插件配置补齐 kitRoot${upgraded.addedBoard ? ` 与 board: ${enableBoard}` : ""}（保留原有审批设置）`,
+      );
     }
   } else {
     if (!dry) {
@@ -125,7 +169,15 @@ function upgradeCordisPatch(current, { kitRoot, enableBoard, boardPort }) {
   while (itemEnd > nameIdx + 1 && !lines[itemEnd - 1].trim()) itemEnd--;
 
   const block = lines.slice(itemStart, itemEnd);
-  if (block.some((l) => /^\s*kitRoot\s*:/.test(l))) return null;
+  const relKitRoot = block.findIndex((l) => /^\s*kitRoot\s*:/.test(l));
+  if (relKitRoot >= 0) {
+    const kitLine = block[relKitRoot];
+    const indent = kitLine.match(/^\s*/)[0];
+    const currentVal = kitLine.replace(/^\s*kitRoot\s*:\s*/, "").replace(/\s+#.*$/, "").trim().replace(/^['"]|['"]$/g, "");
+    if (currentVal === kitRoot) return null;
+    lines[itemStart + relKitRoot] = `${indent}kitRoot: '${kitRoot}'`;
+    return { text: lines.join(eol), addedBoard: false, updatedKitRoot: true };
+  }
   const hasBoard = block.some((l) => /^\s*board\s*:/.test(l));
   const hasBoardPort = block.some((l) => /^\s*boardPort\s*:/.test(l));
   const relCfg = block.findIndex((l) => /^\s*config\s*:/.test(l));
@@ -165,7 +217,7 @@ function upgradeCordisPatch(current, { kitRoot, enableBoard, boardPort }) {
     lines.splice(itemEnd, 0, ...add);
   }
   const nextText = lines.join(eol);
-  return { text: nextText, addedBoard: !hasBoard };
+  return { text: nextText, addedBoard: !hasBoard, updatedKitRoot: false };
 }
 
 /** Removes laoshi's dsh plugin and its mount. */
@@ -173,7 +225,15 @@ export function uninstall({ args, config, env = process.env, report }) {
   const dshHome = dshHomeOf(args, config, env);
   const profile = args.profile ?? config?.platform?.dsh?.profile ?? "web";
   const profileDir = path.join(dshHome, "profiles", profile);
-  fs.rmSync(path.join(profileDir, "node_modules", "laoshi-dsh-plugin"), { recursive: true, force: true });
+  const installed = path.join(profileDir, "node_modules", "laoshi-dsh-plugin");
+  if (fs.existsSync(installed) || hasProfileDep(profileDir)) {
+    try {
+      runDsh(args, env, dshHome, ["plugin", "--profile", profile, "remove", "laoshi-dsh-plugin"]);
+    } catch {
+      // Ignore when dsh CLI or pnpm state is absent; directory removal below still cleans up.
+    }
+  }
+  fs.rmSync(installed, { recursive: true, force: true });
   const patchFile = path.join(profileDir, "cordis.patch.yml");
   if (fs.existsSync(patchFile)) {
     const text = fs.readFileSync(patchFile, "utf8").replace(/- insert:\n\s+- id: laoshi-dsh\n(?:\s{6,}.*\n?)*/m, "");

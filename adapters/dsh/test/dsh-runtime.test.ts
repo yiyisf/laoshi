@@ -509,6 +509,7 @@ test("dsh client.js 声明 dsh.client，注册左侧菜单与主面板并转发�
   assert.equal(pkg.exports["./client"], "./client.js");
   assert.equal(pkg.dsh?.client?.platform, "web");
   assert.ok(pkg.files?.includes("client.js"));
+  assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-conversation"));
   assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-sidebar"));
   assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-layout"));
   assert.ok(pkg.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-workspace"));
@@ -535,16 +536,40 @@ test("dsh client.js 声明 dsh.client，注册左侧菜单与主面板并转发�
     documentElement: { style: { colorScheme: "dark" }, getAttribute: () => "dark" },
   };
   const effectCleanups: Array<() => void> = [];
+  let stateValue: unknown;
+  let stateInitialized = false;
   const fakeReact = {
     createElement: (type: unknown, props: Record<string, unknown>, ...children: unknown[]) => ({ type, props, children }),
     useRef: (init: unknown) => ({ current: init }),
+    useState: (init: unknown) => {
+      if (!stateInitialized) {
+        stateValue = typeof init === "function" ? (init as () => unknown)() : init;
+        stateInitialized = true;
+      }
+      return [stateValue, (next: unknown) => { stateValue = next; }];
+    },
     useCallback: (fn: unknown) => fn,
     useEffect: (fn: () => void | (() => void)) => {
       const cleanup = fn();
       if (typeof cleanup === "function") effectCleanups.push(cleanup);
     },
   };
-  const vmContext = vm.createContext({ window: fakeWindow, document: fakeDocument, fakeReact });
+  const fetchCalls: string[] = [];
+  const fakeFetch = async (url: string) => {
+    fetchCalls.push(url);
+    return {
+      ok: true,
+      json: async () => ({
+        matched: url.includes("sess-req-1"),
+        key: "/repo::feat-1",
+        repo: "/repo",
+        featureDir: "feat-1",
+        title: "快速跳转测试",
+        stage: "需求分析",
+      }),
+    };
+  };
+  const vmContext = vm.createContext({ window: fakeWindow, document: fakeDocument, fakeReact, fetch: fakeFetch, AbortController });
   const code = fs.readFileSync(path.join(pluginDir, "client.js"), "utf8");
   vm.runInContext(code, vmContext);
   const entry = registered as LoadedClientModule | undefined;
@@ -555,10 +580,11 @@ test("dsh client.js 声明 dsh.client，注册左侧菜单与主面板并转发�
     `(function(reg){ return reg.factory(function(id){ return id === "react" ? fakeReact : {}; }); })`,
     vmContext,
   )(entry) as { inject: string[]; apply: (ctx: any) => void };
-  assert.deepEqual([...exportsObj.inject], ["slots", "uiWorkspace"]);
+  assert.deepEqual([...exportsObj.inject], ["slots", "layout", "uiWorkspace"]);
 
   const slots: Array<{ opts: Record<string, unknown>; component: (p: any) => any }> = [];
   const opened: unknown[] = [];
+  const selectedPanels: unknown[] = [];
   exportsObj.apply({
     slots: {
       inject: (_key: string, cb: () => unknown) => cb(),
@@ -567,22 +593,45 @@ test("dsh client.js 声明 dsh.client，注册左侧菜单与主面板并转发�
         return () => {};
       },
     },
+    layout: {
+      selectPanel: (panelId: unknown) => selectedPanels.push(panelId),
+    },
     uiWorkspace: {
       openSession: (target: unknown) => opened.push(target),
     },
   });
   const nav = slots.find((s) => s.opts.name === "sidebar.panellist");
   const main = slots.find((s) => s.opts.name === "main");
+  const headerSlot = slots.find((s) => s.opts.name === "conversation.session.header.utilities");
   assert.equal(nav?.opts.id, "laoshi");
   assert.equal((nav?.opts.label as () => string)(), "需求看板");
   assert.equal(main?.opts.key, "laoshi");
+  assert.equal(headerSlot?.opts.id, "laoshi-requirement");
+  assert.deepEqual(JSON.parse(JSON.stringify((headerSlot?.opts.inject as (id: string) => unknown)("sess-req-1"))), { sessionId: "sess-req-1" });
+
+  // Render header utility button for a session that owns a requirement and simulate click before main panel mounts.
+  assert.equal(headerSlot!.component({ sessionId: "sess-req-1" }), null);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(fetchCalls[0], "/laoshi/api/session-requirement?sessionId=sess-req-1");
+  const btnEl = headerSlot!.component({ sessionId: "sess-req-1" });
+  assert.equal(btnEl.type, "button");
+  btnEl.props.onClick();
+  assert.deepEqual([...selectedPanels], ["laoshi"]);
 
   const iframeEl = vm.runInContext(
     `(function(comp){ return comp({}); })`,
     vmContext,
   )(main!.component);
   assert.equal(iframeEl.type, "iframe");
-  assert.equal(iframeEl.props.src, "/laoshi/?theme=dark");
+  assert.equal(iframeEl.props.src, "/laoshi/?theme=dark&open=%2Frepo%3A%3Afeat-1&repo=%2Frepo&feature=feat-1");
+
+  // Subsequent mount without a shortcut click renders clean board URL without stale open query.
+  for (const c of effectCleanups.splice(0)) c();
+  const plainIframe = vm.runInContext(
+    `(function(comp){ return comp({}); })`,
+    vmContext,
+  )(main!.component);
+  assert.equal(plainIframe.props.src, "/laoshi/?theme=dark");
 
   for (const fn of listeners.message ?? []) {
     fn({ origin: "http://127.0.0.1:3000", data: { type: "laoshi:open-session", sessionId: "child-1", parentSessionId: "parent-1" } });
