@@ -1,6 +1,6 @@
 {
   "name": "laoshi-paseo-plugin",
-  "version": "0.3.1-beta.2",
+  "version": "0.3.1-dev",
   "private": true,
   "description": "The laoshi plugin for Paseo. Ships inside the laoshi package (adapters/paseo/plugin); installed with laoshi plugin install.",
   "type": "module",
