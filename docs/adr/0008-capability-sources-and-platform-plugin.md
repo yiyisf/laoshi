@@ -1,6 +1,6 @@
 # 0008 能力按来源分层，平台插件作为适配器的一部分
 
-- 状态：提议
+- 状态：已采纳（决定 1–4 与决定 6 已在 M2/0.3.0 落地；决定 5 已同步至 `contracts/agent-runtime.md`，事件流与对话通道独立拆层留作后续按需演进）
 - 日期：2026-10-29
 - 关联：[ADR 0002](0002-two-orchestration-modes.md)、[ADR 0003](0003-generate-once-then-lock.md)、[ADR 0006](0006-deterministic-engine-platform-capabilities.md)、[ADR 0007](0007-one-install-many-repos.md)
 - 详见：[dsh-adapter.md](../design/dsh-adapter.md)、[dsh 摸底报告](../discovery/dsh/report.md)

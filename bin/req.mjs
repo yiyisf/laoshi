@@ -72,13 +72,13 @@ const HELP = `laoshi ${version}（${kitRoot}）
 
 本机维护：
   npx -y [--registry=<npm 源>] @yiyi_zhang/laoshi@latest install --platform <平台>
-                               一步安装：从 npm 装好 laoshi，再完成下面的 laoshi install
+                               一步安装：从 npm 装好 laoshi，并完成配置、skill 与平台插件
   laoshi install --platform <平台> [--home <安装根>] [--target <skill 目录>] [--force]
-                               安装或更新：安装级配置、按平台渲染的 skill、平台需要的插件；平台：paseo、dsh
+                               安装或更新：配置、按平台渲染的 skill、平台插件；省略 --platform 时更新全部已安装平台
   laoshi install --check    只检查会做什么，不改动
   laoshi install --uninstall   移除 laoshi 安装的 skill 和插件（保留安装根）
-  laoshi upgrade [版本] [--registry <npm 源>]
-                               升级到最新版本（或指定版本），并重新运行 laoshi install；回到旧版本：laoshi upgrade <旧版本>
+  laoshi upgrade [版本] [--registry <npm 源>] [--allow-running]
+                               升级到最新版本（或指定版本），升级前检查运行中的流水线，并刷新全部已并存平台；回到旧版本：laoshi upgrade <旧版本>
   laoshi docs [--port <端口>] [--no-open]
                                在本机打开这个版本的文档站点（不需要外网）
   laoshi doctor [--no-project] 体检：安装、配置、平台、当前项目

@@ -35,7 +35,7 @@ const step = (title) => console.log(`\n## ${title}\n`);
 
 /** Bootstrap options; everything else goes to `laoshi install`. */
 export function parseArgs(argv) {
-  const opts = { registry: null, saveRegistry: true, spec: null, help: false, rest: [] };
+  const opts = { registry: null, saveRegistry: true, spec: null, allowRunning: false, help: false, rest: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const value = (name) => {
@@ -47,6 +47,7 @@ export function parseArgs(argv) {
     else if (a === "--spec") opts.spec = value("--spec");
     else if (a.startsWith("--spec=")) opts.spec = a.slice("--spec=".length);
     else if (a === "--no-save-registry") opts.saveRegistry = false;
+    else if (a === "--allow-running") opts.allowRunning = true;
     else if (a === "-h" || a === "--help") opts.help = true;
     else opts.rest.push(a);
   }
@@ -90,11 +91,108 @@ const writable = (dir) => {
   }
 };
 
+const WAITING_LABELS = {
+  waiting_for_approval: "等待确认方案",
+  waiting_for_business: "等待需求方回复",
+  phase_done: "开发阶段已完成，等待测试验证",
+};
+
+function isZombie(pid) {
+  if (process.platform !== "linux") return false;
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z");
+  } catch {
+    return false;
+  }
+}
+
+function isAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+  return !isZombie(pid);
+}
+
+function engineAlive(state) {
+  if (!state || typeof state.pid !== "number") return false;
+  if (state.host && state.host !== os.hostname()) return false;
+  return isAlive(state.pid);
+}
+
+export function resolveHome(restArgs = [], env = process.env, kit = KIT) {
+  for (let i = 0; i < restArgs.length; i++) {
+    const a = restArgs[i];
+    if (a.startsWith("--home=")) {
+      const val = a.slice("--home=".length).trim();
+      if (val) return path.resolve(val);
+    } else if (a === "--home" && i + 1 < restArgs.length && !restArgs[i + 1].startsWith("--")) {
+      return path.resolve(restArgs[i + 1]);
+    }
+  }
+  const laoshiEnv = env.LAOSHI_HOME?.trim();
+  if (laoshiEnv) return path.resolve(laoshiEnv);
+  const legacyEnv = env.REQ_KIT_HOME?.trim();
+  if (legacyEnv) return path.resolve(legacyEnv);
+  const programRoot = /^(.*)[\\/]npm[\\/](?:lib[\\/])?node_modules[\\/]/.exec(kit)?.[1] ?? null;
+  if (programRoot && fs.existsSync(path.join(programRoot, "config.json"))) return programRoot;
+  const userHome = os.homedir();
+  const preferred = path.join(userHome, ".laoshi");
+  const legacy = path.join(userHome, ".req-kit");
+  if (!fs.existsSync(preferred) && fs.existsSync(path.join(legacy, "config.json"))) return legacy;
+  return preferred;
+}
+
+/** Lists active running and waiting requirements recorded under the install root (ADR 0007 decision 7). */
+export function findActiveRequirements(home) {
+  const running = [];
+  const waiting = [];
+  const indexDir = path.join(home, "index");
+  if (!fs.existsSync(indexDir)) return { running, waiting };
+  let files = [];
+  try {
+    files = fs.readdirSync(indexDir).filter((n) => n.endsWith(".json"));
+  } catch {
+    return { running, waiting };
+  }
+  for (const name of files) {
+    let entry;
+    try {
+      entry = JSON.parse(fs.readFileSync(path.join(indexDir, name), "utf8"));
+    } catch {
+      continue;
+    }
+    if (!entry || typeof entry.repo !== "string" || typeof entry.featureDir !== "string") continue;
+    const stateFile = path.join(entry.repo, entry.featureDir, ".pipeline", "state.json");
+    let state;
+    try {
+      state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    } catch {
+      continue;
+    }
+    if (!state || typeof state.status !== "string") continue;
+    const project = entry.project || path.basename(entry.sourceRepo || entry.repo);
+    if (state.status === "running" && engineAlive(state)) {
+      const history = Array.isArray(state.history) ? state.history : [];
+      const activeStep = [...history].reverse().find((h) => h && h.outcome === "running");
+      const step = activeStep?.key || activeStep?.stepId || state.phase || "运行中";
+      running.push({ project, repo: entry.repo, featureDir: entry.featureDir, pid: state.pid, step });
+    } else if (state.status in WAITING_LABELS) {
+      waiting.push({ project, repo: entry.repo, featureDir: entry.featureDir, status: state.status });
+    }
+  }
+  return { running, waiting };
+}
+
 const HELP = `用法：npx -y [--registry=<npm 源>] @yiyi_zhang/laoshi@latest install --platform <平台> [安装选项]
 
   --registry <地址>     这次安装用的 npm 源（公司内网的镜像），默认保存为本机的 npm 源
   --no-save-registry    只这次用，不保存
   --spec <包>           安装哪个版本，默认是正在运行的这个（如 @yiyi_zhang/laoshi@0.1.1）
+  --allow-running       发现有正在运行的流水线时，仍继续原地升级（默认先列出并中止）
 其余选项交给 laoshi install（--platform、--home、--target、--force、平台的选项，见 laoshi install --help）。`;
 
 export async function main(argv) {
@@ -113,6 +211,26 @@ export async function main(argv) {
   const npmVersion = npm(["--version"], { timeout: 60_000 });
   if (npmVersion.status !== 0) die("没有找到 npm（通常随 Node.js 一起安装）");
   ok(`npm ${npmVersion.stdout.trim() || "?"}`);
+
+  const home = resolveHome(opts.rest);
+  const { running, waiting } = findActiveRequirements(home);
+  if (running.length > 0 || waiting.length > 0) {
+    step("进行中的需求");
+    for (const w of waiting) {
+      say(`· ${w.project} / ${w.featureDir}（${WAITING_LABELS[w.status] ?? w.status}，不受升级影响）`);
+    }
+    for (const r of running) {
+      warn(`${r.project} / ${r.featureDir}（步骤：${r.step}，进程 ${r.pid}）`);
+    }
+    if (running.length > 0) {
+      if (!opts.allowRunning) {
+        die(
+          `安装根 ${home} 下有 ${running.length} 个正在运行的流水线，原地升级会替换正在使用的程序文件。请先等待结束或执行 laoshi stop <需求>；确认仍要继续请加 --allow-running`,
+        );
+      }
+      warn("已按 --allow-running 继续原地升级，请关注上述运行中的流水线");
+    }
+  }
 
   step("npm 源");
   // `npx --registry=…` passes it on as npm_config_registry; --registry says it explicitly.
