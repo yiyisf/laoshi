@@ -1,6 +1,6 @@
 # 0006 确定性引擎 + 平台能力层：先手写，后生成
 
-- 状态：提议（项目负责人已同意方向，待摸底实验结果确认）
+- 状态：已采纳（已通过 Paseo、dsh、摸高、cli 四个手写适配器与一致性测试验证落地）
 - 日期：2026-10-25
 - 关联：[ADR 0001](0001-new-repo-core-and-adapters.md)、[ADR 0002](0002-two-orchestration-modes.md)、[ADR 0003](0003-generate-once-then-lock.md)
 

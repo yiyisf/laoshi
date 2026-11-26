@@ -18,12 +18,29 @@ function machine() {
   return { base, home };
 }
 
-function install(home: string, args: string[]) {
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home };
+function install(home: string, args: string[], extraEnv: NodeJS.ProcessEnv = {}) {
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_PASEO_BIN: "", ...extraEnv };
   delete env.LAOSHI_HOME;
+  delete env.REQ_KIT_HOME;
   delete env.DSH_HOME;
   const r = spawnSync(process.execPath, [INSTALL, ...args], { env, encoding: "utf8", timeout: 120_000 });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
+function fakePaseoWrapper(dir: string, stateFile: string, logFile: string) {
+  const fakeScript = path.join(ROOT, "adapters", "paseo", "test", "fake-paseo.mjs");
+  const isWin = process.platform === "win32";
+  const bin = path.join(dir, isWin ? "fake-paseo.cmd" : "fake-paseo");
+  if (isWin) {
+    fs.writeFileSync(bin, `@echo off\r\n"${process.execPath}" "${fakeScript}" %*\r\n`);
+  } else {
+    fs.writeFileSync(bin, `#!/bin/sh\nexec "${process.execPath}" "${fakeScript}" "$@"\n`, { mode: 0o755 });
+  }
+  return {
+    LAOSHI_PASEO_BIN: bin,
+    FAKE_PASEO_CONFIG: stateFile,
+    FAKE_PASEO_LOG: logFile,
+  };
 }
 
 test("安装到 dsh：安装级配置、按 dsh 渲染的 skill、插件和挂载、命令；重复安装不重复挂载；卸载干净", () => {
@@ -270,4 +287,188 @@ test("一步安装（npx -y @yiyi_zhang/laoshi@latest install）：从 npm 装�
   assert.equal(fs.realpathSync(record.root), fs.realpathSync(copy), "安装记录指向 npm 装好的那份，而不是 npx 的临时目录");
   const skill = fs.readFileSync(path.join(dshHome, "skills", "laoshi", "SKILL.md"), "utf8");
   assert.ok(skill.includes(copy.split(path.sep).join("/")), "skill 中的路径指向装好的那份");
+});
+
+test("Paseo 默认一步安装并刷新需求插件，传 --no-plugin 时跳过", () => {
+  const { home: homeSkip } = machine();
+  const skipped = install(homeSkip, ["--platform", "paseo", "--no-plugin"]);
+  assert.equal(skipped.code, 0, skipped.out);
+  assert.match(skipped.out, /已按 --no-plugin 跳过 Paseo 需求插件/);
+  assert.equal(fs.existsSync(path.join(homeSkip, ".laoshi", "paseo-plugin", "paseo-plugin.json")), false);
+
+  const { base, home } = machine();
+  const stateFile = path.join(base, "paseo-state.json");
+  const logFile = path.join(base, "paseo.log");
+  const paseoEnv = fakePaseoWrapper(base, stateFile, logFile);
+
+  const first = install(home, ["--platform", "paseo"], paseoEnv);
+  assert.equal(first.code, 0, first.out);
+  assert.match(first.out, /已安装 Paseo 需求插件/);
+  const staged = path.join(home, ".laoshi", "paseo-plugin");
+  assert.ok(fs.existsSync(path.join(staged, "paseo-plugin.json")));
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  assert.equal(state.pluginsEnabled, true);
+  assert.deepEqual(state.plugins.map((p: { id: string; status: string }) => [p.id, p.status]), [["laoshi", "running"]]);
+
+  const second = install(home, ["--platform", "paseo"], paseoEnv);
+  assert.equal(second.code, 0, second.out);
+  assert.match(second.out, /Paseo 插件已更新到这个版本/);
+  const logs = fs.readFileSync(logFile, "utf8");
+  assert.match(logs, /\["plugin","reload","laoshi"\]/);
+});
+
+test("多平台并存（paseo + dsh）省略 --platform 时一次刷新全部已安装平台的 skill 与插件", () => {
+  const { base, home } = machine();
+  const stateFile = path.join(base, "paseo-state.json");
+  const logFile = path.join(base, "paseo.log");
+  const paseoEnv = fakePaseoWrapper(base, stateFile, logFile);
+
+  const r1 = install(home, ["--platform", "paseo"], paseoEnv);
+  assert.equal(r1.code, 0, r1.out);
+
+  const dshHome = path.join(base, "dsh");
+  const dshProfile = path.join(dshHome, "profiles", "web");
+  fs.mkdirSync(dshProfile, { recursive: true });
+  fs.writeFileSync(path.join(dshProfile, "cordis.patch.yml"), "[]\n");
+  const fakeDsh = path.join(base, "fake-dsh.mjs");
+  fs.writeFileSync(fakeDsh, "process.exit(1);\n");
+
+  const r2 = install(home, ["--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh], paseoEnv);
+  assert.equal(r2.code, 0, r2.out);
+
+  // Simulate stale files from an older release on both platforms, then run install.mjs without --platform.
+  const paseoSkill = path.join(home, ".agents", "skills", "laoshi", "SKILL.md");
+  const dshSkill = path.join(dshHome, "skills", "laoshi", "SKILL.md");
+  const dshClient = path.join(dshProfile, "node_modules", "laoshi-dsh-plugin", "client.js");
+  const paseoStagedClient = path.join(home, ".laoshi", "paseo-plugin", "index.client.tsx");
+  fs.writeFileSync(paseoSkill, "stale paseo skill");
+  fs.writeFileSync(dshSkill, "stale dsh skill");
+  fs.writeFileSync(dshClient, "// stale dsh client");
+  fs.writeFileSync(paseoStagedClient, "// stale paseo client");
+
+  const refresh = install(home, ["--dsh-bin", fakeDsh], paseoEnv);
+  assert.equal(refresh.code, 0, refresh.out);
+  assert.match(fs.readFileSync(paseoSkill, "utf8"), /Paseo 提供的 `PASEO_AGENT_ID`/);
+  assert.match(fs.readFileSync(dshSkill, "utf8"), /dsh 提供的 `DSH_SESSION_ID`/);
+  assert.equal(
+    fs.readFileSync(dshClient, "utf8"),
+    fs.readFileSync(path.join(ROOT, "adapters", "dsh", "plugin", "client.js"), "utf8"),
+  );
+  assert.equal(
+    fs.readFileSync(paseoStagedClient, "utf8"),
+    fs.readFileSync(path.join(ROOT, "adapters", "paseo", "plugin", "index.client.tsx"), "utf8"),
+  );
+  assert.match(fs.readFileSync(logFile, "utf8"), /\["plugin","reload","laoshi"\]/);
+
+  const laoshiHome = path.join(home, ".laoshi");
+  const cfg = JSON.parse(fs.readFileSync(path.join(laoshiHome, "config.json"), "utf8"));
+  assert.equal(cfg.platform.adapter, "paseo");
+  assert.equal(cfg.platform.dsh.agents.builder.provider, "dsh/chat-model");
+  const rec = JSON.parse(fs.readFileSync(path.join(laoshiHome, "install.json"), "utf8"));
+  assert.ok(rec.platforms?.paseo && rec.platforms?.dsh);
+});
+
+test("laoshi upgrade（bootstrap）检查进行中的需求：有运行中流水线时默认列出并中止，--allow-running 放行", () => {
+  const { base, home } = machine();
+  const npmScript = path.join(base, "fake-npm.mjs");
+  fs.writeFileSync(npmScript, FAKE_NPM);
+  const prefix = path.join(base, "npm-global");
+  fs.mkdirSync(prefix);
+  const log = path.join(base, "npm.log");
+  const dshHome = path.join(base, "dsh");
+  fs.mkdirSync(path.join(dshHome, "profiles", "web"), { recursive: true });
+  const fakeDsh = path.join(base, "fake-dsh.mjs");
+  fs.writeFileSync(fakeDsh, "process.exit(1);\n");
+
+  const laoshiHome = path.join(home, ".laoshi");
+  const indexDir = path.join(laoshiHome, "index");
+  fs.mkdirSync(indexDir, { recursive: true });
+
+  const repoA = path.join(base, "repo-a");
+  const featA = "docs/features/20261127-live";
+  fs.mkdirSync(path.join(repoA, featA, ".pipeline"), { recursive: true });
+  fs.writeFileSync(
+    path.join(indexDir, "req-a.json"),
+    JSON.stringify({ schema: 1, key: "req-a", repo: repoA, featureDir: featA, sourceRepo: null, workspaceId: null, project: "demo-a", registeredAt: new Date().toISOString() }),
+  );
+  const statePathA = path.join(repoA, featA, ".pipeline", "state.json");
+  fs.writeFileSync(
+    statePathA,
+    JSON.stringify({
+      status: "running",
+      pid: process.pid,
+      host: os.hostname(),
+      phase: "develop",
+      history: [{ key: "implement", stepId: "implement", outcome: "running" }],
+    }),
+  );
+
+  const repoB = path.join(base, "repo-b");
+  const featB = "docs/features/20261127-wait";
+  fs.mkdirSync(path.join(repoB, featB, ".pipeline"), { recursive: true });
+  fs.writeFileSync(
+    path.join(indexDir, "req-b.json"),
+    JSON.stringify({ schema: 1, key: "req-b", repo: repoB, featureDir: featB, sourceRepo: null, workspaceId: null, project: "demo-b", registeredAt: new Date().toISOString() }),
+  );
+  fs.writeFileSync(
+    path.join(repoB, featB, ".pipeline", "state.json"),
+    JSON.stringify({ status: "waiting_for_approval", pid: 999999999, host: os.hostname(), phase: "develop", history: [] }),
+  );
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    LAOSHI_PASEO_BIN: "",
+    LAOSHI_NPM: npmScript,
+    FAKE_NPM_LOG: log,
+    FAKE_NPM_PREFIX: prefix,
+    FAKE_KIT: ROOT,
+    FAKE_VERSION: VERSION,
+    FAKE_NAME: NAME,
+  };
+  delete env.LAOSHI_HOME;
+  delete env.REQ_KIT_HOME;
+
+  const blocked = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "bin", "bootstrap.mjs"), "--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh],
+    { env, encoding: "utf8", timeout: 300_000 },
+  );
+  const blockedOut = `${blocked.stdout}${blocked.stderr}`;
+  assert.notEqual(blocked.status, 0);
+  assert.match(blockedOut, /demo-b \/ docs\/features\/20261127-wait（等待确认方案，不受升级影响）/);
+  assert.match(blockedOut, /demo-a \/ docs\/features\/20261127-live（步骤：implement，进程/);
+  assert.match(blockedOut, /--allow-running/);
+  const blockedCalls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(blockedCalls.some((c) => c.args[0] === "install"), false, "拦截时不应运行 npm install");
+
+  fs.writeFileSync(log, "");
+  const forced = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "bin", "bootstrap.mjs"), "--allow-running", "--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh],
+    { env, encoding: "utf8", timeout: 300_000 },
+  );
+  const forcedOut = `${forced.stdout}${forced.stderr}`;
+  assert.equal(forced.status, 0, forcedOut);
+  assert.match(forcedOut, /已按 --allow-running 继续原地升级/);
+  const forcedCalls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(forcedCalls.some((c) => c.args[0] === "install"), true);
+
+  // Dead PID or different host should not block normal upgrade.
+  fs.writeFileSync(statePathA, JSON.stringify({ status: "running", pid: 999999999, host: os.hostname(), phase: "develop", history: [] }));
+  const deadPid = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "bin", "bootstrap.mjs"), "--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh],
+    { env, encoding: "utf8", timeout: 300_000 },
+  );
+  assert.equal(deadPid.status, 0, `${deadPid.stdout}${deadPid.stderr}`);
+
+  fs.writeFileSync(statePathA, JSON.stringify({ status: "running", pid: process.pid, host: "other-host.invalid", phase: "develop", history: [] }));
+  const otherHost = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "bin", "bootstrap.mjs"), "--platform", "dsh", "--dsh-home", dshHome, "--dsh-bin", fakeDsh],
+    { env, encoding: "utf8", timeout: 300_000 },
+  );
+  assert.equal(otherHost.status, 0, `${otherHost.stdout}${otherHost.stderr}`);
 });

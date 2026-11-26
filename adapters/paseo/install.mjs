@@ -1,6 +1,7 @@
 // laoshi installer, Paseo part (bin/install.mjs): Paseo's agents read skills from the user-level
-// skills directories, as req-kit installed them. The Paseo plugin (requirement views in Paseo,
-// adapters/paseo/plugin) is installed with `laoshi plugin install` and refreshed here on upgrades.
+// skills directories, as req-kit installed them. By default this also stages and installs the
+// Paseo requirement plugin (adapters/paseo/plugin; pass --no-plugin to skip) and refreshes it on
+// upgrades.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +10,7 @@ import { pathToFileURL } from "node:url";
 export const id = "paseo";
 export const options = {
   "with-plugin": { type: "boolean" },
+  "no-plugin": { type: "boolean" },
 };
 
 export function platformConfig() {
@@ -27,19 +29,32 @@ export function skillTargets() {
 
 export async function setup({ kit, args = {}, dry, report, home }) {
   const { installPlugin, refreshPlugin, stagedDir } = await import(pathToFileURL(path.join(kit, "adapters", "paseo", "plugin-cmd.mjs")).href);
-  const staged = fs.existsSync(path.join(stagedDir(home), "paseo-plugin.json"));
-  if (staged && !dry) {
-    // Installed before: refresh its files from this version and reload it in Paseo.
-    refreshPlugin({ kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home }, log: (m) => report("ok", m) });
-  } else if (!staged && args["with-plugin"]) {
-    if (dry) report("ok", "将安装 Paseo 需求插件（--with-plugin）");
-    else {
+  if (args["no-plugin"]) {
+    report("info", "已按 --no-plugin 跳过 Paseo 需求插件（之后可运行 laoshi plugin install 安装）");
+  } else {
+    const staged = fs.existsSync(path.join(stagedDir(home), "paseo-plugin.json"));
+    if (dry) {
+      if (staged) {
+        report("ok", args.check ? "Paseo 需求插件文件已就绪（升级或重新安装时自动同步刷新）" : "将刷新 Paseo 需求插件文件并重新加载");
+      } else if (args.check) {
+        report("info", "尚未部署 Paseo 需求插件：运行 laoshi install --platform paseo 或 laoshi plugin install");
+      } else {
+        report("ok", "将部署并安装 Paseo 需求插件（跳过可加 --no-plugin）");
+      }
+    } else if (staged) {
+      // Installed before: refresh its files from this version and reload it in Paseo.
+      refreshPlugin({ kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home }, log: (m) => report("ok", m) });
+    } else {
       const code = await installPlugin({ yes: true, kitRoot: kit, env: { ...process.env, LAOSHI_HOME: home } });
       if (code === 0) report("ok", "已安装 Paseo 需求插件");
-      else report("warn", "Paseo 插件文件已就绪，但尚未注册到 Paseo daemon", "启动 Paseo daemon 后再运行 laoshi plugin install");
+      else {
+        report(
+          "warn",
+          "Paseo 插件文件已就绪，但尚未注册到 Paseo daemon",
+          "启动 Paseo daemon 后再运行 laoshi plugin install（桌面版 Paseo 可按上面的路径在 设置 → Plugins 手动添加）",
+        );
+      }
     }
-  } else if (!staged) {
-    report("info", "Paseo 的需求插件（看需求、确认方案、一键试用、验收）：运行 laoshi plugin install（或安装时加 --with-plugin 一步装好）");
   }
   return ["在终端运行 laoshi configure，选择 builder 和 reviewer 用的 agent"];
 }

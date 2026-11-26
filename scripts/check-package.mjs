@@ -42,7 +42,8 @@ const home = path.join(work, "home");
 const prefix = path.join(work, "prefix");
 fs.mkdirSync(home);
 fs.mkdirSync(prefix);
-const env = { ...process.env, HOME: home, USERPROFILE: home };
+// Isolate from any real Paseo daemon running on the developer's machine (same idea as fake-dsh below).
+const env = { ...process.env, HOME: home, USERPROFILE: home, LAOSHI_PASEO_BIN: "" };
 for (const key of ["LAOSHI_HOME", "REQ_KIT_HOME", "DSH_HOME", "LAOSHI_DOCS_DIR", "REQ_KIT_DOCS_DIR"]) delete env[key];
 
 try {

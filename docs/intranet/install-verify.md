@@ -4,7 +4,7 @@
 
 - **适用**：laoshi M2 完成后的版本，即安装包 `laoshi-<版本>-<提交>-win32-x64.zip`（0.1.0 起附在 GitHub Release 上）。
 - **环境约定**：
-  - 内网机器是 Windows，Node.js 22.20；
+  - 内网机器是 Windows，推荐 **Node 24**（同时兼容 `>=22.19`，如 22.20）；
   - **PowerShell 被禁止运行**，本文所有命令都在 **cmd** 中执行（Git Bash 也可以）；
   - 步骤 agent 执行 bash 命令依靠团队的 dsh 专属插件（见摸底报告）。
 - **安全**：口令、令牌只放在本机的环境变量里，不要写进本文提到的任何文件，也不要贴进对话或反馈。
@@ -15,7 +15,7 @@
 
 | 项 | 要求 | 检查方法（cmd） |
 | --- | --- | --- |
-| Node.js | 22.19 或更新（22.20 可以） | `node -v` |
+| Node.js | 推荐 Node 24（最低 22.19） | `node -v` |
 | Git for Windows | 已安装，`git` 在 PATH 中 | `git --version` |
 | dsh | 已安装，能用真实模型对话（经内网网关）；知道自己用的是哪个 profile（下文以 `web` 为例） | 打开 dsh 的网页界面，随便问一句 |
 | bash 插件 | 团队的 dsh 专属 bash 插件已在同一个 profile 中启用，步骤 agent 能执行 bash 命令 | 在 dsh 对话里让它执行 `git --version` |
@@ -67,8 +67,8 @@ node adapters\dsh\intranet\install.mjs --profile web
 脚本会依次完成以下几件事，每一步都会显示 ✓ / ⚠ / ✗：
 
 1. 检查 Node.js、git 和依赖。
-2. 写入安装级配置 `<安装根>\config.json`，平台设为 dsh。已有这个文件时不改动；如果文件里的平台不是 dsh，脚本会停下。
-3. 安装 laoshi 的 dsh 插件：先用 `dsh plugin add`；不成功时（比如内网连不到 npm 源），改为直接复制到 profile 的 `node_modules`。然后在 `cordis.patch.yml` 末尾挂载插件。
+2. 写入安装级配置 `<安装根>\config.json`，平台设为 dsh。已有这个文件时：默认平台是 dsh 则不改动，若已有其他平台（如 `paseo`）则保留原有默认平台并在 `platform.dsh` 中以并存方式加入。
+3. 安装或覆盖更新 laoshi 的 dsh 插件：先移除旧版再尝试 `dsh plugin add`（不成功时直接复制，并校验文件与当前版本一致），最后更新 `cordis.patch.yml` 挂载插件与 `kitRoot`/`board` 配置（保留已有 `approvals` 等设置）。
 4. 把 skill 渲染成 dsh 的说法，写到 `<dsh 目录>\skills`。写入后有 `/laoshi`、`/laoshi-setup`、`/laoshi-doctor`、`/laoshi-retro`，以及方法类 skill 和原则 skill。
 
 脚本只启动 `node` 自己；调用 `dsh` 命令时经过 `cmd.exe`。整个过程**不会启动 PowerShell**。

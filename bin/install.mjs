@@ -44,14 +44,15 @@ const { values: args } = parseArgs({
 if (args.help) {
   console.log(`用法：laoshi install --platform <${platforms.join("|")}> [选项]
 
-  --platform <平台>     装到哪个 agent 平台（第一次安装时要写；之后沿用安装记录）
+  --platform <平台>     装到哪个 agent 平台（第一次安装时要写；之后沿用安装记录，省略时会更新全部已安装平台）
   --home <目录>         安装根，默认 LAOSHI_HOME 或 ~/.laoshi
   --target <目录>       另外把 skill 装到这个目录（可以写多次）
   --force               覆盖同名的、不是 laoshi 装的 skill
   --check               只检查安装，不改动
   --dry-run             演练：显示要做的事，不写文件
   --uninstall           卸载 skill 和平台的设置（安装根保留）
-dsh 的选项：--dsh-home <DSH_HOME> --profile <名称> --dsh-bin <dsh 的 bin.js> --approvals ask|allow`);
+Paseo 的选项：--no-plugin（跳过自动安装/刷新 Paseo 需求插件）
+dsh 的选项：--dsh-home <DSH_HOME> --profile <名称> --dsh-bin <dsh 的 bin.js> --approvals ask|allow --no-board --board-port <端口>`);
   process.exit(0);
 }
 const dry = args["dry-run"] || args.check;
@@ -127,17 +128,6 @@ if (problems > 0) process.exit(1);
 
 const existing = readJson(configPath);
 const record = readJson(recordPath);
-const platform = args.platform ?? existing?.platform?.adapter ?? record?.platform ?? null;
-if (!platform) {
-  report("fail", "没有指定平台", `加上 --platform ${platforms.join(" 或 --platform ")}`);
-  process.exit(1);
-}
-const mod = modules[platform];
-if (!mod) {
-  report("fail", `没有平台「${platform}」`, `可选：${platforms.join("、")}`);
-  process.exit(1);
-}
-
 const isObj = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 function normalizedRecordPlatforms(rec) {
   if (isObj(rec?.platforms)) {
@@ -153,19 +143,28 @@ function normalizedRecordPlatforms(rec) {
   }
   return {};
 }
+const recordedPlatforms = normalizedRecordPlatforms(record);
+const configuredPlatforms = isObj(existing?.platform)
+  ? [
+      ...(typeof existing.platform.adapter === "string" && existing.platform.adapter ? [existing.platform.adapter] : []),
+      ...Object.entries(existing.platform)
+        .filter(([k, v]) => k !== "adapter" && isObj(v))
+        .map(([k]) => k),
+    ]
+  : [];
 
-// ---------------------------------------------------------------------------------------------
 if (args.uninstall) {
+  const platform = args.platform ?? existing?.platform?.adapter ?? record?.platform ?? null;
+  if (!platform) {
+    report("fail", "没有指定平台", `加上 --platform ${platforms.join(" 或 --platform ")}`);
+    process.exit(1);
+  }
+  const mod = modules[platform];
+  if (!mod) {
+    report("fail", `没有平台「${platform}」`, `可选：${platforms.join("、")}`);
+    process.exit(1);
+  }
   section("卸载");
-  const recordedPlatforms = normalizedRecordPlatforms(record);
-  const configuredPlatforms = isObj(existing?.platform)
-    ? [
-        ...(typeof existing.platform.adapter === "string" && existing.platform.adapter ? [existing.platform.adapter] : []),
-        ...Object.entries(existing.platform)
-          .filter(([k, v]) => k !== "adapter" && isObj(v))
-          .map(([k]) => k),
-      ]
-    : [];
   const knownPlatforms = [...new Set([...Object.keys(recordedPlatforms), ...configuredPlatforms])];
   const remainingIds = knownPlatforms.filter((id) => id !== platform);
   const sharedTargets = new Set(remainingIds.flatMap((id) => recordedPlatforms[id]?.targets ?? []).map((d) => path.resolve(d)));
@@ -214,99 +213,133 @@ if (args.uninstall) {
   process.exit(problems > 0 ? 1 : 0);
 }
 
+let targetPlatforms;
+if (args.platform) {
+  if (!modules[args.platform]) {
+    report("fail", `没有平台「${args.platform}」`, `可选：${platforms.join("、")}`);
+    process.exit(1);
+  }
+  targetPlatforms = [args.platform];
+} else {
+  const primary = existing?.platform?.adapter ?? record?.platform ?? null;
+  targetPlatforms = [...new Set([primary, ...Object.keys(recordedPlatforms), ...configuredPlatforms].filter((id) => typeof id === "string" && id && modules[id]))];
+  if (targetPlatforms.length === 0) {
+    report("fail", "没有指定平台", `加上 --platform ${platforms.join(" 或 --platform ")}`);
+    process.exit(1);
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 section("安装级配置");
 let config = existing;
-if (existing) {
-  const current = existing.platform?.adapter ?? "paseo";
-  if (current === platform) {
-    report("ok", `已有 ${configPath}（平台 ${platform}），不改动`);
-  } else {
-    const platformCfg = mod.platformConfig(args);
-    const platformSection = isObj(platformCfg?.[platform]) ? platformCfg[platform] : {};
-    const existingPlatform = isObj(existing.platform) ? existing.platform : { adapter: current };
-    const prevSection = isObj(existingPlatform[platform]) ? existingPlatform[platform] : null;
-    if (prevSection && isObj(prevSection.agents)) {
-      report("ok", `已有 ${configPath}（默认 ${current}，并存平台 ${platform}），不改动`);
+for (const platform of targetPlatforms) {
+  const mod = modules[platform];
+  if (config) {
+    const current = config.platform?.adapter ?? "paseo";
+    if (current === platform) {
+      report("ok", `已有 ${configPath}（平台 ${platform}），不改动`);
     } else {
-      const nextSection = prevSection
-        ? { ...platformSection, ...prevSection, agents: mod.defaultAgents }
-        : { ...platformSection, agents: mod.defaultAgents };
-      config = { ...existing, platform: { ...existingPlatform, adapter: current, [platform]: nextSection } };
-      if (!dry) {
-        fs.mkdirSync(home, { recursive: true });
-        fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+      const platformCfg = mod.platformConfig(args);
+      const platformSection = isObj(platformCfg?.[platform]) ? platformCfg[platform] : {};
+      const existingPlatform = isObj(config.platform) ? config.platform : { adapter: current };
+      const prevSection = isObj(existingPlatform[platform]) ? existingPlatform[platform] : null;
+      if (prevSection && isObj(prevSection.agents)) {
+        report("ok", `已有 ${configPath}（默认 ${current}，并存平台 ${platform}），不改动`);
+      } else {
+        const nextSection = prevSection
+          ? { ...platformSection, ...prevSection, agents: mod.defaultAgents }
+          : { ...platformSection, agents: mod.defaultAgents };
+        config = { ...config, platform: { ...existingPlatform, adapter: current, [platform]: nextSection } };
+        if (!dry) {
+          fs.mkdirSync(home, { recursive: true });
+          fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+        }
+        report(
+          "ok",
+          prevSection
+            ? `${dry ? "将" : "已"}在 ${configPath} 中为并存平台 ${platform} 补齐默认 agents（默认仍为 ${current}）`
+            : `${dry ? "将" : "已"}在 ${configPath} 中保留默认平台 ${current}，并添加并存平台 ${platform}`,
+        );
       }
-      report(
-        "ok",
-        prevSection
-          ? `${dry ? "将" : "已"}在 ${configPath} 中为并存平台 ${platform} 补齐默认 agents（默认仍为 ${current}）`
-          : `${dry ? "将" : "已"}在 ${configPath} 中保留默认平台 ${current}，并添加并存平台 ${platform}`,
-      );
     }
+  } else {
+    config = { platform: mod.platformConfig(args), agents: mod.defaultAgents };
+    if (!dry) {
+      fs.mkdirSync(home, { recursive: true });
+      fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    }
+    report("ok", `${dry ? "将写入" : "写入"} ${configPath}（平台 ${platform}）`);
   }
-} else {
-  config = { platform: mod.platformConfig(args), agents: mod.defaultAgents };
-  if (!dry) {
-    fs.mkdirSync(home, { recursive: true });
-    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-  }
-  report("ok", `${dry ? "将写入" : "写入"} ${configPath}（平台 ${platform}）`);
 }
 
 // ---------------------------------------------------------------------------------------------
-section("skill");
-const targets = [...mod.skillTargets(args, config, process.env, home), ...args.target.map((t) => ({ dir: path.resolve(t), label: `自定义目录 ${path.resolve(t)}` }))];
-const rendered = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-skills-"));
-const renderConfig = path.join(rendered, "config.json");
-const renderCfg = { ...config, platform: { ...(isObj(config.platform) ? config.platform : {}), adapter: platform } };
-fs.writeFileSync(renderConfig, JSON.stringify(renderCfg));
-const out = path.join(rendered, "skills");
-const r = spawnSync(process.execPath, [tsxCli, path.join(kit, "engine", "src", "skills-render.ts"), "--out", out, "--config", renderConfig], {
-  encoding: "utf8",
-  windowsHide: true,
-  env: { ...process.env, LAOSHI_HOME: home, LAOSHI_PLATFORM: platform },
-});
-if (r.status !== 0) {
-  report("fail", `为 ${platform} 渲染 skill 失败：${(r.stderr || r.stdout).trim()}`);
-  process.exit(1);
-}
-const skills = fs.readdirSync(out).filter((n) => fs.existsSync(path.join(out, n, "SKILL.md")));
-for (const target of targets) {
-  const blocked = [];
-  let changed = 0;
-  for (const name of skills) {
-    const dir = path.join(target.dir, name);
-    const owner = ownership(dir);
-    if (owner === "symlink" || ((owner === "foreign" || owner === "req-kit") && !args.force)) {
-      blocked.push(`${name}（${owner === "req-kit" ? "req-kit 安装的" : owner === "symlink" ? "符号链接" : "不是 laoshi 安装的"}）`);
-      continue;
-    }
-    if (dry) {
-      if (!sameFiles(path.join(out, name), dir)) changed += 1;
-      continue;
-    }
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.cpSync(path.join(out, name), dir, { recursive: true });
-    const files = Object.fromEntries(listFiles(dir).map((f) => [f.split(path.sep).join("/"), crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, f))).digest("hex")]));
-    fs.writeFileSync(path.join(dir, MARKER), `${JSON.stringify({ name: "laoshi", skill: name, version, root: kit, platform, installedAt: new Date().toISOString(), files }, null, 2)}\n`);
-    changed += 1;
+const writtenSkillDirs = new Map();
+const nextPlatforms = { ...recordedPlatforms };
+const allNext = [];
+for (const platform of targetPlatforms) {
+  const mod = modules[platform];
+  section(targetPlatforms.length > 1 ? `skill（${platform}）` : "skill");
+  const targets = [...mod.skillTargets(args, config, process.env, home), ...args.target.map((t) => ({ dir: path.resolve(t), label: `自定义目录 ${path.resolve(t)}` }))];
+  const rendered = fs.mkdtempSync(path.join(os.tmpdir(), "laoshi-skills-"));
+  const renderConfig = path.join(rendered, "config.json");
+  const renderCfg = { ...config, platform: { ...(isObj(config.platform) ? config.platform : {}), adapter: platform } };
+  fs.writeFileSync(renderConfig, JSON.stringify(renderCfg));
+  const out = path.join(rendered, "skills");
+  const r = spawnSync(process.execPath, [tsxCli, path.join(kit, "engine", "src", "skills-render.ts"), "--out", out, "--config", renderConfig], {
+    encoding: "utf8",
+    windowsHide: true,
+    env: { ...process.env, LAOSHI_HOME: home, LAOSHI_PLATFORM: platform },
+  });
+  if (r.status !== 0) {
+    report("fail", `为 ${platform} 渲染 skill 失败：${(r.stderr || r.stdout).trim()}`);
+    process.exit(1);
   }
-  // Skills an earlier laoshi installed that this one no longer has.
-  const stale = fs.existsSync(target.dir) ? fs.readdirSync(target.dir).filter((n) => !skills.includes(n) && ownership(path.join(target.dir, n)) === "ours") : [];
-  if (!dry) for (const n of stale) fs.rmSync(path.join(target.dir, n), { recursive: true, force: true });
-  const done = dry ? (changed ? `将安装或更新 ${changed} 个 skill` : `${skills.length - blocked.length} 个 skill 已是这个版本的`) : `已安装 ${changed} 个 skill`;
-  report(blocked.length || (args.check && changed) ? "warn" : "ok", `${target.label}：${done}${stale.length ? `，删除旧版本留下的 ${stale.join("、")}` : ""}${blocked.length ? `；没有覆盖 ${blocked.join("、")}` : ""}`, blocked.length ? "确认可以覆盖时加 --force" : undefined);
-}
-fs.rmSync(rendered, { recursive: true, force: true });
+  const skills = fs.readdirSync(out).filter((n) => fs.existsSync(path.join(out, n, "SKILL.md")));
+  for (const target of targets) {
+    const resolvedDir = path.resolve(target.dir);
+    if (writtenSkillDirs.has(resolvedDir)) {
+      report("info", `${target.label}：已由平台 ${writtenSkillDirs.get(resolvedDir)} 更新，跳过重复写入`);
+      continue;
+    }
+    writtenSkillDirs.set(resolvedDir, platform);
+    const blocked = [];
+    let changed = 0;
+    for (const name of skills) {
+      const dir = path.join(target.dir, name);
+      const owner = ownership(dir);
+      if (owner === "symlink" || ((owner === "foreign" || owner === "req-kit") && !args.force)) {
+        blocked.push(`${name}（${owner === "req-kit" ? "req-kit 安装的" : owner === "symlink" ? "符号链接" : "不是 laoshi 安装的"}）`);
+        continue;
+      }
+      if (dry) {
+        if (!sameFiles(path.join(out, name), dir)) changed += 1;
+        continue;
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.cpSync(path.join(out, name), dir, { recursive: true });
+      const files = Object.fromEntries(listFiles(dir).map((f) => [f.split(path.sep).join("/"), crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, f))).digest("hex")]));
+      fs.writeFileSync(path.join(dir, MARKER), `${JSON.stringify({ name: "laoshi", skill: name, version, root: kit, platform, installedAt: new Date().toISOString(), files }, null, 2)}\n`);
+      changed += 1;
+    }
+    // Skills an earlier laoshi installed that this one no longer has.
+    const stale = fs.existsSync(target.dir) ? fs.readdirSync(target.dir).filter((n) => !skills.includes(n) && ownership(path.join(target.dir, n)) === "ours") : [];
+    if (!dry) for (const n of stale) fs.rmSync(path.join(target.dir, n), { recursive: true, force: true });
+    const done = dry ? (changed ? `将安装或更新 ${changed} 个 skill` : `${skills.length - blocked.length} 个 skill 已是这个版本的`) : `已安装 ${changed} 个 skill`;
+    report(blocked.length || (args.check && changed) ? "warn" : "ok", `${target.label}：${done}${stale.length ? `，删除旧版本留下的 ${stale.join("、")}` : ""}${blocked.length ? `；没有覆盖 ${blocked.join("、")}` : ""}`, blocked.length ? "确认可以覆盖时加 --force" : undefined);
+  }
+  fs.rmSync(rendered, { recursive: true, force: true });
+  nextPlatforms[platform] = { targets: targets.map((t) => t.dir), installedAt: new Date().toISOString() };
 
-// ---------------------------------------------------------------------------------------------
-section(`平台：${platform}`);
-let next = [];
-try {
-  next = (await mod.setup({ kit, args, config, dry, report, home })) ?? [];
-} catch (error) {
-  report("fail", error.message);
+  section(`平台：${platform}`);
+  let next = [];
+  try {
+    next = (await mod.setup({ kit, args, config, dry, report, home })) ?? [];
+  } catch (error) {
+    report("fail", error.message);
+  }
+  for (const line of next) {
+    if (!allNext.includes(line)) allNext.push(line);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -330,13 +363,8 @@ if (path.resolve(foundAt) !== home) {
 }
 
 if (!dry) {
-  const prevPlatforms = normalizedRecordPlatforms(record);
-  const nextPlatforms = {
-    ...prevPlatforms,
-    [platform]: { targets: targets.map((t) => t.dir), installedAt: new Date().toISOString() },
-  };
   const allTargets = [...new Set(Object.values(nextPlatforms).flatMap((p) => p.targets))];
-  const primaryPlatform = existing?.platform?.adapter ?? platform;
+  const primaryPlatform = config?.platform?.adapter ?? targetPlatforms[0];
   fs.writeFileSync(
     recordPath,
     `${JSON.stringify({ version, root: kit, platform: primaryPlatform, targets: allTargets, platforms: nextPlatforms, installedAt: new Date().toISOString() }, null, 2)}\n`,
@@ -344,5 +372,5 @@ if (!dry) {
 }
 
 section("接下来");
-for (const [i, line] of [...next, `体检：laoshi doctor --no-project`].entries()) console.log(`${i + 1}. ${line}`);
+for (const [i, line] of [...allNext, `体检：laoshi doctor --no-project`].entries()) console.log(`${i + 1}. ${line}`);
 process.exit(problems > 0 ? 1 : 0);

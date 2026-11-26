@@ -1,6 +1,6 @@
 # 0004 对外契约在迁移中保持稳定
 
-- 状态：提议
+- 状态：已采纳（已在 M2d/0.1.0 实现，对外契约保持 `schema: 1` 并由输出层做字段映射）
 - 详见：[state-v2.md §3](../design/state-v2.md)、[compat-migration.md](../design/compat-migration.md)
 
 ## 背景

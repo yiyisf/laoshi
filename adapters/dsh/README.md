@@ -6,7 +6,7 @@
 
 | 部分 | 位置 | 做什么 |
 | --- | --- | --- |
-| 插件（服务端 + 前端面板） | `plugin/`（npm 包 `laoshi-dsh-plugin`，含 `index.mjs` 与 `client.js`） | 运行在 dsh host 与 Web 界面中：在对话下创建步骤 agent、向对话发定时消息、按策略回答步骤的审批请求，把会话的创建、发送消息、取消、状态、历史转给 dsh 的会话控制器；同时在 dsh 左侧导航栏挂载 **「需求看板」** 入口并在 `/laoshi/` 代理托管 Web 看板（复用 dsh 登录校验，支持从看板抽屉直接跳转回对应阶段执行记录和原需求对话）。不含流程逻辑 |
+| 插件（服务端 + 前端面板） | `plugin/`（npm 包 `laoshi-dsh-plugin`，含 `index.mjs` 与 `client.js`） | 运行在 dsh host 与 Web 界面中：在对话下创建步骤 agent、向对话发定时消息、按策略回答步骤的审批请求，把会话的创建、发送消息、取消、状态、历史转给 dsh 的会话控制器；在 dsh 左侧导航栏挂载 **「需求看板」** 入口（`/laoshi/`）及会话顶部栏 **「需求：<标题>」** 快捷入口，代理托管全宽 Web 看板（复用 dsh 登录校验，支持从全宽详情页直接跳回各阶段执行记录和原需求对话）。不含流程逻辑 |
 | 运行时 | `dsh-runtime.ts` | 引擎一侧的 `AgentRuntime` 实现，只通过插件做事，不调用 dsh 的 `/api` |
 | 本地通道 | `plugin/channel.mjs` | 两边共用的约定：插件在 `$DSH_HOME/laoshi/` 下监听本地 socket（Windows 上是命名管道），并写一个随机令牌，只有同一用户能读到，调用时必须带上 |
 | 测试 | `test/` | 插件配上模拟的 dsh 服务，运行时通过真实的 socket 调用插件；属于 `npm test` |
@@ -34,9 +34,9 @@
            board: true      # 默认随 dsh 启动托管 Web 需求看板，并在 dsh 左侧导航栏「需求看板」（/laoshi/）内嵌打开；传 --no-board 时关闭
    ```
 
-   重启 `dsh` 后，直接在 dsh Web 界面左侧导航栏点击 **「需求看板」** 即可使用（无需再单独开浏览器标签页）；详情抽屉「执行记录」支持一键跳回各阶段子 agent 执行对话及原需求对话。从旧版 `cordis.patch.yml`（缺少 `kitRoot` / `board`）升级时，重新运行 `laoshi install --platform dsh` 或 `laoshi upgrade` 会自动补齐并保留原有 `approvals` 设置。
+   重启 `dsh` 后，直接在 dsh Web 界面左侧导航栏点击 **「需求看板」** 即可使用（无需再单独开浏览器标签页）：顶部支持 **需求 / 使用统计 / 配置** 切换，全宽需求详情页中的 **「执行记录」** 支持一键跳回各阶段子 agent 执行对话及原需求对话；在需求对话或步骤子对话顶部栏还会出现 **「需求：<标题>」** 快捷按钮直达详情。推荐使用 `npx -y @yiyi_zhang/laoshi@latest install --platform dsh` 或 `laoshi upgrade` 一步完成安装与升级，安装器会直接覆盖更新插件文件并自动更新 `cordis.patch.yml` 中的 `kitRoot` / 补齐 `board`（同时保留 `approvals` 与同机并存的其他平台配置），无需先手工卸载旧版。
 
-2. laoshi 的配置里选择 dsh 适配器：
+2. laoshi 的配置里选择 dsh 适配器（如已安装 Paseo 等平台，则保留原默认平台并在 `platform.dsh` 中以并存形式写入；运行时根据 `DSH_SESSION_ID` / `LAOSHI_PLATFORM` 自动切换）：
 
    ```json
    { "platform": { "adapter": "dsh" } }
@@ -79,3 +79,5 @@ LAOSHI_E2E_DSH=<装有 @deepseek-ai/dsh 的目录> node adapters/dsh/e2e/run-e2e
 最近一次结果（2026-11-01，Linux，dsh 0.2.2-alpha.2）：不加参数时 8 项检查全部通过（M4b 时 Node 24.22 和 22.20 各跑一次，M2b 时 Node 24.22）；加 `--worktree` 时 14 项全部通过（M2b，Node 24.22）。7 个步骤（方案设计 → 方案审核 → 代码实现 → 代码评审 → 提测说明 → 功能验证 → 完成报告）都以带标签的子 agent 挂在对话下，流水线状态为 `completed`，进展和结束通知都发回了对话。
 
 实机适配补充（2026-11-24，macOS，Node 24.10.0，`@deepseek-ai/dsh@0.2.2-rc.5`）：插件已针对 `0.2.2-rc.5` 调整的 `subagents.startActivation`（扁平顶层参数）、`subagents.interrupt`、`schedule.create`/`edit`（含 `cron.time_zone`）与 `sessions.events` 做了双版本兼容；重跑 `run-e2e.mjs --worktree` 跑通 16/17 项核心链路（全部 7 个步骤、worktree、`setup`、内置服务启动/健康检查/停服务、按角色选用 `e2e/step-1` 与对话结束通知；仅环境日志检查因测试机 `~/.agents/skills/` 中遗留旧版 `req-setup` 描述含 Paseo 字样而提示），另在隔离宿主实机验证了 `board: true` 托管看板网页渲染、主题交互、`schedule`（含 `expiresAt`）、`scheduleAgent`、`cancelSchedule` 与 `laoshi doctor` 全部正常。
+
+内网实机验证（2026-11-25，Windows，`@deepseek-ai/dsh@0.2.2-rc.5`，laoshi `0.3.1-beta.2`）：内嵌「需求看板」面板、会话顶部栏 **「需求：<标题>」** 快捷跳转、全宽需求详情与 Paseo 一致化视图、各阶段执行记录与原对话跳回，以及真实模型完成全流程需求均实机验证通过。
