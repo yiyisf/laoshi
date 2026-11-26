@@ -2,6 +2,26 @@
 
 laoshi 的版本号遵循语义化版本，从 0.1.0 开始；每一版的标题写成 `## <版本> - <日期>`。每一版先写使用者会看到的变化，再写升级须知。laoshi 之前的历史见 paseo-req-kit 的更新记录（laoshi 从它的 1.15.0 抽出）。
 
+## 0.3.1 - 2026-11-27
+
+正式版（npm `latest` 标签）：把共享 Web 需求看板直接内嵌到 DeepSeek Harness（`dsh`）左侧导航栏并支持全宽详情与 Paseo 一致化体验，增加会话顶部栏直达需求详情快捷入口与阶段执行记录跳回，修复 `dsh` 插件覆盖升级不生效，支持 Paseo 与 `dsh` 同机多平台并存，并完善一步安装与多平台自动升级体验。安装：`npx -y @yiyi_zhang/laoshi@latest install --platform <dsh|paseo>`。
+
+### 使用者会看到的变化
+
+- **dsh 内嵌左侧栏「需求看板」与对话快捷直达**：`laoshi-dsh-plugin` 在 `dsh` 左侧导航栏挂载 **「需求看板」**（`/laoshi/` 代理，自动随 `dsh` 切换深浅主题并复用登录校验）；在需求主对话或步骤子对话顶部工具栏展示 **「需求：<标题>」** 快捷按钮一键直达详情；详情中可从 **「执行记录」**（`查看执行记录 ↗`）或 **「打开需求对话 ↗」** 直接跳回对应子 agent 或原需求对话。
+- **Web 需求看板全宽详情与 Paseo 体验对齐**：顶部新增 **需求 / 使用统计 / 配置** 导航切换；需求详情由 460px 右侧抽屉改为全宽页面（带 `← 返回需求列表`、关键决策高亮按钮、代码审查 / 审查原型外链、2 列元数据卡片、Markdown 渲染与 TSV 表格文档弹窗、完整执行记录与全宽验收/变更子页）。
+- **dsh 插件直接覆盖升级生效**：再次运行 `laoshi install --platform dsh` 或 `laoshi upgrade` 时先移除并清理旧版 `laoshi-dsh-plugin`、校验并覆写最新文件，同时保留 `cordis.patch.yml` 中的 `approvals`、`board`、`boardPort` 并自动刷新 `kitRoot` 路径，无需手工先卸载旧插件。
+- **Paseo 与 dsh 同机多平台并存**：同一台机器可先后安装多个平台，共用 `~/.laoshi/config.json` 与 `install.json`；运行时按 `LAOSHI_PLATFORM` 或对话环境变量（`DSH_SESSION_ID`、`PASEO_AGENT_ID`）自动切换适配器与平台级 `agents`；`laoshi doctor` 与 `laoshi install --platform <id> --uninstall` 支持分平台检查与单独卸载。
+- **真正的一步安装与多平台同步升级**：`laoshi install --platform paseo` 现默认一并部署并加载 Paseo 需求插件（可用 `--no-plugin` 跳过，`--with-plugin` 兼容保留）；`laoshi upgrade` 或不带 `--platform` 执行 `laoshi install` 时会自动同步刷新所有已安装并存平台的 skill 与插件。
+- **升级前运行中需求检查（ADR 0007）**：`laoshi upgrade` 在原地替换程序文件前自动扫描安装根索引下各代码库，列出等待中与运行中的流水线，存在本机运行中流水线时默认中止提醒（确认仍要继续可加 `--allow-running`）。
+- **契约、ADR 与文档同步**：按 ADR 0008 修订 `contracts/agent-runtime.md`，将 ADR 0004/0006/0007/0008 定状态为 `已采纳`，并同步更新 Roadmap 与安装/升级/走查文档。
+
+### 升级须知
+
+- **一步升级全部平台**：在任意已安装机器运行 `laoshi upgrade`（公司内网镜像加 `--registry <地址>`），会自动升级到 `0.3.1` 并同步刷新本机所有已并存平台（Paseo / dsh）的 skill 与插件。
+- **内网离线包（Windows / dsh）**：下载本版本 Release 附带的 `laoshi-0.3.1-<commit>-win32-x64.zip`，解压后直接覆盖运行 `node adapters\dsh\intranet\install.mjs --profile web`，完成后重启 `dsh --profile web`。
+- **摸高**：替换为本版本 Release 附带的 `laoshi-expert-0.3.1.zip`（或运行 `node adapters/mogao/make-expert.mjs` 重新生成）。
+
 ## 0.3.1-beta.2 - 2026-11-25
 
 测试版（npm `beta` 标签，GitHub Pre-release）：修复 `dsh` 插件覆盖升级不生效、支持 `paseo` 与 `dsh` 同机多平台并存、在 `dsh` 会话顶部栏增加直达需求详情的快捷入口，并将 Web 看板升级为全宽详情与 Paseo 一致化视图。安装：`npx -y @yiyi_zhang/laoshi@beta install --platform dsh`。
